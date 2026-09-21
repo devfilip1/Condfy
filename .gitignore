@@ -41,3 +41,12 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Spec Kit e ferramentas de IA (controle interno, fora do repositorio)
+.specify/
+specs/
+.claude/
+api/.claude/
+api/.agents/
+api/.windsurf/
+api/skills-lock.json

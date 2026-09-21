@@ -1,6 +1,6 @@
 import React from "react";
 
-import MenuButton from "../../components/MenuButton";
+import MenuButton from "@/shared/components/MenuButton";
 
 export default function TabsLayout() {
   return (

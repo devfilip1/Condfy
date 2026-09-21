@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
 export default function Banner() {
   return (
     <Image
-      source={require("../assets/images/condominio-brisas.jpg")}
+      source={require("../../../assets/images/condominio-brisas.jpg")}
       style={styles.image}
     />
   );

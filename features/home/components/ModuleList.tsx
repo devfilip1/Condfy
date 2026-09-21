@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import modules, { Module } from "../data/Modules";
+import modules, { Module } from "@/features/home/data/modules";
 
 export const styles = StyleSheet.create({
   overContainer: {
