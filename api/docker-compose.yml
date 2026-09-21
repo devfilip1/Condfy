@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: condfy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: condfy
+      POSTGRES_PASSWORD: condfy
+      POSTGRES_DB: condfy
+    ports:
+      - "5432:5432"
+    volumes:
+      - condfy-pgdata:/var/lib/postgresql/data
+
+volumes:
+  condfy-pgdata:
