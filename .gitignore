@@ -1,52 +1,26 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# dependências
 node_modules/
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
+# variáveis de ambiente
+.env
+.env*.local
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
+# logs e caches
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
 *.tsbuildinfo
 
-app-example
-
-# generated native folders
-/ios
-/android
+# sistema operacional
+.DS_Store
+Thumbs.db
 
 # Spec Kit e ferramentas de IA (controle interno, fora do repositorio)
 .specify/
 specs/
 .claude/
-api/.claude/
-api/.agents/
-api/.windsurf/
-api/skills-lock.json
+server/.claude/
+server/.agents/
+server/.windsurf/
+server/.expo/
+server/skills-lock.json
