@@ -86,3 +86,49 @@ export function validarNovoVisitante(entrada: NovoVisitante): ErrosFormulario {
 export function entradaEhValida(erros: ErrosFormulario): boolean {
   return Object.keys(erros).length === 0;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Type guards: narrowing do JSON que chega da API (Constituição, Princípio IV). */
+/* -------------------------------------------------------------------------- */
+
+function ehObjeto(valor: unknown): valor is Record<string, unknown> {
+  return typeof valor === "object" && valor !== null && !Array.isArray(valor);
+}
+
+/** `true` quando o valor tem exatamente a forma de um `Visitante` válido. */
+export function ehVisitante(valor: unknown): valor is Visitante {
+  if (!ehObjeto(valor)) {
+    return false;
+  }
+  return (
+    typeof valor.id === "string" &&
+    typeof valor.nome === "string" &&
+    typeof valor.autorizadoPor === "string" &&
+    typeof valor.tipo === "string" &&
+    (TIPOS_VISITA as readonly string[]).includes(valor.tipo) &&
+    typeof valor.dataPrevista === "string" &&
+    ehDataISOValida(valor.dataPrevista)
+  );
+}
+
+/** `true` quando o valor é uma lista em que todo item é um `Visitante`. */
+export function ehListaDeVisitantes(valor: unknown): valor is Visitante[] {
+  return Array.isArray(valor) && valor.every(ehVisitante);
+}
+
+const CAMPOS_FORMULARIO: readonly (keyof ErrosFormulario)[] = [
+  "nome",
+  "tipo",
+  "dataPrevista",
+  "autorizadoPor",
+];
+
+/** `true` quando o valor é um objeto de erros por campo, no formato do formulário. */
+export function ehErrosFormulario(valor: unknown): valor is ErrosFormulario {
+  if (!ehObjeto(valor)) {
+    return false;
+  }
+  return CAMPOS_FORMULARIO.every(
+    (campo) => valor[campo] === undefined || typeof valor[campo] === "string"
+  );
+}

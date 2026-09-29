@@ -4,10 +4,15 @@ import { StyleSheet, View } from "react-native";
 import AddButton from "@/shared/components/AddButton";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
+import LoadErrorState from "@/features/visitors/components/LoadErrorState";
+import LoadingState from "@/features/visitors/components/LoadingState";
 import VisitorFormModal from "@/features/visitors/components/VisitorFormModal";
 import VisitorList from "@/features/visitors/components/VisitorList";
 import { Colors } from "@/shared/constants/Colors";
-import { useVisitantes } from "@/features/visitors/hooks/useVisitantes";
+import {
+  MENSAGEM_FALHA_CARREGAMENTO,
+  useVisitantes,
+} from "@/features/visitors/hooks/useVisitantes";
 
 const styles = StyleSheet.create({
   screen: {
@@ -22,10 +27,15 @@ const styles = StyleSheet.create({
  */
 export default function VisitorsScreen() {
   const {
-    visitantes,
+    lista,
+    recarregar,
     formularioAberto,
     errosFormulario,
+    enviando,
+    erroEnvio,
     remocaoPendente,
+    removendo,
+    erroRemocao,
     abrirFormulario,
     fecharFormulario,
     adicionarVisitante,
@@ -37,11 +47,24 @@ export default function VisitorsScreen() {
   return (
     <View style={styles.screen}>
       <HeaderModule name="Visitors" onBack={() => router.back()} />
-      <VisitorList visitantes={visitantes} onRemove={pedirRemocao} />
-      <AddButton onPress={abrirFormulario} />
+      {lista.status === "carregando" && <LoadingState />}
+      {lista.status === "erro" && (
+        <LoadErrorState
+          message={MENSAGEM_FALHA_CARREGAMENTO}
+          onRetry={recarregar}
+        />
+      )}
+      {lista.status === "pronto" && (
+        <>
+          <VisitorList visitantes={lista.visitantes} onRemove={pedirRemocao} />
+          <AddButton onPress={abrirFormulario} />
+        </>
+      )}
       <VisitorFormModal
         visible={formularioAberto}
         erros={errosFormulario}
+        enviando={enviando}
+        erroEnvio={erroEnvio}
         onSubmit={adicionarVisitante}
         onCancel={fecharFormulario}
       />
@@ -54,6 +77,8 @@ export default function VisitorsScreen() {
         }
         onConfirm={confirmarRemocao}
         onCancel={cancelarRemocao}
+        busy={removendo}
+        errorMessage={erroRemocao}
       />
     </View>
   );

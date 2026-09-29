@@ -7,6 +7,10 @@ export interface ConfirmDialogProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Ação em andamento: os dois botões ficam desativados e o diálogo não fecha. */
+  busy?: boolean;
+  /** Falha da ação, exibida abaixo da mensagem. */
+  errorMessage?: string | null;
 }
 
 export const styles = StyleSheet.create({
@@ -27,6 +31,12 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
     color: Colors.textPrimary,
   },
+  error: {
+    marginTop: -15,
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.danger,
+  },
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -36,6 +46,9 @@ export const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   cancelButton: {
     backgroundColor: Colors.chipBackground,
@@ -58,37 +71,59 @@ export const styles = StyleSheet.create({
  *
  * Construído com `Modal` em vez de `Alert.alert` porque `Alert` não funciona em web —
  * a remoção aconteceria sem confirmação no navegador (decisão D-002).
+ * `busy` e `errorMessage` são opcionais: quem não os usa mantém o comportamento original.
  */
 export default function ConfirmDialog({
   visible,
   message,
   onConfirm,
   onCancel,
+  busy = false,
+  errorMessage = null,
 }: ConfirmDialogProps) {
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onCancel}
+      onRequestClose={busy ? () => {} : onCancel}
     >
       <View style={styles.overlay}>
         <View style={styles.dialog}>
           <Text style={styles.message}>{message}</Text>
+          {errorMessage ? (
+            <Text style={styles.error} accessibilityRole="alert">
+              {errorMessage}
+            </Text>
+          ) : null}
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
+              style={[
+                styles.button,
+                styles.cancelButton,
+                busy ? styles.buttonDisabled : null,
+              ]}
               onPress={onCancel}
+              disabled={busy}
               accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
             >
               <Text style={styles.cancelLabel}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.confirmButton]}
+              style={[
+                styles.button,
+                styles.confirmButton,
+                busy ? styles.buttonDisabled : null,
+              ]}
               onPress={onConfirm}
+              disabled={busy}
               accessibilityRole="button"
+              accessibilityState={{ disabled: busy, busy }}
             >
-              <Text style={styles.confirmLabel}>Remove</Text>
+              <Text style={styles.confirmLabel}>
+                {busy ? "Removing…" : "Remove"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

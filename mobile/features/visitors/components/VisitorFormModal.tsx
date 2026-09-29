@@ -26,6 +26,10 @@ import {
 export interface VisitorFormModalProps {
   visible: boolean;
   erros: ErrosFormulario;
+  /** Envio em andamento: o botão de confirmar fica desativado (FR-010). */
+  enviando: boolean;
+  /** Falha que não é de um campo específico (rede ou servidor). */
+  erroEnvio: string | null;
   onSubmit: (entrada: NovoVisitante) => void;
   onCancel: () => void;
 }
@@ -132,6 +136,15 @@ export const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: Colors.accent,
   },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitError: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.danger,
+  },
   buttonLabel: {
     fontWeight: "600",
     color: Colors.textPrimary,
@@ -149,6 +162,8 @@ const TIPO_PADRAO: TipoVisita = "visitante";
 export default function VisitorFormModal({
   visible,
   erros,
+  enviando,
+  erroEnvio,
   onSubmit,
   onCancel,
 }: VisitorFormModalProps) {
@@ -276,6 +291,12 @@ export default function VisitorFormModal({
                 />
               </View>
 
+              {erroEnvio ? (
+                <Text style={styles.submitError} accessibilityRole="alert">
+                  {erroEnvio}
+                </Text>
+              ) : null}
+
               <View style={styles.actions}>
                 <TouchableOpacity
                   style={[styles.button, styles.cancelButton]}
@@ -285,11 +306,19 @@ export default function VisitorFormModal({
                   <Text style={styles.buttonLabel}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.button, styles.submitButton]}
+                  style={[
+                    styles.button,
+                    styles.submitButton,
+                    enviando ? styles.submitButtonDisabled : null,
+                  ]}
                   onPress={confirmar}
+                  disabled={enviando}
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: enviando, busy: enviando }}
                 >
-                  <Text style={styles.buttonLabel}>Add visitor</Text>
+                  <Text style={styles.buttonLabel}>
+                    {enviando ? "Saving…" : "Add visitor"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
