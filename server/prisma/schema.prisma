@@ -37,3 +37,92 @@ model Visitor {
   @@index([expectedDate])
   @@map("visitors")
 }
+
+// Cargo de um usuário em um condomínio: morador, síndico, portaria.
+enum Role {
+  resident
+  manager
+  doorman
+}
+
+// As CHECKs (nome, e-mail, bloco, número) e as triggers de "morador tem unidade" não cabem no
+// schema: estão na migration create_users_condominiums (research R-005, R-010).
+
+model Condominium {
+  id        String              @id @default(uuid())
+  name      String              @db.VarChar(100)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  units     Unit[]
+  members   CondominiumMember[]
+
+  @@map("condominiums")
+}
+
+model Unit {
+  id            String         @id @default(uuid())
+  condominiumId String         @map("condominium_id")
+  /// `null` = condomínio sem blocos. Guardado em maiúsculas (research R-005).
+  block         String?        @db.VarChar(20)
+  /// Guardado em maiúsculas (research R-005).
+  number        String         @db.VarChar(10)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  condominium   Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  residents     UnitResident[]
+
+  // Alvo da FK composta de UnitResident: garante unidade do mesmo condomínio do vínculo (R-002).
+  @@unique([id, condominiumId])
+  @@unique([condominiumId, block, number])
+  // NULL não se repete em índice único; este cobre as unidades sem bloco (research R-004).
+  @@unique([condominiumId, number], map: "units_number_without_block_key", where: raw("block IS NULL"))
+  @@map("units")
+}
+
+model User {
+  id           String              @id @default(uuid())
+  name         String              @db.VarChar(100)
+  /// Guardado em minúsculas; único no sistema todo (research R-005).
+  email        String              @unique @db.VarChar(254)
+  /// `scrypt$N$r$p$salt$hash` (research R-006). Nunca a senha.
+  passwordHash String              @map("password_hash")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  memberships  CondominiumMember[]
+
+  @@map("users")
+}
+
+/// Vínculo usuário × condomínio, com o cargo naquele condomínio.
+model CondominiumMember {
+  userId        String         @map("user_id")
+  condominiumId String         @map("condominium_id")
+  role          Role
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  condominium   Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  residences    UnitResident[]
+
+  @@id([userId, condominiumId])
+  // No máximo um síndico por condomínio (research R-003).
+  @@unique([condominiumId], map: "condominium_members_one_manager_key", where: raw("role = 'manager'"))
+  @@index([condominiumId])
+  @@map("condominium_members")
+}
+
+/// Moradia: usuário × unidade. Aponta para o vínculo, e não direto para o usuário, para só existir
+/// com vínculo no condomínio da unidade (research R-002).
+model UnitResident {
+  userId        String            @map("user_id")
+  unitId        String            @map("unit_id")
+  /// Repetido de propósito: amarra as duas FKs compostas ao mesmo condomínio.
+  condominiumId String            @map("condominium_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  member        CondominiumMember @relation(fields: [userId, condominiumId], references: [userId, condominiumId], onDelete: Cascade)
+  unit          Unit              @relation(fields: [unitId, condominiumId], references: [id, condominiumId], onDelete: Restrict)
+
+  @@id([userId, unitId])
+  @@index([unitId, condominiumId])
+  @@map("unit_residents")
+}
