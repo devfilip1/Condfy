@@ -1,5 +1,3 @@
-import type { TipoVisita } from "../../generated/prisma/enums.ts";
-
 /**
  * Validação do body de `POST /visitantes`.
  *
@@ -7,6 +5,12 @@ import type { TipoVisita } from "../../generated/prisma/enums.ts";
  * (`validarNovoVisitante`). App e API são projetos separados, então a regra existe nos dois
  * lugares de propósito (research R-006): ao mudar um, mude o outro.
  */
+
+/**
+ * Tipo de visita no vocabulário do contrato JSON (o mesmo do app). O banco guarda o equivalente em
+ * inglês (`VisitType`); o service traduz nos dois sentidos (research R-011 da feature 003).
+ */
+export type TipoVisita = "visitante" | "entrega" | "prestador";
 
 export interface NovoVisitante {
   nome: string;

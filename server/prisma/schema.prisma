@@ -3,11 +3,15 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
+// Toda a persistência é em inglês: tabelas, colunas, enums e models (constituição v3.0.0, III).
+// O contrato JSON do app continua em português; os services traduzem.
+
 generator client {
   provider            = "prisma-client"
   output              = "../generated/prisma"
   importFileExtension = "ts"
   moduleFormat        = "esm"
+  previewFeatures     = ["partialIndexes"]
 }
 
 datasource db {
@@ -15,21 +19,21 @@ datasource db {
 }
 
 
-enum TipoVisita {
-  visitante
-  entrega
-  prestador
+enum VisitType {
+  visitor
+  delivery
+  service_provider
 }
 
-model Visitante {
-  id            String     @id @default(uuid())
-  nome          String     @db.VarChar(60)
-  tipo          TipoVisita
-  dataPrevista  DateTime   @map("data_prevista") @db.Date
-  autorizadoPor String     @map("autorizado_por")
-  criadoEm      DateTime   @default(now()) @map("criado_em")
-  atualizadoEm  DateTime   @updatedAt @map("atualizado_em")
+model Visitor {
+  id           String    @id @default(uuid())
+  name         String    @db.VarChar(60)
+  type         VisitType
+  expectedDate DateTime  @map("expected_date") @db.Date
+  authorizedBy String    @map("authorized_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  @@index([dataPrevista])
-  @@map("visitantes")
+  @@index([expectedDate])
+  @@map("visitors")
 }

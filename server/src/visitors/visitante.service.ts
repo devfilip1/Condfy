@@ -1,14 +1,29 @@
-import type { Visitante as LinhaVisitante } from "../../generated/prisma/client.ts";
-import type { TipoVisita } from "../../generated/prisma/enums.ts";
+import type { Visitor as LinhaVisitante } from "../../generated/prisma/client.ts";
+import type { VisitType } from "../../generated/prisma/enums.ts";
 import { prisma } from "../lib/prisma.ts";
-import type { NovoVisitante } from "./visitante.dto.ts";
+import type { NovoVisitante, TipoVisita } from "./visitante.dto.ts";
 
 /**
  * Regras e acesso a dados de visitantes.
  *
  * Não conhece HTTP: não recebe objetos de requisição e não escolhe status code. Por isso pode ser
  * chamado por rotas, scripts e testes (constituição, seção Backend).
+ *
+ * O banco é em inglês e o contrato JSON em português (constituição v3.0.0, III): este service é
+ * o único lugar que traduz entre os dois.
  */
+
+const PARA_VISIT_TYPE: Record<TipoVisita, VisitType> = {
+  visitante: "visitor",
+  entrega: "delivery",
+  prestador: "service_provider",
+};
+
+const PARA_TIPO_VISITA: Record<VisitType, TipoVisita> = {
+  visitor: "visitante",
+  delivery: "entrega",
+  service_provider: "prestador",
+};
 
 /** Visitante no formato do contrato JSON: os mesmos campos e nomes do app. */
 export interface Visitante {
@@ -23,17 +38,17 @@ export interface Visitante {
 /**
  * Converte a linha do banco para o contrato.
  *
- * A coluna `data_prevista` é `DATE`, que o Prisma entrega como `Date` à meia-noite UTC. Ler a data
+ * A coluna `expected_date` é `DATE`, que o Prisma entrega como `Date` à meia-noite UTC. Ler a data
  * em UTC devolve sempre o dia gravado, sem deslocamento de fuso (research R-007).
- * `criadoEm` e `atualizadoEm` ficam fora do contrato.
+ * `createdAt` e `updatedAt` ficam fora do contrato.
  */
 export function paraVisitante(linha: LinhaVisitante): Visitante {
   return {
     id: linha.id,
-    nome: linha.nome,
-    tipo: linha.tipo,
-    dataPrevista: linha.dataPrevista.toISOString().slice(0, 10),
-    autorizadoPor: linha.autorizadoPor,
+    nome: linha.name,
+    tipo: PARA_TIPO_VISITA[linha.type],
+    dataPrevista: linha.expectedDate.toISOString().slice(0, 10),
+    autorizadoPor: linha.authorizedBy,
   };
 }
 
@@ -42,8 +57,8 @@ export function paraVisitante(linha: LinhaVisitante): Visitante {
  * No empate, vale a ordem de criação, e por fim o `id`, para a ordem ser sempre estável.
  */
 export async function listarVisitantes(): Promise<Visitante[]> {
-  const linhas = await prisma.visitante.findMany({
-    orderBy: [{ dataPrevista: "asc" }, { criadoEm: "asc" }, { id: "asc" }],
+  const linhas = await prisma.visitor.findMany({
+    orderBy: [{ expectedDate: "asc" }, { createdAt: "asc" }, { id: "asc" }],
   });
   return linhas.map(paraVisitante);
 }
@@ -54,12 +69,12 @@ export async function listarVisitantes(): Promise<Visitante[]> {
  * (research R-007).
  */
 export async function criarVisitante(dados: NovoVisitante): Promise<Visitante> {
-  const linha = await prisma.visitante.create({
+  const linha = await prisma.visitor.create({
     data: {
-      nome: dados.nome,
-      tipo: dados.tipo,
-      dataPrevista: new Date(`${dados.dataPrevista}T00:00:00.000Z`),
-      autorizadoPor: dados.autorizadoPor,
+      name: dados.nome,
+      type: PARA_VISIT_TYPE[dados.tipo],
+      expectedDate: new Date(`${dados.dataPrevista}T00:00:00.000Z`),
+      authorizedBy: dados.autorizadoPor,
     },
   });
   return paraVisitante(linha);
@@ -70,5 +85,5 @@ export async function criarVisitante(dados: NovoVisitante): Promise<Visitante> {
  * a operação é idempotente (FR-012, research R-011).
  */
 export async function removerVisitante(id: string): Promise<void> {
-  await prisma.visitante.deleteMany({ where: { id } });
+  await prisma.visitor.deleteMany({ where: { id } });
 }
