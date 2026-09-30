@@ -35,8 +35,8 @@ export const styles = StyleSheet.create({
 });
 
 /**
- * Falha ao carregar a lista, com a ação de tentar novamente (FR-005).
- * Ocupa o lugar da lista: o estado vazio nunca aparece quando a busca falhou.
+ * Falha ao load a list, com a ação de tentar novamente (FR-005).
+ * Ocupa o lugar da list: o state empty nunca aparece quando a busca falhou.
  */
 export default function LoadErrorState({ message, onRetry }: LoadErrorStateProps) {
   return (

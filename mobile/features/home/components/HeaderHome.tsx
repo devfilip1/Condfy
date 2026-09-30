@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import { useAuth } from "@/features/auth";
 
 export const styles = StyleSheet.create({
   container: {
@@ -28,18 +30,22 @@ export const styles = StyleSheet.create({
 });
 
 export default function HeaderHome() {
+  const { signOut } = useAuth();
+
   return (
     <View style={styles.container}>
       <View>
         <Text style={styles.unit}>Unit</Text>
         <Text style={styles.name}>Filipi Oliva - BV-1303</Text>
       </View>
-      <Ionicons
+      <TouchableOpacity
         style={styles.settings}
-        name="settings-outline"
-        size={35}
-        color="black"
-      />
+        onPress={signOut}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out"
+      >
+        <Ionicons name="log-out-outline" size={35} color="black" />
+      </TouchableOpacity>
     </View>
   );
 }

@@ -10,14 +10,14 @@ export const styles = StyleSheet.create({
   },
 });
 
-/** Indicador exibido enquanto a lista de visitantes é buscada no servidor (FR-004). */
+/** Indicador de carregamento em tela cheia: list de visitors, restauro de sessão. */
 export default function LoadingState() {
   return (
     <View style={styles.container}>
       <ActivityIndicator
         size="large"
         color={Colors.accent}
-        accessibilityLabel="Loading visitors"
+        accessibilityLabel="Loading"
       />
     </View>
   );

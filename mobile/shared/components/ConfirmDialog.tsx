@@ -9,7 +9,7 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
   /** Ação em andamento: os dois botões ficam desativados e o diálogo não fecha. */
   busy?: boolean;
-  /** Falha da ação, exibida abaixo da mensagem. */
+  /** Falha da ação, exibida abaixo da message. */
   errorMessage?: string | null;
 }
 

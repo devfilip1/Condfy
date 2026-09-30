@@ -5,14 +5,14 @@ import AddButton from "@/shared/components/AddButton";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/features/visitors/components/LoadErrorState";
-import LoadingState from "@/features/visitors/components/LoadingState";
+import LoadingState from "@/shared/components/LoadingState";
 import VisitorFormModal from "@/features/visitors/components/VisitorFormModal";
 import VisitorList from "@/features/visitors/components/VisitorList";
 import { Colors } from "@/shared/constants/Colors";
 import {
-  MENSAGEM_FALHA_CARREGAMENTO,
-  useVisitantes,
-} from "@/features/visitors/hooks/useVisitantes";
+  MESSAGE_LOAD_FAILED,
+  useVisitors,
+} from "@/features/visitors/hooks/useVisitors";
 
 const styles = StyleSheet.create({
   screen: {
@@ -23,62 +23,62 @@ const styles = StyleSheet.create({
 
 /**
  * Tela do módulo de Visitantes: apenas composição.
- * Todo o estado vem do hook `useVisitantes`.
+ * Todo o state vem do hook `useVisitors`.
  */
 export default function VisitorsScreen() {
   const {
-    lista,
-    recarregar,
-    formularioAberto,
-    errosFormulario,
-    enviando,
-    erroEnvio,
-    remocaoPendente,
-    removendo,
-    erroRemocao,
-    abrirFormulario,
-    fecharFormulario,
-    adicionarVisitante,
-    pedirRemocao,
-    cancelarRemocao,
-    confirmarRemocao,
-  } = useVisitantes();
+    list,
+    reload,
+    formOpen,
+    formErrors,
+    submitting,
+    submitError,
+    pendingRemoval,
+    removing,
+    removalError,
+    openForm,
+    closeForm,
+    addVisitor,
+    requestRemoval,
+    cancelRemoval,
+    confirmRemoval,
+  } = useVisitors();
 
   return (
     <View style={styles.screen}>
       <HeaderModule name="Visitors" onBack={() => router.back()} />
-      {lista.status === "carregando" && <LoadingState />}
-      {lista.status === "erro" && (
+      {list.status === "loading" && <LoadingState />}
+      {list.status === "error" && (
         <LoadErrorState
-          message={MENSAGEM_FALHA_CARREGAMENTO}
-          onRetry={recarregar}
+          message={MESSAGE_LOAD_FAILED}
+          onRetry={reload}
         />
       )}
-      {lista.status === "pronto" && (
+      {list.status === "ready" && (
         <>
-          <VisitorList visitantes={lista.visitantes} onRemove={pedirRemocao} />
-          <AddButton onPress={abrirFormulario} />
+          <VisitorList visitors={list.visitors} onRemove={requestRemoval} />
+          <AddButton onPress={openForm} />
         </>
       )}
       <VisitorFormModal
-        visible={formularioAberto}
-        erros={errosFormulario}
-        enviando={enviando}
-        erroEnvio={erroEnvio}
-        onSubmit={adicionarVisitante}
-        onCancel={fecharFormulario}
+        visible={formOpen}
+        errors={formErrors}
+        submitting={submitting}
+        submitError={submitError}
+        onSubmit={addVisitor}
+        onCancel={closeForm}
       />
       <ConfirmDialog
-        visible={remocaoPendente !== null}
+        visible={pendingRemoval !== null}
         message={
-          remocaoPendente
-            ? `Remove ${remocaoPendente.nome} from the visitor list?`
+          pendingRemoval
+            ? `Remove ${pendingRemoval.name} from the visitor list?`
             : ""
         }
-        onConfirm={confirmarRemocao}
-        onCancel={cancelarRemocao}
-        busy={removendo}
-        errorMessage={erroRemocao}
+        onConfirm={confirmRemoval}
+        onCancel={cancelRemoval}
+        busy={removing}
+        errorMessage={removalError}
       />
     </View>
   );
