@@ -3,8 +3,8 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
-// Toda a persistência é em inglês: tabelas, colunas, enums e models (constituição v3.0.0, III).
-// O contrato JSON do app continua em português; os services traduzem.
+// Tudo em inglês: tabelas, colunas, enums, models, código e contrato JSON (constituição v4.0.0,
+// III; ADR 0008). Nenhuma camada traduz nomes.
 
 generator client {
   provider            = "prisma-client"
@@ -17,7 +17,6 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-
 
 enum VisitType {
   visitor
@@ -80,15 +79,16 @@ model Unit {
 }
 
 model User {
-  id           String              @id @default(uuid())
-  name         String              @db.VarChar(100)
+  id            String              @id @default(uuid())
+  name          String              @db.VarChar(100)
   /// Guardado em minúsculas; único no sistema todo (research R-005).
-  email        String              @unique @db.VarChar(254)
+  email         String              @unique @db.VarChar(254)
   /// `scrypt$N$r$p$salt$hash` (research R-006). Nunca a senha.
-  passwordHash String              @map("password_hash")
-  createdAt    DateTime            @default(now()) @map("created_at")
-  updatedAt    DateTime            @updatedAt @map("updated_at")
-  memberships  CondominiumMember[]
+  passwordHash  String              @map("password_hash")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  memberships   CondominiumMember[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -125,4 +125,37 @@ model UnitResident {
   @@id([userId, unitId])
   @@index([unitId, condominiumId])
   @@map("unit_residents")
+}
+
+// Renovação de sessão (feature 004). O valor da credencial nunca é gravado: só o hash SHA-256.
+// Não existe tabela de sessão: a sessão É a cadeia de credenciais de renovação, e o prazo
+// acompanha cada credencial emitida (ADR 0007).
+
+/// Cada credencial de renovação emitida. Rotaciona a cada uso; a antiga fica revogada.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  /// SHA-256 em hex do valor entregue ao aplicativo.
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  /// Renovar emite uma credencial nova com prazo novo: quem usa o aplicativo não perde a sessão.
+  expiresAt DateTime  @map("expires_at")
+  /// Preenchido na rotação e ao sair. `null` = a credencial ainda vale.
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// Contador do bloqueio de entrada (FR-005) e do limite de cadastro (FR-032).
+/// A chave é texto e não referencia `users`: e-mail inexistente também é contado (FR-003).
+model LoginAttempt {
+  /// `email:<e-mail>`, `ip:<origem>` ou `signup-ip:<origem>`.
+  key             String    @id @db.VarChar(320)
+  attempts        Int       @default(0)
+  windowStartedAt DateTime  @default(now()) @map("window_started_at")
+  blockedUntil    DateTime? @map("blocked_until")
+
+  @@map("login_attempts")
 }
