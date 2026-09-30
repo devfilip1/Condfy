@@ -1,8 +1,12 @@
 import cors from "@fastify/cors";
+import jwt from "@fastify/jwt";
 import Fastify from "fastify";
 
+import { JWT_SECRET } from "./lib/config.ts";
 import { prisma } from "./lib/prisma.ts";
-import visitanteController from "./visitors/visitante.controller.ts";
+import authController from "./auth/auth.controller.ts";
+import { authenticate } from "./auth/authenticate.ts";
+import visitorController from "./visitors/visitor.controller.ts";
 
 // Os serializers padrão registram método, URL, status e tempo; nunca o body (FR-017).
 const app = Fastify({ logger: true });
@@ -10,9 +14,21 @@ const app = Fastify({ logger: true });
 await app.register(cors, {
   origin: process.env.CORS_ORIGIN ?? "http://localhost:8081",
   methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 });
 
-await app.register(visitanteController, { prefix: "/visitantes" });
+await app.register(jwt, { secret: JWT_SECRET });
+
+await app.register(authController);
+
+// Visitantes passam a exigir sessão (FR-023). O módulo de visitors não sabe que isso existe.
+await app.register(
+  async (instancia) => {
+    instancia.addHook("preHandler", authenticate);
+    await instancia.register(visitorController, { prefix: "/visitors" });
+  },
+  { name: "rotas-protegidas" }
+);
 
 app.setErrorHandler((error, request, reply) => {
   const statusCode =
@@ -26,7 +42,7 @@ app.setErrorHandler((error, request, reply) => {
   }
 
   request.log.error(error);
-  return reply.code(500).send({ mensagem: "Internal server error." });
+  return reply.code(500).send({ message: "Internal server error." });
 });
 
 app.addHook("onClose", async () => {
