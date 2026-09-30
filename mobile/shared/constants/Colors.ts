@@ -1,7 +1,7 @@
 /**
  * Tokens de cor do módulo de Visitantes (FR-016).
  *
- * A paleta é explícita e não herda cor do sistema: nenhum fundo ou texto fica indefinido,
+ * A paleta é explícita e não herda cor do sistema: nenhum fundo ou text fica indefinido,
  * então o conteúdo permanece legível tanto com o dispositivo em tema claro quanto escuro.
  * Isso mantém o módulo visualmente consistente com as telas já existentes do aplicativo,
  * que também usam cores fixas.
@@ -23,7 +23,7 @@ export const Colors = {
   inputBorder: "#E2E2E2",
   chipBackground: "#F0F0F0",
 
-  /** Realce suave do dia de hoje e do estado pressionado no calendário. */
+  /** Realce suave do day de hoje e do state pressionado no calendário. */
   accentSoft: "#FFF1DA",
   /** Texto legível sobre fundo claro, mais escuro que `textSecondary`. */
   textMuted: "#767676",

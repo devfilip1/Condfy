@@ -4,24 +4,24 @@ import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from "react-native
 
 import { Colors } from "@/shared/constants/Colors";
 import {
-  INICIAIS_DIAS_SEMANA,
-  MesCalendario,
-  dataISODeHoje,
-  deslocarMes,
-  mesInicialDoCalendario,
-  montarDataISO,
-  montarGradeDoMes,
-  paraDataExibicao,
-  rotuloDoMes,
-  somarDias,
-} from "@/shared/lib/calendario";
+  WEEKDAY_INITIALS,
+  CalendarMonth,
+  todayISODate,
+  shiftMonth,
+  initialCalendarMonth,
+  buildISODate,
+  buildMonthGrid,
+  toDisplayDate,
+  monthLabel,
+  addDays,
+} from "@/shared/lib/calendar";
 
 export interface DateFieldProps {
   label: string;
-  /** Data selecionada em `YYYY-MM-DD`, ou string vazia quando ainda não há escolha. */
-  valor: string;
-  onChange: (dataISO: string) => void;
-  erro?: string;
+  /** Data selecionada em `YYYY-MM-DD`, ou string blank quando ainda não há escolha. */
+  value: string;
+  onChange: (isoDate: string) => void;
+  error?: string;
 }
 
 export const styles = StyleSheet.create({
@@ -113,7 +113,7 @@ export const styles = StyleSheet.create({
   },
   dayCell: {
     flex: 1,
-    // Altura fixa: com `aspectRatio` a grade fica alta demais e empurra os botões da folha.
+    // Altura fixa: com `aspectRatio` a grade fica alta demais e empurra os botões da sheet.
     height: 42,
     alignItems: "center",
     justifyContent: "center",
@@ -149,42 +149,42 @@ export const styles = StyleSheet.create({
 /**
  * Campo de data com calendário embutido (FR-005).
  *
- * Substitui a digitação livre `DD/MM/AAAA`: o usuário toca no campo, escolhe o dia
+ * Substitui a digitação livre `DD/MM/AAAA`: o usuário toca no field, escolhe o day
  * e nunca precisa do teclado — o que também evita o teclado cobrindo o formulário.
  * Nenhum cálculo de data vive aqui; tudo vem de `shared/lib/calendario`.
  */
 export default function DateField({
   label,
-  valor,
+  value,
   onChange,
-  erro,
+  error,
 }: DateFieldProps) {
   const [aberto, setAberto] = useState(false);
-  const [mesVisivel, setMesVisivel] = useState<MesCalendario>(() =>
-    mesInicialDoCalendario(valor)
+  const [mesVisivel, setMesVisivel] = useState<CalendarMonth>(() =>
+    initialCalendarMonth(value)
   );
 
-  const hoje = dataISODeHoje();
-  const amanha = somarDias(hoje, 1);
-  const semanas = montarGradeDoMes(mesVisivel);
+  const hoje = todayISODate();
+  const amanha = addDays(hoje, 1);
+  const weeks = buildMonthGrid(mesVisivel);
 
   function alternarCalendario() {
     // O calendário e o teclado disputam o mesmo espaço na tela.
     Keyboard.dismiss();
     if (!aberto) {
-      setMesVisivel(mesInicialDoCalendario(valor));
+      setMesVisivel(initialCalendarMonth(value));
     }
     setAberto(!aberto);
   }
 
-  function selecionar(dataISO: string) {
-    onChange(dataISO);
+  function selecionar(isoDate: string) {
+    onChange(isoDate);
     setAberto(false);
   }
 
-  function escolherAtalho(dataISO: string) {
+  function escolherAtalho(isoDate: string) {
     Keyboard.dismiss();
-    selecionar(dataISO);
+    selecionar(isoDate);
   }
 
   return (
@@ -196,7 +196,7 @@ export default function DateField({
         onPress={alternarCalendario}
         accessibilityRole="button"
         accessibilityLabel={
-          valor ? `Expected date ${paraDataExibicao(valor)}` : "Select a date"
+          value ? `Expected date ${toDisplayDate(value)}` : "Select a date"
         }
         accessibilityState={{ expanded: aberto }}
       >
@@ -208,10 +208,10 @@ export default function DateField({
         <Text
           style={[
             styles.triggerValue,
-            valor ? null : styles.triggerPlaceholder,
+            value ? null : styles.triggerPlaceholder,
           ]}
         >
-          {valor ? paraDataExibicao(valor) : "Select a date"}
+          {value ? toDisplayDate(value) : "Select a date"}
         </Text>
         <Ionicons
           name={aberto ? "chevron-up" : "chevron-down"}
@@ -222,20 +222,20 @@ export default function DateField({
 
       <View style={styles.shortcuts}>
         {[
-          { rotulo: "Today", data: hoje },
-          { rotulo: "Tomorrow", data: amanha },
+          { label: "Today", data: hoje },
+          { label: "Tomorrow", data: amanha },
         ].map((atalho) => (
           <TouchableOpacity
-            key={atalho.rotulo}
+            key={atalho.label}
             style={[
               styles.shortcut,
-              valor === atalho.data ? styles.shortcutSelected : null,
+              value === atalho.data ? styles.shortcutSelected : null,
             ]}
             onPress={() => escolherAtalho(atalho.data)}
             accessibilityRole="button"
-            accessibilityState={{ selected: valor === atalho.data }}
+            accessibilityState={{ selected: value === atalho.data }}
           >
-            <Text style={styles.shortcutLabel}>{atalho.rotulo}</Text>
+            <Text style={styles.shortcutLabel}>{atalho.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -245,7 +245,7 @@ export default function DateField({
           <View style={styles.calendarHeader}>
             <TouchableOpacity
               style={styles.monthButton}
-              onPress={() => setMesVisivel(deslocarMes(mesVisivel, -1))}
+              onPress={() => setMesVisivel(shiftMonth(mesVisivel, -1))}
               accessibilityRole="button"
               accessibilityLabel="Previous month"
             >
@@ -255,10 +255,10 @@ export default function DateField({
                 color={Colors.textPrimary}
               />
             </TouchableOpacity>
-            <Text style={styles.monthLabel}>{rotuloDoMes(mesVisivel)}</Text>
+            <Text style={styles.monthLabel}>{monthLabel(mesVisivel)}</Text>
             <TouchableOpacity
               style={styles.monthButton}
-              onPress={() => setMesVisivel(deslocarMes(mesVisivel, 1))}
+              onPress={() => setMesVisivel(shiftMonth(mesVisivel, 1))}
               accessibilityRole="button"
               accessibilityLabel="Next month"
             >
@@ -271,17 +271,17 @@ export default function DateField({
           </View>
 
           <View style={styles.week}>
-            {INICIAIS_DIAS_SEMANA.map((inicial, indice) => (
-              <View key={indice} style={styles.weekdayCell}>
+            {WEEKDAY_INITIALS.map((inicial, index) => (
+              <View key={index} style={styles.weekdayCell}>
                 <Text style={styles.weekdayLabel}>{inicial}</Text>
               </View>
             ))}
           </View>
 
-          {semanas.map((semana, indiceSemana) => (
+          {weeks.map((semana, indiceSemana) => (
             <View key={indiceSemana} style={styles.week}>
-              {semana.map((dia, indiceDia) => {
-                if (dia === null) {
+              {semana.map((day, indiceDia) => {
+                if (day === null) {
                   return (
                     <View
                       key={`${indiceSemana}-${indiceDia}`}
@@ -290,13 +290,13 @@ export default function DateField({
                   );
                 }
 
-                const dataDoDia = montarDataISO(
-                  mesVisivel.ano,
-                  mesVisivel.mes,
-                  dia
+                const dataDoDia = buildISODate(
+                  mesVisivel.year,
+                  mesVisivel.month,
+                  day
                 );
-                const selecionado = dataDoDia === valor;
-                const ehHoje = dataDoDia === hoje;
+                const selecionado = dataDoDia === value;
+                const isToday = dataDoDia === hoje;
 
                 return (
                   <View
@@ -306,12 +306,12 @@ export default function DateField({
                     <TouchableOpacity
                       style={[
                         styles.dayTouchable,
-                        ehHoje && !selecionado ? styles.dayToday : null,
+                        isToday && !selecionado ? styles.dayToday : null,
                         selecionado ? styles.daySelected : null,
                       ]}
                       onPress={() => selecionar(dataDoDia)}
                       accessibilityRole="button"
-                      accessibilityLabel={paraDataExibicao(dataDoDia)}
+                      accessibilityLabel={toDisplayDate(dataDoDia)}
                       accessibilityState={{ selected: selecionado }}
                     >
                       <Text
@@ -320,7 +320,7 @@ export default function DateField({
                           selecionado ? styles.dayLabelSelected : null,
                         ]}
                       >
-                        {dia}
+                        {day}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -331,7 +331,7 @@ export default function DateField({
         </View>
       ) : null}
 
-      {erro ? <Text style={styles.error}>{erro}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }

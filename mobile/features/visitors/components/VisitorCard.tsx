@@ -2,18 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Colors } from "@/shared/constants/Colors";
-import { TipoVisita, Visitante } from "@/features/visitors/domain/visitante";
-import { paraDataExibicao } from "@/shared/lib/calendario";
+import { VisitType, Visitor } from "@/features/visitors/domain/visitor";
+import { toDisplayDate } from "@/shared/lib/calendar";
 
 export interface VisitorCardProps {
-  visitante: Visitante;
+  visitor: Visitor;
   /** Apenas notifica a intenção de remover — a exclusão e a confirmação são de quem consome. */
-  onRemove: (visitante: Visitante) => void;
+  onRemove: (visitor: Visitor) => void;
 }
 
 /** Rótulos de interface em inglês para os valores de domínio em português (D-005). */
-const ROTULOS_TIPO: Record<TipoVisita, string> = {
-  visitante: "Visitor",
+const TYPE_LABELS: Record<VisitType, string> = {
+  visitor: "Visitor",
   entrega: "Delivery",
   prestador: "Service",
 };
@@ -75,8 +75,8 @@ export const styles = StyleSheet.create({
   },
 });
 
-/** Card de um visitante, com controle de remoção sempre visível (FR-002, FR-010). */
-export default function VisitorCard({ visitante, onRemove }: VisitorCardProps) {
+/** Card de um visitor, com controle de remoção sempre visível (FR-002, FR-010). */
+export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
   return (
     <View style={styles.container}>
       <View style={styles.containerUpSide}>
@@ -87,25 +87,25 @@ export default function VisitorCard({ visitante, onRemove }: VisitorCardProps) {
         />
         <View style={styles.identity}>
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
-            {visitante.nome}
+            {visitor.name}
           </Text>
-          <Text style={styles.role}>{ROTULOS_TIPO[visitante.tipo]}</Text>
+          <Text style={styles.role}>{TYPE_LABELS[visitor.type]}</Text>
         </View>
         <TouchableOpacity
           style={styles.removeButton}
-          onPress={() => onRemove(visitante)}
+          onPress={() => onRemove(visitor)}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${visitante.nome}`}
+          accessibilityLabel={`Remove ${visitor.name}`}
         >
           <Ionicons name="trash-outline" size={22} color={Colors.danger} />
         </TouchableOpacity>
       </View>
       <View style={styles.footer}>
         <Text style={styles.authorizedBy} numberOfLines={1} ellipsizeMode="tail">
-          Access authorized by: {visitante.autorizadoPor}
+          Access authorized by: {visitor.authorizedBy}
         </Text>
         <Text style={styles.date}>
-          {paraDataExibicao(visitante.dataPrevista)}
+          {toDisplayDate(visitor.expectedDate)}
         </Text>
       </View>
     </View>

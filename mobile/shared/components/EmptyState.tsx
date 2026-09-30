@@ -21,7 +21,7 @@ export const styles = StyleSheet.create({
   },
 });
 
-/** Mensagem de lista vazia, reutilizável por qualquer módulo (FR-013). */
+/** Mensagem de list blank, reutilizável por qualquer módulo (FR-013). */
 export default function EmptyState({ message }: EmptyStateProps) {
   return (
     <View style={styles.container}>

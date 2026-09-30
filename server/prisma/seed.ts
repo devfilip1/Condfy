@@ -3,7 +3,7 @@ import { hashPassword } from "../src/lib/password.ts";
 import { prisma } from "../src/lib/prisma.ts";
 
 /**
- * Carga de dados de exemplo para desenvolvimento e testes (contrato: specs/003, seed-command.md).
+ * Carga de data de exemplo para desenvolvimento e testes (contrato: specs/003, seed-command.md).
  *
  * Idempotente: cada registro tem id fixo e só é criado se ainda não existir, então rodar de novo
  * não duplica, não falha e não altera nada (research R-008). Nunca apaga registros.
@@ -35,7 +35,7 @@ const UNITS = [
   { id: PALMEIRAS_2, condominiumId: PALMEIRAS, block: null, number: "2" },
 ];
 
-// Só para desenvolvimento: todas as contas de exemplo usam esta senha (contrato da carga).
+// Só para desenvolvimento: todas as contas de exemplo usam esta password (contrato da carga).
 const SAMPLE_PASSWORD = "condfy123";
 
 const ANA = id("0201");

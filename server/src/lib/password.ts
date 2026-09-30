@@ -1,12 +1,12 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
 /**
- * Proteção de senha com scrypt (research R-006).
+ * Proteção de password com scrypt (research R-006).
  *
  * scrypt vem no próprio Node; argon2, a primeira escolha da OWASP, exigiria uma dependência com
  * binário nativo. Os parâmetros seguem a recomendação da OWASP para scrypt.
  *
- * O valor guardado descreve os próprios parâmetros (`scrypt$N$r$p$salt$hash`), então dá para
+ * O value guardado descreve os próprios parâmetros (`scrypt$N$r$p$salt$hash`), então dá para
  * endurecê-los depois sem invalidar as senhas já guardadas.
  */
 
@@ -27,14 +27,14 @@ function deriveKey(password: string, salt: Buffer, logN: number, r: number, p: n
   });
 }
 
-/** Gera o valor a ser guardado no lugar da senha. Cada chamada usa um sal novo. */
+/** Gera o value a ser guardado no lugar da password. Cada chamada usa um sal novo. */
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LENGTH);
   const key = await deriveKey(password, salt, LOG_N, R, P);
   return `scrypt$${LOG_N}$${R}$${P}$${salt.toString("base64url")}$${key.toString("base64url")}`;
 }
 
-/** Confere uma senha digitada contra o valor guardado. Formato inválido nunca confere. */
+/** Confere uma password digitada contra o value guardado. Formato inválido nunca confere. */
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   const parts = storedHash.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;

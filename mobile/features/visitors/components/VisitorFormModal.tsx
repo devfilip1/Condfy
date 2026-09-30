@@ -16,26 +16,26 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateField from "@/shared/components/DateField";
 import { Colors } from "@/shared/constants/Colors";
 import {
-  ErrosFormulario,
-  LIMITE_NOME,
-  NovoVisitante,
-  TIPOS_VISITA,
-  TipoVisita,
-} from "@/features/visitors/domain/visitante";
+  FormErrors,
+  NAME_MAX_LENGTH,
+  NewVisitor,
+  VISIT_TYPES,
+  VisitType,
+} from "@/features/visitors/domain/visitor";
 
 export interface VisitorFormModalProps {
   visible: boolean;
-  erros: ErrosFormulario;
-  /** Envio em andamento: o botão de confirmar fica desativado (FR-010). */
-  enviando: boolean;
-  /** Falha que não é de um campo específico (rede ou servidor). */
-  erroEnvio: string | null;
-  onSubmit: (entrada: NovoVisitante) => void;
+  errors: FormErrors;
+  /** Envio em andamento: o botão de submit fica desativado (FR-010). */
+  submitting: boolean;
+  /** Falha que não é de um field específico (rede ou servidor). */
+  submitError: string | null;
+  onSubmit: (input: NewVisitor) => void;
   onCancel: () => void;
 }
 
-const ROTULOS_TIPO: Record<TipoVisita, string> = {
-  visitante: "Visitor",
+const TYPE_LABELS: Record<VisitType, string> = {
+  visitor: "Visitor",
   entrega: "Delivery",
   prestador: "Service",
 };
@@ -151,42 +151,42 @@ export const styles = StyleSheet.create({
   },
 });
 
-const TIPO_PADRAO: TipoVisita = "visitante";
+const DEFAULT_TYPE: VisitType = "visitor";
 
 /**
- * Formulário de cadastro sobreposto à lista (FR-004, FR-005).
+ * Formulário de cadastro sobreposto à list (FR-004, FR-005).
  *
- * O componente não valida nada: apenas coleta os campos e exibe os erros recebidos por prop.
- * A validação é regra de domínio (`domain/visitante.ts`).
+ * O componente não valida nada: apenas coleta os fields e exibe os errors recebidos por prop.
+ * A validação é regra de domínio (`domain/visitor.ts`).
  */
 export default function VisitorFormModal({
   visible,
-  erros,
-  enviando,
-  erroEnvio,
+  errors,
+  submitting,
+  submitError,
   onSubmit,
   onCancel,
 }: VisitorFormModalProps) {
-  const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState<TipoVisita>(TIPO_PADRAO);
-  const [dataPrevista, setDataPrevista] = useState("");
-  const [autorizadoPor, setAutorizadoPor] = useState("");
+  const [name, setName] = useState("");
+  const [type, setType] = useState<VisitType>(DEFAULT_TYPE);
+  const [expectedDate, setExpectedDate] = useState("");
+  const [authorizedBy, setAuthorizedBy] = useState("");
 
   const insets = useSafeAreaInsets();
-  const campoAutorizadoPor = useRef<TextInput>(null);
+  const authorizedByField = useRef<TextInput>(null);
 
-  // Limpa os campos ao reabrir, para não vazar dados de uma tentativa anterior.
+  // Limpa os fields ao reabrir, para não vazar data de uma tentativa anterior.
   useEffect(() => {
     if (visible) {
-      setNome("");
-      setTipo(TIPO_PADRAO);
-      setDataPrevista("");
-      setAutorizadoPor("");
+      setName("");
+      setType(DEFAULT_TYPE);
+      setExpectedDate("");
+      setAuthorizedBy("");
     }
   }, [visible]);
 
-  function confirmar() {
-    onSubmit({ nome, tipo, dataPrevista, autorizadoPor });
+  function submit() {
+    onSubmit({ name, type, expectedDate, authorizedBy });
   }
 
   return (
@@ -200,11 +200,11 @@ export default function VisitorFormModal({
     >
       <KeyboardAvoidingView
         style={styles.avoider}
-        // Sem isto o teclado do iOS sobe por cima da folha; no Android o ajuste é de altura.
+        // Sem isto o teclado do iOS sobe por cima da sheet; no Android o ajuste é de altura.
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.overlay}>
-          {/* Tocar fora da folha fecha o formulário, como em qualquer bottom sheet. */}
+          {/* Tocar fora da sheet fecha o formulário, como em qualquer bottom sheet. */}
           <Pressable
             style={styles.backdrop}
             onPress={onCancel}
@@ -225,75 +225,75 @@ export default function VisitorFormModal({
                 <Text style={styles.label}>Name</Text>
                 <TextInput
                   style={styles.input}
-                  value={nome}
-                  onChangeText={setNome}
+                  value={name}
+                  onChangeText={setName}
                   placeholder="Visitor full name"
                   placeholderTextColor={Colors.textSecondary}
-                  maxLength={LIMITE_NOME}
+                  maxLength={NAME_MAX_LENGTH}
                   autoCapitalize="words"
                   returnKeyType="next"
                   submitBehavior="submit"
-                  onSubmitEditing={() => campoAutorizadoPor.current?.focus()}
+                  onSubmitEditing={() => authorizedByField.current?.focus()}
                 />
-                {erros.nome ? (
-                  <Text style={styles.error}>{erros.nome}</Text>
+                {errors.name ? (
+                  <Text style={styles.error}>{errors.name}</Text>
                 ) : null}
               </View>
 
               <View style={styles.field}>
                 <Text style={styles.label}>Visit type</Text>
                 <View style={styles.chips}>
-                  {TIPOS_VISITA.map((opcao) => (
+                  {VISIT_TYPES.map((option) => (
                     <TouchableOpacity
-                      key={opcao}
+                      key={option}
                       style={[
                         styles.chip,
-                        opcao === tipo ? styles.chipSelected : null,
+                        option === type ? styles.chipSelected : null,
                       ]}
-                      onPress={() => setTipo(opcao)}
+                      onPress={() => setType(option)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: opcao === tipo }}
+                      accessibilityState={{ selected: option === type }}
                     >
-                      <Text style={styles.chipLabel}>{ROTULOS_TIPO[opcao]}</Text>
+                      <Text style={styles.chipLabel}>{TYPE_LABELS[option]}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                {erros.tipo ? (
-                  <Text style={styles.error}>{erros.tipo}</Text>
+                {errors.type ? (
+                  <Text style={styles.error}>{errors.type}</Text>
                 ) : null}
               </View>
 
               <View style={styles.field}>
                 <Text style={styles.label}>Authorized by</Text>
                 <TextInput
-                  ref={campoAutorizadoPor}
+                  ref={authorizedByField}
                   style={styles.input}
-                  value={autorizadoPor}
-                  onChangeText={setAutorizadoPor}
+                  value={authorizedBy}
+                  onChangeText={setAuthorizedBy}
                   placeholder="Resident name"
                   placeholderTextColor={Colors.textSecondary}
                   autoCapitalize="words"
                   returnKeyType="done"
                 />
-                {erros.autorizadoPor ? (
-                  <Text style={styles.error}>{erros.autorizadoPor}</Text>
+                {errors.authorizedBy ? (
+                  <Text style={styles.error}>{errors.authorizedBy}</Text>
                 ) : null}
               </View>
 
-              {/* Último campo do formulário: o calendário cresce no lugar, sem
-                  reposicionar a rolagem — era isso que fazia a folha saltar. */}
+              {/* Último field do formulário: o calendário cresce no lugar, sem
+                  reposicionar a rolagem — era isso que fazia a sheet saltar. */}
               <View style={styles.field}>
                 <DateField
                   label="Expected date"
-                  valor={dataPrevista}
-                  onChange={setDataPrevista}
-                  erro={erros.dataPrevista}
+                  value={expectedDate}
+                  onChange={setExpectedDate}
+                  error={errors.expectedDate}
                 />
               </View>
 
-              {erroEnvio ? (
+              {submitError ? (
                 <Text style={styles.submitError} accessibilityRole="alert">
-                  {erroEnvio}
+                  {submitError}
                 </Text>
               ) : null}
 
@@ -309,15 +309,15 @@ export default function VisitorFormModal({
                   style={[
                     styles.button,
                     styles.submitButton,
-                    enviando ? styles.submitButtonDisabled : null,
+                    submitting ? styles.submitButtonDisabled : null,
                   ]}
-                  onPress={confirmar}
-                  disabled={enviando}
+                  onPress={submit}
+                  disabled={submitting}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: enviando, busy: enviando }}
+                  accessibilityState={{ disabled: submitting, busy: submitting }}
                 >
                   <Text style={styles.buttonLabel}>
-                    {enviando ? "Saving…" : "Add visitor"}
+                    {submitting ? "Saving…" : "Add visitor"}
                   </Text>
                 </TouchableOpacity>
               </View>
