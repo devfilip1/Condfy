@@ -24,14 +24,19 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
 
 ## Rules the code does not show
 
+- **Everything is named in English** — code, routes, JSON contract and database. Portuguese stays
+  in comments and in the glossary of `docs/product.md` (ADR 0008).
+
 - **The database is English, the API contract is Portuguese.** Only the resource service
   translates. Never rename a JSON field to match a column.
-- **Validation is duplicated on purpose** between `mobile/features/visitors/domain/visitante.ts`
-  and `server/src/visitors/visitante.dto.ts`, message text included. Change both together.
+- **Validation is duplicated on purpose** between `mobile/features/visitors/domain/visitor.ts`
+  and `server/src/visitors/visitor.dto.ts`, message text included. Change both together.
 - **Server imports end in `.ts`** and `enum`, `namespace` and parameter properties are rejected —
   Node strips types, it does not compile them.
 - **App imports use the `@/` alias**; a feature imports another only through its `index.ts`.
 - **Prisma and `DATABASE_URL` must never appear in `mobile/`.**
+- **Identity always comes from the token** (`request.usuario`), never from the request body.
+- **`JWT_SECRET` is required** for the server to start; it lives in `server/.env`.
 - **Dates are calendar days.** Convert at the server boundary in UTC; never read a `DATE` in local
   time.
 - **Never `npm audit fix --force` in `server/`** — it downgrades Prisma across a major version.

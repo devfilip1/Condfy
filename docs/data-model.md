@@ -5,8 +5,8 @@
 **Source of truth:** [schema.prisma](../server/prisma/schema.prisma) and the migrations in
 [server/prisma/migrations/](../server/prisma/migrations)
 
-Names are English throughout — tables, columns and enum values
-([ADR 0006](decisions/0006-english-database-portuguese-contract.md)). Every table has `created_at`
+Names are English throughout — tables, columns, enum values, code and the JSON contract
+([ADR 0008](decisions/0008-english-everywhere.md)). Every table has `created_at`
 and `updated_at`, kept by Prisma, except `unit_residents`, which only records `created_at`.
 
 ## Diagram
@@ -127,6 +127,24 @@ Someone a resident expects. The oldest table, created before the condominium mod
 
 Indexed by `expected_date`, the column the list is always sorted by.
 
+## RefreshToken and LoginAttempt
+
+Added by the authentication feature. Rules in
+[Authentication and sessions](business-rules.md#authentication-and-sessions).
+
+There is **no session table**: a session is the chain of renewal credentials belonging to a user.
+Each rotation revokes one row and creates the next one, with a new 30-day deadline.
+
+| Table | What it holds |
+|---|---|
+| `refresh_tokens` | One row per renewal credential ever issued: `user_id`, the SHA-256 `token_hash`, its own `expires_at`, and `revoked_at` (set on rotation, on sign-out, or when a reuse revokes everything) |
+| `login_attempts` | The block counter, keyed by `email:…`, `ip:…` or `signup-ip:…`. Not a foreign key: an e-mail that does not exist still has to be counted |
+
+The credential itself is never stored — only its hash — so a leak of the table grants no sessions.
+Constraints: `refresh_tokens_expires_after_created`, `login_attempts_attempts_positive`, a
+unique index on `token_hash` and an index on `user_id` (used to revoke every credential of a
+user at once).
+
 ## Where the rules live
 
 The database does more than store: it refuses invalid data. A full list is in
@@ -157,7 +175,7 @@ The database does more than store: it refuses invalid data. A full list is in
 
 | Migration | What it did |
 |---|---|
-| `20260921011928_create_visitante` | First `visitantes` table, in Portuguese |
+| `20260921011928_create_visitante` | First visitors table, then named in Portuguese |
 | `20260929040257_rename_visitors_to_english` | Renamed table, columns and enum to English, keeping the rows |
 | `20260929040409_create_users_condominiums` | Condominiums, units, users, memberships, residency, plus every `CHECK`, partial index and trigger |
 

@@ -1,6 +1,6 @@
 # 0006 · English database, Portuguese API contract
 
-**Status:** Accepted · **Date:** 2026-09
+**Status:** Superseded by [0008](0008-english-everywhere.md) · **Date:** 2026-09
 
 ## Context
 
@@ -28,6 +28,13 @@ The existing table was renamed in a migration (`ALTER TABLE … RENAME`), keepin
 - **Translating in the controller** — would spread mapping tables across route handlers instead of
   keeping them in one service.
 
+## Why it was superseded
+
+The boundary worked, but it meant every reader crossed a language line, and every new resource had
+to repeat the mapping. On 2026-09-30 the author decided to move the whole project to English —
+contract included — which removes the translation entirely. See
+[ADR 0008](0008-english-everywhere.md).
+
 ## Consequences
 
 - Reading the code requires crossing one language boundary, always in the same file.
@@ -37,6 +44,6 @@ The existing table was renamed in a migration (`ALTER TABLE … RENAME`), keepin
   both directions are updated.
 - A field renamed in the database is invisible to the app, which is the point.
 
-**Evidence:** [visitante.service.ts](../../server/src/visitors/visitante.service.ts),
+**Evidence:** [visitor.service.ts](../../server/src/visitors/visitor.service.ts),
 [rename migration](../../server/prisma/migrations/20260929040257_rename_visitors_to_english/migration.sql),
 [schema.prisma](../../server/prisma/schema.prisma)

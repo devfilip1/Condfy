@@ -10,7 +10,9 @@ forces at the time, the alternatives, and what it costs.
 | [0003](0003-fastify-and-native-typescript.md) | Fastify plus Node's native TypeScript, no build step | Accepted | 2026-09 |
 | [0004](0004-integrity-rules-in-the-database.md) | Enforce integrity rules in PostgreSQL | Accepted | 2026-09 |
 | [0005](0005-scrypt-for-passwords.md) | Hash passwords with `scrypt` from Node's standard library | Accepted | 2026-09 |
-| [0006](0006-english-database-portuguese-contract.md) | English database, Portuguese API contract | Accepted | 2026-09 |
+| [0006](0006-english-database-portuguese-contract.md) | English database, Portuguese API contract | Superseded by 0008 | 2026-09 |
+| [0007](0007-jwt-with-rotating-refresh-tokens.md) | Short-lived JWT plus an opaque rotating renewal credential | Accepted | 2026-09 |
+| [0008](0008-english-everywhere.md) | English everywhere: code, contract and database | Accepted | 2026-09 |
 
 Decisions reconstructed from code carry the status `Reconstructed`. When a decision replaces
 another, the old one becomes `Superseded by NNNN` and is kept.

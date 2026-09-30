@@ -24,18 +24,18 @@ flowchart TB
     subgraph mobile["mobile/ — Expo app"]
         route["app/ routes<br/>thin re-exports"]
         screen["features/visitors/VisitorsScreen"]
-        hook["hooks/useVisitantes<br/>state + orchestration"]
-        svc["services/visitanteService<br/>+ http.ts"]
-        dom["domain/visitante.ts<br/>pure rules"]
+        hook["hooks/useVisitors<br/>state + orchestration"]
+        svc["services/visitorService<br/>+ http.ts"]
+        dom["domain/visitor.ts<br/>pure rules"]
         route --> screen --> hook --> svc
         screen --> dom
         hook --> dom
         svc --> dom
     end
     subgraph server["server/ — Fastify API"]
-        ctl["visitors/visitante.controller<br/>routes + HTTP"]
-        dto["visitors/visitante.dto<br/>validation"]
-        ssvc["visitors/visitante.service<br/>rules + PT↔EN translation"]
+        ctl["visitors/visitor.controller<br/>routes + HTTP"]
+        dto["visitors/visitor.dto<br/>validation"]
+        ssvc["visitors/visitor.service<br/>rules + date conversion"]
         pc["lib/prisma.ts<br/>single client"]
         pw["lib/password.ts<br/>scrypt"]
         ctl --> dto
@@ -87,21 +87,27 @@ Home and About. Route files are one line — [app/visitors.tsx](../mobile/app/vi
 re-exports `@/features/visitors` — so screens live with their feature and the route file only
 declares that the URL exists. There is no route guard: every screen is reachable by anyone.
 
-**Global state.** There is none, on purpose. No context, no store, no state library. Each screen
-gets its state from its feature hook, and the only state that exists today is the visitor list in
-[useVisitantes.ts](../mobile/features/visitors/hooks/useVisitantes.ts). That hook models the
-remote list as three exclusive states — `carregando`, `erro`, `pronto` — plus independent flags
+**Global state.** One context: `AuthProvider` in `features/auth`, holding the session as
+`loading`, `anonymous` or `authenticated`. While it is `loading` no screen decides
+anything, which is what stops the sign-in screen from flashing for someone who is already signed
+in. The root layout redirects between the `(auth)` group and the rest based on that state. Apart
+from it, each screen still gets its state from its feature hook — the visitor list lives in
+[useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts). That hook models the
+remote list as three exclusive states — `loading`, `erro`, `pronto` — plus independent flags
 for a submission in flight (`enviando`, `erroEnvio`) and a removal in flight (`removendo`,
 `erroRemocao`). When login arrives it will need shared state; that is the moment to reconsider
 ([ADR 0003](decisions/0003-fastify-and-native-typescript.md) discusses the related server choice).
 
-**Talking to the API.** [http.ts](../mobile/features/visitors/services/http.ts) is a small
-`fetch` wrapper: it prepends `EXPO_PUBLIC_API_URL`, serializes JSON, aborts after 10 seconds and
-converts every failure into a typed `ErroHttp` with one of three kinds — `rede` (no answer or
-timeout), `validacao` (`400` carrying field errors) and `servidor` (anything else). It produces no
-user-facing text. [visitanteService.ts](../mobile/features/visitors/services/visitanteService.ts)
+**Talking to the API.** [http.ts](../mobile/features/auth/services/http.ts) is a small
+`fetch` wrapper that now belongs to the auth feature: it prepends `EXPO_PUBLIC_API_URL`,
+attaches the access token, serializes JSON, aborts after 10 seconds, and on a `401` renews once
+and repeats the request — with a single shared renewal, so concurrent calls never rotate twice and
+kill the session. Failures become a typed `HttpError` with four kinds: `network` (no answer or
+timeout), `validation` (`400` carrying field errors), `session` (a `401` renewal could not
+fix) and `server` (anything else). It produces no
+user-facing text. [visitorService.ts](../mobile/features/visitors/services/visitorService.ts)
 turns responses into domain objects, narrowing `unknown` through the type guards in
-[domain/visitante.ts](../mobile/features/visitors/domain/visitante.ts). The hook decides the
+[domain/visitor.ts](../mobile/features/visitors/domain/visitor.ts). The hook decides the
 message the resident reads. The client lives inside the feature because `shared/lib/` is reserved
 for pure functions and `services/` is the only layer allowed to do I/O; it moves to `shared/` when
 a second feature needs HTTP.
@@ -110,7 +116,7 @@ a second feature needs HTTP.
 built by hand instead of `Alert.alert`, because `Alert` does nothing on web and a removal would
 then happen without confirmation. [DateField](../mobile/shared/components/DateField.tsx) is a
 calendar input that holds no date logic of its own — every calculation comes from
-[shared/lib/calendario.ts](../mobile/shared/lib/calendario.ts). Colors come from
+[shared/lib/calendar.ts](../mobile/shared/lib/calendar.ts). Colors come from
 [shared/constants/Colors.ts](../mobile/shared/constants/Colors.ts); there is no global stylesheet.
 
 ## Main flow: registering a visitor
@@ -118,15 +124,15 @@ calendar input that holds no date logic of its own — every calculation comes f
 ```mermaid
 sequenceDiagram
     participant S as VisitorsScreen
-    participant H as useVisitantes
-    participant Svc as visitanteService
+    participant H as useVisitors
+    participant Svc as visitorService
     participant C as controller
     participant Sv as service
     participant DB as PostgreSQL
 
     S->>H: adicionarVisitante(entrada)
     H->>H: validarNovoVisitante — invalid stops here, no network
-    H->>Svc: POST /visitantes
+    H->>Svc: POST /visitors
     Svc->>C: HTTP request
     C->>C: validarNovoVisitante (server copy)
     alt invalid
@@ -135,9 +141,9 @@ sequenceDiagram
         H-->>S: errors under each field, form stays open
     else valid
         C->>Sv: criarVisitante(dados)
-        Sv->>DB: insert (date as midnight UTC, type translated to English)
+        Sv->>DB: insert (date as midnight UTC)
         DB-->>Sv: row
-        Sv-->>C: Visitante (Portuguese contract)
+        Sv-->>C: Visitor (contract shape)
         C-->>Svc: 201 + visitor
         Svc-->>H: Visitante
         H-->>S: inserted in the list, re-sorted, form closes
@@ -150,13 +156,18 @@ leaving the resident without the visitor they just registered.
 
 ## Cross-cutting concerns
 
-- **Authentication and authorization:** none. Any device on the network can call every route.
+- **Authentication:** e-mail and password, exchanged for a 15-minute JWT and a rotating renewal
+  credential. The visitor routes require the token; a `preHandler` verifies it and puts the user
+  id on the request, which is the only source of identity. See
+  [Authentication and sessions](business-rules.md#authentication-and-sessions).
+- **Authorization:** none yet. Roles exist in the database but nothing reads them: being signed in
+  grants everything.
 - **Validation:** duplicated on purpose between app and server, with identical messages, so the
   server's rejection lands under the right form field without any translation layer.
 - **Error handling (server):** [server.ts](../server/src/server.ts) lets Fastify's own errors
   below `500` through (malformed JSON becomes `400`) and turns anything else into
   `500 { mensagem: "Internal server error." }`, logging the cause without the body.
-- **Error handling (app):** all failures become one of the three `ErroHttp` kinds and then a
+- **Error handling (app):** all failures become one of the three `HttpError` kinds and then a
   message; the list never silently empties.
 - **Logging:** Fastify's pino logger with default serializers — method, URL, status, duration.
   No request body, no personal data ([RN-USR-04](business-rules.md#rn-usr-04--personal-data-never-reaches-the-logs)).
@@ -176,18 +187,20 @@ leaving the resident without the visitor they just registered.
 | [0004](decisions/0004-integrity-rules-in-the-database.md) | Enforce integrity rules in PostgreSQL, not only in application code |
 | [0005](decisions/0005-scrypt-for-passwords.md) | Hash passwords with `scrypt` from Node's standard library |
 | [0006](decisions/0006-english-database-portuguese-contract.md) | English database, Portuguese API contract, translated in one place |
+| [0007](decisions/0007-jwt-with-rotating-refresh-tokens.md) | Short-lived JWT plus an opaque rotating renewal credential |
 
 ## Risks and technical debt
 
-- **The API is wide open.** No authentication, no authorization, and `DELETE /visitantes/:id`
-  needs nothing but an id. It is acceptable only because the server is bound to a local network
-  during development; it must not be exposed to the internet before the login feature.
+- **Open sign-up with global visitors.** Authentication now exists, but anyone who reaches the
+  server can create an account and then see every visitor of every condominium. Sign-up needs
+  approval or invites before this is published, and credentials travel in clear text without
+  HTTPS.
 - **Visitors live outside the condominium model.** See
   [gaps](business-rules.md#inconsistencies-and-gaps-found). Any future "visitors of my
   condominium" query requires a migration and a decision about existing rows.
 - **Duplicated validation drifts silently.** Nothing fails if
-  [visitante.dto.ts](../server/src/visitors/visitante.dto.ts) and
-  [domain/visitante.ts](../mobile/features/visitors/domain/visitante.ts) disagree; the app would
+  [visitor.dto.ts](../server/src/visitors/visitor.dto.ts) and
+  [domain/visitor.ts](../mobile/features/visitors/domain/visitor.ts) disagree; the app would
   simply show a server message that does not match its own rule.
 - **No automated tests.** Every regression is caught by hand. The riskiest area is the date
   conversion, where an error is invisible until someone in another timezone looks at a card.

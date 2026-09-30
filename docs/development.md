@@ -87,13 +87,13 @@ The API can be exercised without the app, which is the fastest way to tell an ap
 server bug:
 
 ```bash
-curl http://localhost:3333/visitantes
+curl http://localhost:3333/visitors
 
-curl -X POST http://localhost:3333/visitantes \
+curl -X POST http://localhost:3333/visitors \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Jane Smith","tipo":"visitante","dataPrevista":"2026-09-14","autorizadoPor":"Carlos"}'
+  -d '{"name":"Jane Smith","type":"visitor","expectedDate":"2026-09-14","authorizedBy":"Carlos"}'
 
-curl -i -X DELETE http://localhost:3333/visitantes/<id>     # 204, twice in a row
+curl -i -X DELETE http://localhost:3333/visitors/<id>     # 204, twice in a row
 ```
 
 In the app, the scenarios worth re-checking after touching the visitor module: list loads and is
@@ -118,8 +118,7 @@ npx prisma studio      # from server/
   `erasableSyntaxOnly`, because Node only strips types, it does not compile them.
 - **`any` is forbidden** in both projects. External JSON enters as `unknown` and passes through a
   type guard.
-- **The database is English, the API contract is Portuguese.** Only the resource service
-  translates ([ADR 0006](decisions/0006-english-database-portuguese-contract.md)).
+- **Everything is English.** Contract, code and database share one vocabulary, so nothing translates ([ADR 0006](decisions/0006-english-database-portuguese-contract.md)).
 - **Never run `npm audit fix --force` in `server/`.** It downgrades Prisma across a major version
   and breaks the configuration. Use `npm audit --omit=dev` to see what actually ships.
 - **Spec Kit artifacts are local only.** `.specify/`, `specs/` and `.claude/` are in `.gitignore`;
@@ -159,7 +158,7 @@ npx prisma studio      # from server/
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| App shows *Couldn't load visitors* | The API is not running, or the phone cannot reach it | Start `npm run dev` in `server/`; open `http://<IP>:3333/visitantes` in the phone's browser to tell the two apart |
+| App shows *Couldn't load visitors* | The API is not running, or the phone cannot reach it | Start `npm run dev` in `server/`; open `http://<IP>:3333/visitors` in the phone's browser to tell the two apart |
 | It worked yesterday, not today | The computer's Wi-Fi IP changed | `ipconfig`, update `.env.local`, restart Metro with `--clear` |
 | Windows firewall prompt on first run | Node listening on the network | Allow it on **private** networks, otherwise the phone cannot connect |
 | `npm run dev` fails to import the Prisma Client | `generated/` is missing or stale | `npm run db:generate` |

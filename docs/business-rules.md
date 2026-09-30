@@ -21,18 +21,18 @@ The visitor form and its validation messages are in English, like the rest of th
 Surrounding spaces are trimmed before validating and before storing, so a name made only of
 spaces counts as empty.
 
-- **Where:** app — [visitante.ts](../mobile/features/visitors/domain/visitante.ts),
-  `validarNovoVisitante`; server — [visitante.dto.ts](../server/src/visitors/visitante.dto.ts);
+- **Where:** app — [visitor.ts](../mobile/features/visitors/domain/visitor.ts),
+  `validateNewVisitor`; server — [visitor.dto.ts](../server/src/visitors/visitor.dto.ts);
   database — column `name VARCHAR(60)` in [schema.prisma](../server/prisma/schema.prisma)
 - **Message:** `Name is required.` / `Name must be at most 60 characters.`
 
 ### RN-VIS-02 · The visit type is one of three fixed values
 
-`visitante` (a person), `entrega` (a delivery) or `prestador` (a service provider). The app shows
-them as *Visitor*, *Delivery* and *Service*.
+`visitor` (a person), `delivery` or `service_provider`. The app shows them as *Visitor*,
+*Delivery* and *Service*. Contract and database use the same three values.
 
 - **Where:** app — `TIPOS_VISITA` in
-  [visitante.ts](../mobile/features/visitors/domain/visitante.ts); database — enum `VisitType`
+  [visitor.ts](../mobile/features/visitors/domain/visitor.ts); database — enum `VisitType`
   in [schema.prisma](../server/prisma/schema.prisma), which rejects any other value at insert time
 - **Message:** `Select a visit type.`
 
@@ -42,8 +42,8 @@ The date is a day, never a moment: no time, no timezone. `2026-02-31` is rejecte
 never has 31 days. Dates in the past are accepted — the system does not expire or clean up
 visitors.
 
-- **Where:** app — `ehDataISOValida` in [calendario.ts](../mobile/shared/lib/calendario.ts);
-  server — its own copy in [visitante.dto.ts](../server/src/visitors/visitante.dto.ts);
+- **Where:** app — `ehDataISOValida` in [calendar.ts](../mobile/shared/lib/calendar.ts);
+  server — its own copy in [visitor.dto.ts](../server/src/visitors/visitor.dto.ts);
   database — column `expected_date DATE`
 - **Message:** `Expected date is required.` / `Enter a real date as DD/MM/YYYY.`
 
@@ -53,8 +53,8 @@ A visitor expected on the 14th shows the 14th on any device, in any timezone. Th
 at the boundary: `"2026-09-14"` becomes midnight UTC on the way in, and the date is read back in
 UTC on the way out.
 
-- **Where:** [visitante.service.ts](../server/src/visitors/visitante.service.ts), `paraVisitante`
-  and `criarVisitante`
+- **Where:** [visitor.service.ts](../server/src/visitors/visitor.service.ts), `toVisitor`
+  and `createVisitor`
 - **Why it matters:** reading a `DATE` in local time is the classic off-by-one-day bug.
 
 ### RN-VIS-05 · The authorizing resident is required
@@ -70,18 +70,18 @@ Ties are broken by creation order, then by id, so the order never shuffles betwe
 server sorts; the app re-sorts only when it inserts a newly created visitor into the list it
 already has.
 
-- **Where:** server — `listarVisitantes` in
-  [visitante.service.ts](../server/src/visitors/visitante.service.ts); app —
-  `ordenarPorDataPrevista` in [visitante.ts](../mobile/features/visitors/domain/visitante.ts)
+- **Where:** server — `listVisitors` in
+  [visitor.service.ts](../server/src/visitors/visitor.service.ts); app —
+  `sortByExpectedDate` in [visitor.ts](../mobile/features/visitors/domain/visitor.ts)
 
 ### RN-VIS-07 · Removing a visitor twice is not an error
 
 Deleting a visitor that no longer exists (already removed on another device) returns the same
 success as deleting an existing one, and the app just refreshes its list.
 
-- **Where:** server — `removerVisitante` uses `deleteMany` in
-  [visitante.service.ts](../server/src/visitors/visitante.service.ts); the route answers `204`
-  either way ([visitante.controller.ts](../server/src/visitors/visitante.controller.ts))
+- **Where:** server — `removeVisitor` uses `deleteMany` in
+  [visitor.service.ts](../server/src/visitors/visitor.service.ts); the route answers `204`
+  either way ([visitor.controller.ts](../server/src/visitors/visitor.controller.ts))
 
 ### RN-VIS-08 · Visitors cannot be edited
 
@@ -89,7 +89,7 @@ There is no update route and no edit screen, by product decision. Fixing a wrong
 removing it and registering it again.
 
 - **Where:** absence of `PUT`/`PATCH` in
-  [visitante.controller.ts](../server/src/visitors/visitante.controller.ts)
+  [visitor.controller.ts](../server/src/visitors/visitor.controller.ts)
 
 ### RN-VIS-09 · A visitor only appears after the server confirms it
 
@@ -97,14 +97,14 @@ The app never shows an optimistic card. While the request is in flight the confi
 disabled, which also prevents a double tap from creating two visitors.
 
 - **Where:** `adicionarVisitante` in
-  [useVisitantes.ts](../mobile/features/visitors/hooks/useVisitantes.ts) (the `enviandoRef` guard)
+  [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts) (the `enviandoRef` guard)
 
 ### RN-VIS-10 · A failed load never looks like an empty list
 
 If the list cannot be fetched, the screen shows a failure message and a *Try again* button. The
 "no visitors yet" message is reserved for a successful, genuinely empty response.
 
-- **Where:** `lista` state in [useVisitantes.ts](../mobile/features/visitors/hooks/useVisitantes.ts);
+- **Where:** `lista` state in [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts);
   rendering in [VisitorsScreen.tsx](../mobile/features/visitors/VisitorsScreen.tsx)
 - **Message:** `Couldn't load visitors. Check your connection and try again.`
 
@@ -223,13 +223,99 @@ rolled back. Managers and doormen may live in a unit but are not required to.
 
 ---
 
+## Authentication and sessions
+
+### RN-AUT-01 · Signing in never reveals which e-mails exist
+
+A wrong password and an unknown e-mail get the same message and the same response time — the
+server hashes a throwaway password when the account does not exist, so the delay matches.
+
+- **Where:** `signIn` in [auth.service.ts](../server/src/auth/auth.service.ts)
+- **Message:** `E-mail or password is incorrect.`
+- **Known exception:** signing up must say when an e-mail is already in use (RN-AUT-08), which
+  does expose existence. Closing that would require e-mail confirmation, deliberately out of scope.
+
+### RN-AUT-02 · Five failures block sign-in for 15 minutes
+
+Counted on two axes at once — the e-mail and the request origin — and whichever hits the limit
+first blocks. During the block, even the correct password is refused, so the block never confirms
+a guess. A successful sign-in clears the e-mail counter; the origin counter stays.
+
+- **Where:** `checkLockout`, `recordFailure` and `clearFailures` in
+  [auth.service.ts](../server/src/auth/auth.service.ts); table `login_attempts`
+- **Message:** `Too many attempts. Try again in a few minutes.` with `Retry-After`
+- **Why both axes:** only by e-mail, anyone could lock someone else's account on purpose; only by
+  origin, an attacker who changes IP walks through.
+
+### RN-AUT-03 · Using the app keeps you signed in; 30 days away ends it
+
+The access credential lasts 15 minutes and is renewed silently. Each renewal issues a renewal
+credential with a **new** 30-day deadline, so opening the app at least once a month means never
+typing the password again. Thirty days without opening it, and the credential expires.
+
+- **Where:** `issueCredentials` and `refresh` in
+  [auth.service.ts](../server/src/auth/auth.service.ts); `refresh_tokens.expires_at`
+
+### RN-AUT-04 · Reusing a renewal credential signs the person out everywhere
+
+Each renewal revokes the credential it replaces. Presenting an already-revoked one means someone
+holds a copy, so **every** renewal credential of that user is revoked — every device. The person
+signs in again, and the thief's copy is worthless.
+
+The swap is atomic: the update filters on `revoked_at IS NULL`, so two simultaneous renewals with
+the same credential race in the database and exactly one wins. The loser takes the reuse path.
+
+- **Where:** `refresh` and `revokeAllForUser` in
+  [auth.service.ts](../server/src/auth/auth.service.ts)
+- **Cost accepted:** a lost response followed by a retry looks exactly like a copy, and signs the
+  person out of every device. The app renews once at a time, which avoids causing it itself.
+
+### RN-AUT-05 · The access token carries identity and nothing else
+
+`sub`, `iat`, `exp`, `iss`. No role, no condominium: a token never goes stale because
+something changed elsewhere, and the API never has to trust a claim about permissions.
+
+- **Where:** `assinarAcesso` in [auth.controller.ts](../server/src/auth/auth.controller.ts)
+
+### RN-AUT-06 · A deleted account keeps access for at most 15 minutes
+
+Verifying the token does not touch the database, so the access credential stays valid until it
+expires. Renewal is refused immediately, which caps the window at one cycle.
+
+- **Where:** [authenticate.ts](../server/src/auth/authenticate.ts); the cascade from
+  `users` to `refresh_tokens`
+
+### RN-AUT-07 · Signing out works without a network
+
+The app erases the credentials from the device first, then tells the server. If that call fails,
+it is forgotten: the orphan credential dies by expiry or on the first reuse attempt (RN-AUT-04).
+
+- **Where:** `signOut` in [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx) and in
+  [auth.service.ts](../server/src/auth/auth.service.ts)
+
+### RN-AUT-08 · An account is created without a condominium
+
+Sign-up asks for name, e-mail and password, and signs the person in. It creates no membership, no
+role and no residency: linking a person to a condominium is a later feature. A `resident`
+membership without a unit would be refused by the database anyway
+([RN-RES-02](#rn-res-02--every-resident-lives-in-at-least-one-unit)).
+
+- **Where:** `signUp` in [auth.service.ts](../server/src/auth/auth.service.ts)
+- **Messages:** `This e-mail is already in use.` · `Enter a valid e-mail.` ·
+  `Password must be at least 8 characters.`
+- **Risk accepted:** sign-up is open and visitors are still global, so anyone who reaches the
+  server can create an account and see every visitor. Acceptable only on a development network;
+  before publishing, sign-up needs approval by the manager or an invite.
+
+---
+
 ## Entity lifecycles
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Registered: POST /visitantes
-    Registered --> [*]: DELETE /visitantes/:id
+    [*] --> Registered: POST /visitors
+    Registered --> [*]: DELETE /visitors/:id
     note right of Registered
         No editing (RN-VIS-08)
         Past dates stay listed
@@ -256,8 +342,8 @@ RN-MEM-03).
   [RN-RES-01](#rn-res-01--a-resident-only-lives-in-units-of-a-condominium-they-belong-to); and
   what happens to the rows already registered, which have no condominium to point at.
 - **The same validation lives in two files by design.** The rules in
-  [visitante.ts](../mobile/features/visitors/domain/visitante.ts) (app) and
-  [visitante.dto.ts](../server/src/visitors/visitante.dto.ts) (server) must be changed together,
+  [visitor.ts](../mobile/features/visitors/domain/visitor.ts) (app) and
+  [visitor.dto.ts](../server/src/visitors/visitor.dto.ts) (server) must be changed together,
   including the message text — the app shows the server's message under the right field. The
   server file carries a comment pointing at the app file.
 - **One server-side rule is unreachable from the interface.** The name field has
@@ -265,5 +351,8 @@ RN-MEM-03).
   server; only a direct API call can.
 - **`visitors.updated_at` is never meaningful.** Visitors cannot be edited (RN-VIS-08), so the
   column only ever equals `created_at`.
-- **Roles are stored but never checked.** Nothing in the app or API reads `role` yet; any caller
-  can do anything (see [risks](architecture.md#risks-and-technical-debt)).
+- **Roles are stored but never checked.** Nothing in the app or API reads `role` yet. Signing in
+  proves who someone is, not what they may do (see [risks](architecture.md#risks-and-technical-debt)).
+- **Validation is duplicated for accounts too**, between
+  [sessao.ts](../mobile/features/auth/domain/session.ts) and
+  [auth.dto.ts](../server/src/auth/auth.dto.ts), with the same message text.

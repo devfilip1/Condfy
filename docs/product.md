@@ -56,14 +56,14 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     R->>App: opens the Visitors module
-    App->>API: GET /visitantes
+    App->>API: GET /visitors
     API->>DB: select ordered by expected date
     DB-->>API: rows
     API-->>App: JSON list
     App-->>R: cards, nearest visit first
     R->>App: fills the form and confirms
     App->>App: validates locally (friendly errors, no network)
-    App->>API: POST /visitantes
+    App->>API: POST /visitors
     API->>API: validates again (cannot trust the caller)
     API->>DB: insert
     DB-->>API: row with generated id
@@ -89,20 +89,21 @@ disappears. A failure at any point keeps the list untouched and explains what ha
 
 ## Glossary
 
-The domain vocabulary is Portuguese in the app and in the JSON contract, English in the database
-([ADR 0006](decisions/0006-english-database-portuguese-contract.md)).
+The domain is named in English everywhere — code, JSON contract and database
+([ADR 0008](decisions/0008-english-everywhere.md)). The Portuguese column is what a resident or a
+manager calls each thing in conversation.
 
-| Term | Meaning | In the API/app | In the database |
-|---|---|---|---|
-| Condomínio | The gated community or building served by the system; the root of all data | — | `Condominium` |
-| Unidade | An apartment or house inside a condominium, identified by number and optional block | — | `Unit` |
-| Morador | A person who lives in one or more units of a condominium | — | role `resident` |
-| Síndico | The elected manager of a condominium; at most one at a time | — | role `manager` |
-| Portaria | Front desk staff | — | role `doorman` |
-| Vínculo | A person's membership in a condominium, carrying the role | — | `CondominiumMember` |
-| Moradia | The record that a person lives in a given unit | — | `UnitResident` |
-| Visitante | Someone a resident expects to receive | `Visitante`, `visitante` | `Visitor`, `visitor` |
-| Entrega | A delivery (package, food) | `entrega` | `delivery` |
-| Prestador | A service provider (plumber, technician) | `prestador` | `service_provider` |
-| Data prevista | The calendar day the visitor is expected, no time of day | `dataPrevista` | `expected_date` |
-| Autorizado por | The resident who authorized the visit, free text today | `autorizadoPor` | `authorized_by` |
+| Termo (conversa) | Meaning | In code, contract and database |
+|---|---|---|
+| Condomínio | The gated community or building served by the system; the root of all data | `Condominium` |
+| Unidade | An apartment or house inside a condominium, identified by number and optional block | `Unit` |
+| Morador | A person who lives in one or more units of a condominium | role `resident` |
+| Síndico | The elected manager of a condominium; at most one at a time | role `manager` |
+| Portaria | Front desk staff | role `doorman` |
+| Vínculo | A person's membership in a condominium, carrying the role | `CondominiumMember` |
+| Moradia | The record that a person lives in a given unit | `UnitResident` |
+| Visitante | Someone a resident expects to receive | `Visitor`, `visitor` |
+| Entrega | A delivery (package, food) | `delivery` |
+| Prestador | A service provider (plumber, technician) | `service_provider` |
+| Data prevista | The calendar day the visitor is expected, no time of day | `expected_date` |
+| Autorizado por | The resident who authorized the visit, free text today | `authorized_by` |

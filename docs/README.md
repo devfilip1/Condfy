@@ -5,7 +5,7 @@ life from their phones. The visitor module is the first one running end to end; 
 for condominiums, units and user accounts is in place.
 
 **Stack:** Expo SDK 57 · React Native 0.86 · Fastify 5 · Prisma 7 · PostgreSQL 17 · TypeScript 6 ·
-**Status:** in development, no authentication yet, local network only
+**Status:** in development, authentication in place, local network only
 
 ## Documentation map
 
@@ -47,8 +47,10 @@ flowchart LR
   not only by application code ([ADR 0004](decisions/0004-integrity-rules-in-the-database.md)).
 - **Validation runs twice on purpose.** The app validates for a friendly error without spending
   the network; the server validates because it cannot trust its caller.
-- **No authentication yet.** Any client on the same Wi-Fi can read, create and delete visitors.
-  The API is meant for local development only until the login feature exists.
+- **Sign-in is required, sign-up is open.** Visitor routes need a token; anyone who reaches the
+  server can create an account and then see every visitor, because visitors still have no owner.
+  That combination is only acceptable on a development network
+  ([ADR 0007](decisions/0007-jwt-with-rotating-refresh-tokens.md)).
 - **No automated tests.** Verification is manual, through type checks, lint and the scripted
   scenarios in [development.md](development.md#manual-verification).
 
@@ -76,4 +78,4 @@ flowchart LR
   screen distinguishes them from residents.
 
 ---
-Last updated: 2026-09-29 (4e37411)
+Last updated: 2026-09-29 (authentication feature)
