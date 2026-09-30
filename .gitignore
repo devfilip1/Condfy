@@ -24,3 +24,6 @@ server/.agents/
 server/.windsurf/
 server/.expo/
 server/skills-lock.json
+
+# Estado do editor de notas
+docs/.obsidian/
