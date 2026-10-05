@@ -2,12 +2,13 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import Fastify from "fastify";
 
-import { JWT_SECRET } from "./lib/config.ts";
-import { prisma } from "./lib/prisma.ts";
 import authController from "./auth/auth.controller.ts";
 import { authenticate } from "./auth/authenticate.ts";
 import commonAreaController from "./condominiums/commonArea.controller.ts";
 import noticeController from "./condominiums/notice.controller.ts";
+import reservationController from "./condominiums/reservation.controller.ts";
+import { JWT_SECRET } from "./lib/config.ts";
+import { prisma } from "./lib/prisma.ts";
 import visitorController from "./visitors/visitor.controller.ts";
 
 // Os serializers padrão registram método, URL, status e tempo; nunca o body (FR-017).
@@ -31,6 +32,7 @@ await app.register(
     await instancia.register(visitorController, { prefix: "/visitors" });
     await instancia.register(commonAreaController, { prefix: "/condominiums" });
     await instancia.register(noticeController, { prefix: "/condominiums" });
+    await instancia.register(reservationController, { prefix: "/condominiums" });
   },
   { name: "rotas-protegidas" }
 );
