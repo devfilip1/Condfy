@@ -1,14 +1,16 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 
 import { ACCESS_TOKEN_TTL_SECONDS } from "../lib/config.ts";
-import { validateSignUp, validateSignIn } from "./auth.dto.ts";
+import { authenticate } from "./authenticate.ts";
+import { validateSignIn, validateSignUp } from "./auth.dto.ts";
 import {
   AuthError,
   SignUpError,
-  signUp,
-  signIn,
+  getProfile,
   refresh,
+  signIn,
   signOut,
+  signUp,
   type SignAccessToken,
 } from "./auth.service.ts";
 
@@ -103,6 +105,28 @@ const authController: FastifyPluginAsync = async (app) => {
     }
     // Sempre 204: signOut de uma sessão que já não existe é o mesmo result (FR-017).
     return reply.code(204).send();
+  });
+
+  /**
+   * Quem está autenticado, e onde pertence.
+   *
+   * O `preHandler` está na rota, e não num escopo em `server.ts` como acontece com `/visitors`,
+   * porque as outras três rotas deste controller são públicas: um escopo cobriria todas.
+   */
+  app.get("/me", { preHandler: authenticate }, async (request, reply) => {
+    const userId = request.authUser?.id;
+    if (!userId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    try {
+      return reply.send(await getProfile(userId));
+    } catch (error) {
+      if (error instanceof AuthError) {
+        return replyWithFailure(error, reply);
+      }
+      throw error;
+    }
   });
 
   app.post("/sessions/refresh", async (request, reply) => {

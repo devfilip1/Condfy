@@ -1,4 +1,5 @@
 import type { User } from "../../generated/prisma/client.ts";
+import type { Role } from "../../generated/prisma/enums.ts";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   LOCKOUT_MINUTES,
@@ -324,5 +325,89 @@ export async function signUp(
   return {
     user: toAuthUser(user),
     credentials: await issueCredentials(user.id, signAccessToken),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Perfil de quem está autenticado                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Unidade onde a pessoa mora. `block` é `null` em condomínio sem blocos; juntos, `block` e
+ * `number` SÃO o apartamento — não existe outra coluna para isso (research R-005).
+ */
+export interface ProfileUnit {
+  id: string;
+  block: string | null;
+  number: string;
+}
+
+/**
+ * Vínculo com um condomínio.
+ *
+ * É uma LISTA no perfil, e `units` é uma lista dentro dela, porque a mesma pessoa pode pertencer a
+ * mais de um condomínio com cargo diferente em cada um, e morar em mais de uma unidade do mesmo
+ * condomínio. É também o motivo de o token não carregar condomínio nem unidade (RN-AUT-05).
+ */
+export interface ProfileMembership {
+  condominium: { id: string; name: string };
+  role: Role;
+  /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
+  units: ProfileUnit[];
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  memberships: ProfileMembership[];
+}
+
+/**
+ * Perfil de quem está autenticado: quem é, e onde pertence.
+ *
+ * Existe para o aplicativo não precisar guardar nome e e-mail no aparelho, e para as telas saberem
+ * em qual condomínio e unidade a pessoa pode agir — o seletor de unidade do formulário de visitante
+ * sai daqui.
+ *
+ * Conta apagada com credencial ainda válida cai em `AuthError("session")`. Verificar o token não
+ * consulta o banco (RN-AUT-06), mas esta rota consulta, então é aqui que aquela janela fecha.
+ */
+export async function getProfile(userId: string): Promise<Profile> {
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      memberships: {
+        select: {
+          role: true,
+          condominium: { select: { id: true, name: true } },
+          residences: {
+            select: {
+              unit: { select: { id: true, block: true, number: true } },
+            },
+            orderBy: [{ unit: { block: "asc" } }, { unit: { number: "asc" } }],
+          },
+        },
+        orderBy: { condominium: { name: "asc" } },
+      },
+    },
+  });
+
+  if (!row) {
+    throw new AuthError("session");
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    memberships: row.memberships.map((membership) => ({
+      condominium: membership.condominium,
+      role: membership.role,
+      units: membership.residences.map((residence) => residence.unit),
+    })),
   };
 }
