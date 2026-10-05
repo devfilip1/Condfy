@@ -159,6 +159,16 @@ model Reservation {
   /// Aponta para o vínculo, não para o usuário: só existe se quem reservou pertence ao condomínio.
   reservedBy CondominiumMember @relation(fields: [reservedById, condominiumId], references: [userId, condominiumId], onDelete: Cascade)
 
+  // NADA de duas reservas no mesmo horário do mesmo local. Como a grade é fixa e toda reserva se
+  // alinha a ela, duas reservas do mesmo horário carregam obrigatoriamente os MESMOS três valores:
+  // a reserva dupla deixa de ser pergunta sobre intervalos e passa a ser chave duplicada, que o
+  // Postgres recusa sem ser pedido duas vezes. Dois INSERTs simultâneos chegam ao índice, um passa
+  // e o outro é recusado pelo banco — não por um "confere antes de gravar", que os dois passariam
+  // (research R-001). `endMinute` fica fora da chave: a CHECK o amarra a `startMinute + 120`.
+  @@unique([commonAreaId, date, startMinute])
+  // A grade em si é uma CHECK escrita à mão na migration (`reservations_slot_grid_check`): o Prisma
+  // não expressa CHECK (ADR 0004), e a regra precisa valer para a seed e para scripts, não só para
+  // quem passa pela API (research R-002).
   @@index([commonAreaId, date])
   @@map("reservations")
 }
