@@ -201,7 +201,8 @@ Indexed by `(condominium_id, is_available)` — the catalogue query, and the onl
 
 ### Reservation
 
-A held slot of a common area. The table exists; **no route writes to it yet**.
+A held slot of a common area. Written by the booking screen, and the first table in the project
+two people can race for.
 
 | Field | Meaning |
 |---|---|
@@ -218,6 +219,8 @@ by an admin or a cancellation history would be a new column and a new rule.
 | `(common_area_id, condominium_id) → common_areas(id, condominium_id)` | The place belongs to the reservation's condominium |
 | `(reserved_by_id, condominium_id) → condominium_members(user_id, condominium_id)` | Whoever booked has a membership in that condominium |
 | `reservations_minutes_check` | Ends after it starts, never crosses midnight, never zero-length |
+| `reservations_slot_grid_check` | `start_minute` is one of the eight grid values and `end_minute` is exactly `start_minute + 120` |
+| `UNIQUE (common_area_id, date, start_minute)` | **No double booking**, decided by the database under concurrency ([ADR 0011](decisions/0011-no-double-booking-is-a-unique-index.md)) |
 
 Deleting a membership cascades to that person's reservations; a common area with reservations cannot
 be deleted (`Restrict`) — switch `is_available` off instead, which is why that column exists.
@@ -234,9 +237,28 @@ timezone. Prisma's `@db.Time` was rejected because it returns a JavaScript `Date
 1970-01-01, so any local-time read shifts it. Conversion to `"HH:MM"` happens at the API boundary,
 where Principle IV puts it: the app never sees a minute count, the database never sees a string.
 
-A `GiST` exclusion constraint would let Postgres refuse overlapping reservations declaratively. It
-was not added because nothing can create a reservation yet; it is the natural upgrade when booking is
-built.
+#### Why a unique index and not an exclusion constraint
+
+The eight-slot grid is fixed — 07:00–09:00 through 21:00–23:00, the same for every place and every
+day — and `reservations_slot_grid_check` keeps every row on it. So two bookings of the same slot
+carry *the same three column values*, and "no overlapping reservations" becomes "no duplicate key",
+which a `UNIQUE` index settles inside the write.
+
+A `GiST` exclusion constraint over a `tsrange` is the general answer, and the right one if periods
+were arbitrary. With a fixed grid, overlap can only mean equality, so it would cost `btree_gist`, a
+column shape Prisma cannot model and raw SQL in every query to express what the index already
+expresses. If per-place opening hours ever make the grid variable, that is when to revisit it
+([ADR 0011](decisions/0011-no-double-booking-is-a-unique-index.md)).
+
+#### What the schema cannot hold
+
+A reservation may be made from today up to **60 days ahead**, and that rule is **not** in the
+database. A CHECK may only call immutable functions, and "today" is the opposite of immutable, so
+the window lives in the service and is checked on both sides.
+
+The split is deliberate rather than an omission: the grid and the uniqueness are properties of the
+data, the window is a property of *when the request arrives*. A row 90 days out is odd but harmless;
+two rows in one slot is a resident standing outside a locked party room.
 
 ### Notice
 

@@ -377,14 +377,84 @@ A reservation stores a date, a start and an end, as minutes after midnight. Four
 by the database rather than by code: it ends after it starts, it never crosses midnight, it is never
 zero-length, and it can only exist for a place in a condominium the person belongs to.
 
-It carries **no status**. The row's existence is the booking, and releasing a slot deletes it. The
-consequence, accepted deliberately: the system cannot say who booked a place and gave it up.
-
-**Nothing creates a reservation yet.** The table and its guarantees exist so that the shape was
-decided before any screen depended on it; the booking flow is a later feature.
+It carries **no status**. The row's existence is the booking, and cancelling deletes it. The
+consequence, accepted deliberately: the system cannot say who booked a place and gave it up —
+a cancelled booking leaves no trace at all (RN-RSV-08).
 
 - **Where:** `reservations_minutes_check` in
   [the migration](../server/prisma/migrations/20261004161156_add_common_areas_and_reservations/migration.sql)
+
+### RN-RSV-04 · A reservation is one of eight fixed slots, never a typed time
+
+The day is divided into eight two-hour slots, the same for every place and every day: 07:00–09:00,
+09:00–11:00, 11:00–13:00, 13:00–15:00, 15:00–17:00, 17:00–19:00, 19:00–21:00, 21:00–23:00. A
+resident picks one; nobody types or drags a time, and nothing outside the grid can be stored.
+
+The rule is in the **database**, not only in the request validator, so it also holds for the seed,
+for a script and for a row inserted by hand. It is stated three times on purpose, and two of those
+are not the same kind of statement: the two `slot.ts` modules decide what to **offer**, the CHECK
+decides what may **exist**.
+
+- **Where:** `reservations_slot_grid_check` in the migration,
+  [server/src/condominiums/slot.ts](../server/src/condominiums/slot.ts) and
+  [mobile/features/reservations/domain/slot.ts](../mobile/features/reservations/domain/slot.ts)
+
+### RN-RSV-05 · Two people cannot hold the same slot, and the database is what decides
+
+Exactly one of two simultaneous attempts at the same slot succeeds. The other is refused with a
+`409` saying the time was just taken, and the list refreshes without it.
+
+The guarantee is a **unique index** on `(common_area_id, date, start_minute)`, not a "is it free?"
+read before the insert — two requests can both pass such a read and both write. This is the first
+rule in the project where concurrency can produce a wrong answer, and the reasoning is recorded in
+[ADR 0011](decisions/0011-no-double-booking-is-a-unique-index.md).
+
+- **Where:** the unique index in the migration, and the `P2002` translation in
+  [reservation.service.ts](../server/src/condominiums/reservation.service.ts)
+
+### RN-RSV-06 · Bookings reach 60 days ahead, and the server is what enforces it
+
+A resident may book from today up to 60 days ahead, counted in whole days, so a booking made at
+23:00 reaches the same last day as one made at 07:00. The calendar does not offer a day outside the
+window, and the API refuses one anyway — a screen that hides something is a courtesy, not a rule.
+
+Unlike the grid, this one **cannot** live in the database: a CHECK may only call immutable
+functions, and "today" is not one. It is the first rule in the project where that distinction
+matters.
+
+- **Where:** `validateNewReservation` in
+  [reservation.dto.ts](../server/src/condominiums/reservation.dto.ts)
+
+### RN-RSV-07 · Only what is free is shown, and only the server decides what that means
+
+A slot held by somebody else is **absent** from the list — not greyed out, not labelled. Nothing
+anywhere says who holds a slot. A slot of today whose start time has passed is absent too.
+
+The server computes this, on its own clock, because its clock is the one that will accept or refuse
+the booking. If the device decided, a wrong clock would offer a slot the server then refuses, and
+the resident would read that as a broken app.
+
+- **Where:** `listAvailability` in
+  [reservation.service.ts](../server/src/condominiums/reservation.service.ts)
+
+### RN-RSV-08 · The person who booked and the administrator may cancel; nobody else
+
+Cancelling releases the slot for everyone and **deletes** the record — there is no history, no
+reason and nothing to consult afterwards, because the reservation carries no state (RN-RSV-03).
+A slot whose time has already started cannot be cancelled: it frees nothing and would erase the
+only record that the place was used.
+
+A member who may not cancel that reservation is told so (`403`); somebody outside the condominium
+gets the same `404` every other route gives. This is the second use of
+[ADR 0010](decisions/0010-permission-rules-live-in-the-service.md), and the permission check comes
+**before** the already-started check, so somebody who may not cancel does not learn whether the slot
+has begun.
+
+Unlike `DELETE /visitors/:id`, this route is **not idempotent**: deleting a reservation that is
+already gone answers `404`. Telling a stranger "already deleted" would leak that the id existed.
+
+- **Where:** `cancelReservation` in
+  [reservation.service.ts](../server/src/condominiums/reservation.service.ts)
 
 ## Newsletter
 
@@ -460,6 +530,13 @@ rather than one line and an ellipsis.
   [visitor.dto.ts](../server/src/visitors/visitor.dto.ts) (server) must be changed together,
   including the message text — the app shows the server's message under the right field. The
   server file carries a comment pointing at the app file.
+
+  The same arrangement now holds for the **slot grid**:
+  [slot.ts](../mobile/features/reservations/domain/slot.ts) (app) and
+  [slot.ts](../server/src/condominiums/slot.ts) (server) declare the same eight start minutes, and
+  each points at the other. Unlike the validation pair, a third copy exists in
+  `reservations_slot_grid_check` — and that one is not the same kind of statement: the modules
+  decide what to offer, the CHECK decides what may exist.
 - **One server-side rule is unreachable from the interface.** The name field has
   `maxLength={60}`, so the app cannot produce the "at most 60 characters" rejection from the
   server; only a direct API call can.

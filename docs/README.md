@@ -78,4 +78,4 @@ flowchart LR
   screen distinguishes them from residents.
 
 ---
-Last updated: 2026-10-05 (newsletter, feature 006, and the first role-gated route, ADR 0010)
+Last updated: 2026-10-05 (booking a common area, feature 007, and the unique index that makes a double booking impossible, ADR 0011)

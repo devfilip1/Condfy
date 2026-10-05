@@ -15,6 +15,7 @@ forces at the time, the alternatives, and what it costs.
 | [0008](0008-english-everywhere.md) | English everywhere: code, contract and database | Accepted | 2026-09 |
 | [0009](0009-visitors-belong-to-a-unit-and-a-membership.md) | A visit belongs to a unit and to a membership | Accepted | 2026-10 |
 | [0010](0010-permission-rules-live-in-the-service.md) | Permission rules live in the service; 403 for a member, 404 for an outsider | Accepted | 2026-10 |
+| [0011](0011-no-double-booking-is-a-unique-index.md) | No double booking is a unique index, not a check in the code | Accepted | 2026-10 |
 
 Decisions reconstructed from code carry the status `Reconstructed`. When a decision replaces
 another, the old one becomes `Superseded by NNNN` and is kept.

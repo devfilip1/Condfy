@@ -147,8 +147,115 @@ Authorization: Bearer <accessToken>
 ```
 
 **Not in the contract**: there is no `POST`, `PATCH` or `DELETE` for common areas — the catalogue is
-read-only and the examples come from the seed. There are **no reservation endpoints at all**: the
-`reservations` table exists, and nothing touches it.
+read-only and the examples come from the seed. Reserving one of them is the next three routes.
+
+## `GET /condominiums/:condominiumId/common-areas/:commonAreaId/availability`
+
+One month of availability for one place, plus the place itself. This single response paints the whole
+booking screen. Requires a session.
+
+Query: `month=YYYY-MM`. Absent means the current month.
+
+```ts
+type SlotStatus = "open" | "held";
+
+interface Slot {
+  startMinute: number;      // minutes after midnight: 420 is 07:00
+  endMinute: number;        // always startMinute + 120
+  status: SlotStatus;
+  reservationId?: string;   // present exactly when status is "held"
+}
+
+interface Availability {
+  commonArea: { id: string; name: string; usageFee: string };
+  month: string;            // "YYYY-MM", echoing what was asked for
+  days: { date: string; slots: Slot[] }[];   // date is "YYYY-MM-DD"
+}
+```
+
+Reading it is the whole screen, so each shape means one thing:
+
+- `days` carries **only bookable days** — today through today + 60, intersected with the month asked
+  for. A day in the past, or past the window, is **absent**, so the app has one rule and not three:
+  no entry, no dot, not selectable.
+- `slots` carries only what the caller can act on. A slot taken by **somebody else** is absent, and
+  nothing anywhere says who holds a slot.
+- `"open"` is free. `"held"` is taken **and releasable by the caller** — their own booking, or any
+  booking of that place when they are the administrator. It is there so the cancel action has
+  somewhere to live; a slot that simply vanished could never be cancelled.
+- `"slots": []` on a present day is a **full** day: the red dot. Different from an absent day, which
+  gets no dot at all.
+- For **today**, slots whose start time has already passed are absent, computed on the server's
+  clock. Past 21:00, today is a full day.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `Availability` | The caller has a membership and the place is available |
+| `400` | `{ "errors": { "month": "Select a month." } }` | `month` is not `YYYY-MM` |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `404` | `{ "message": "Common area not found." }` | No such place, **or** it is in another condominium, **or** it is unavailable, **or** the caller has no membership — deliberately the same answer |
+
+The server computes availability, rather than the app, because deciding what is free needs the
+current time — and the server's clock is the one that will accept or refuse the booking. If the
+device decided, a wrong clock would offer a slot the server then refuses, and the resident would read
+that as a broken app.
+
+## `POST /condominiums/:condominiumId/common-areas/:commonAreaId/reservations`
+
+Books one slot. Requires a session and a membership in that condominium.
+
+Body: `{ date, startMinute }` and nothing else. `endMinute` is **not accepted** — it is
+`startMinute + 120` by definition, and taking it from the client would create a way to disagree with
+the grid. `reservedById` is not accepted either: identity comes from the token.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | `{ id, commonAreaId, date, startMinute, endMinute }` | Booked |
+| `400` | `{ "errors": { date?, startMinute? } }` | Not a real date, before today, more than 60 days ahead, or not one of the eight grid times |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `404` | `{ "message": "Common area not found." }` | Unknown, unavailable or foreign place, or the caller is not a member |
+| **`409`** | `{ "message": "That time was just taken. Pick another one." }` | Somebody else booked that slot between the caller reading the list and confirming |
+
+`condominiumId` and `reservedById` are absent from the response: the first is already in the path,
+and the second can only be the caller.
+
+### The 409 is the first of its kind
+
+The project had 400, 401, 403 and 404, and none of them fits. The request was well formed, so not
+400. Permission has nothing to do with it, so not 403. The slot plainly exists, so not 404. What
+happened is that the state changed between reading and writing, which is what 409 means.
+
+It is raised by the **unique index** on `(common_area_id, date, start_minute)`, not by a prior "is it
+free?" read — two requests can both pass such a read and both insert. The database decides who gets
+the slot; the server only translates its refusal
+([ADR 0011](decisions/0011-no-double-booking-is-a-unique-index.md)).
+
+The window check is a `400` on `date` rather than a `409` for the same reason in reverse: that
+request was already wrong when it was written, not overtaken by events.
+
+## `DELETE /condominiums/:condominiumId/reservations/:reservationId`
+
+Releases a slot. The reservation is removed and nothing records that it existed.
+
+Note the path: reservations hang off the **condominium**, not off the place. The id already
+identifies one reservation, and the condominium is what the permission check needs.
+
+| Status | Body | When |
+|---|---|---|
+| `204` | — | Cancelled; the slot is open for everyone again |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| **`403`** | `{ "message": "Only the person who booked it or the condominium administrator can cancel a reservation." }` | The caller **is** a member, but neither booked it nor administers the condominium |
+| `404` | `{ "message": "Reservation not found." }` | No such reservation, it belongs to another condominium, or the caller is **not** a member |
+| `409` | `{ "message": "That time has already started and cannot be cancelled." }` | The slot has begun — there is nothing left to free |
+
+The 403/404 split is the notice rule applied a second time
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)): hide existence from outsiders,
+explain the refusal to insiders. The 403 is checked **before** the 409, so somebody who may not
+cancel does not learn whether the slot has started.
+
+**Not idempotent, on purpose.** Deleting a reservation that is already gone answers `404`, not `204`
+— the opposite of `DELETE /visitors/:id`. The reason is the permission: telling a stranger "already
+deleted" for an id they never had a claim on would leak that the id once existed.
 
 ## `GET /condominiums/:condominiumId/notices`
 

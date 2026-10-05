@@ -31,6 +31,9 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
   translates. Never rename a JSON field to match a column.
 - **Validation is duplicated on purpose** between `mobile/features/visitors/domain/visitor.ts`
   and `server/src/visitors/visitor.dto.ts`, message text included. Change both together.
+- **The slot grid is duplicated on purpose** between `mobile/features/reservations/domain/slot.ts`
+  and `server/src/condominiums/slot.ts` — the same eight start minutes. Change both together, and
+  the `reservations_slot_grid_check` CHECK with them (ADR 0011).
 - **Server imports end in `.ts`** and `enum`, `namespace` and parameter properties are rejected —
   Node strips types, it does not compile them.
 - **App imports use the `@/` alias**; a feature imports another only through its `index.ts`.

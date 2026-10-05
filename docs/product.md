@@ -107,6 +107,8 @@ an administrator calls each thing in conversation.
 | Área comum | A place inside a condominium that residents can reserve: salão, quiosque, quadra | `CommonArea` |
 | Aviso | Something the condominium announces to its residents: title, content and a date | `Notice` |
 | Reserva | A held slot of a common area, for a day and a time range | `Reservation` |
+| Horário | One of the eight fixed two-hour slots a common area can be booked for, 07:00 to 23:00 | `Slot`, `startMinute` / `endMinute` |
+| Janela de reserva | How far ahead a booking may go: today plus 60 days, counted in whole days | `BOOKING_WINDOW_DAYS` |
 | Taxa de uso | What the condominium charges to use a common area; zero means free | `usageFee` |
 | Visitante | Someone a resident expects to receive | `Visitor`, `visitor` |
 | Entrega | A delivery (package, food) | `delivery` |
