@@ -174,7 +174,7 @@ export interface Profile {
   memberships: ProfileMembership[];
 }
 
-const ROLES: readonly string[] = ["resident", "manager", "doorman"];
+const ROLES: readonly string[] = ["resident", "admin"];
 
 function isProfileUnit(value: unknown): value is ProfileUnit {
   if (!isObject(value)) {

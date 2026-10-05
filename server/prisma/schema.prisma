@@ -50,11 +50,14 @@ model Visitor {
   @@map("visitors")
 }
 
-// Cargo de um usuário em um condomínio: morador, síndico, portaria.
+/// Cargo de um usuário em um condomínio.
+///
+/// `manager` (síndico) e `doorman` (portaria) saíram na feature 007: o papel de gestão virou
+/// `admin` (administrador), e por enquanto é o único além de morador. Nenhuma linha usava os dois
+/// removidos quando a troca aconteceu.
 enum Role {
   resident
-  manager
-  doorman
+  admin
 }
 
 // As CHECKs (nome, e-mail, bloco, número) e as triggers de "morador tem unidade" não cabem no
@@ -179,8 +182,9 @@ model CondominiumMember {
   reservations     Reservation[]
 
   @@id([userId, condominiumId])
-  // No máximo um síndico por condomínio (research R-003).
-  @@unique([condominiumId], map: "condominium_members_one_manager_key", where: raw("role = 'manager'"))
+  // No máximo um administrador por condomínio. Herdado da regra do síndico (research R-003), que
+  // era um cargo eletivo único; vale reavaliar se uma administradora puder ter várias pessoas.
+  @@unique([condominiumId], map: "condominium_members_one_admin_key", where: raw("role = 'admin'"))
   @@index([condominiumId])
   @@map("condominium_members")
 }

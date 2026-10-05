@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import modules, { Module } from "@/features/home/data/modules";
+import { Module } from "@/features/home/data/modules";
 
 export const styles = StyleSheet.create({
   overContainer: {
@@ -46,7 +46,12 @@ export const styles = StyleSheet.create({
   },
 });
 
-export default function ModuleList() {
+export interface ModuleListProps {
+  /** Já filtrados por cargo pela tela. O componente não decide quem vê o quê. */
+  modules: Module[];
+}
+
+export default function ModuleList({ modules }: ModuleListProps) {
   return (
     <FlatList
       style={styles.overContainer}
