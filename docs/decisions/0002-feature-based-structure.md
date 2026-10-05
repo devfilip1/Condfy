@@ -33,7 +33,7 @@ the vocabulary, not the separation of concerns.
 ## Consequences
 
 - A new module is a new folder, not files scattered across six drawers.
-- Generic date logic moved to `shared/lib/calendario.ts`, so the date field no longer depends on
+- Generic date logic moved to `shared/lib/calendar.ts`, so the date field no longer depends on
   the Visitor entity.
 - `index.ts` files exist with a single export today; their value is the boundary they declare, not
   the code they hold.

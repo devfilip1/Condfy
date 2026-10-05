@@ -133,7 +133,8 @@ npx prisma studio      # from server/
    `request` or `reply`.
 2. Declare the route in the controller of that resource — routes live inside the controller.
 3. If it accepts a body, validate it in the dto file, returning the same
-   `{ erros: { campo: mensagem } }` shape.
+   `{ errors: { field: message } }` shape. The key is `errors`, in English — the app's HTTP client
+   tests for exactly that key before showing field errors, so `erros` makes the form fail silently.
 4. Document it in [api.md](api.md) and, if it introduces a rule, in
    [business-rules.md](business-rules.md).
 

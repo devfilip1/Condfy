@@ -4,7 +4,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
  * Exige uma credencial de accessToken válida (FR-019, FR-023).
  *
  * Registrado como `preHandler` nas rotas que precisam de sessão, sem que elas saibam disso. A
- * identidade fica em `request.user` e é a ÚNICA fonte de quem está agindo (FR-022): nenhum
+ * identidade fica em `request.authUser` e é a ÚNICA fonte de quem está agindo (FR-022): nenhum
  * campo do body pode dizer quem é o usuário.
  */
 

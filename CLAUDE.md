@@ -35,7 +35,8 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
   Node strips types, it does not compile them.
 - **App imports use the `@/` alias**; a feature imports another only through its `index.ts`.
 - **Prisma and `DATABASE_URL` must never appear in `mobile/`.**
-- **Identity always comes from the token** (`request.usuario`), never from the request body.
+- **Identity always comes from the token** (`request.authUser`, set by `authenticate.ts`), never
+  from the request body. `request.user` is the raw payload from `@fastify/jwt` — a different thing.
 - **`JWT_SECRET` is required** for the server to start; it lives in `server/.env`.
 - **Dates are calendar days.** Convert at the server boundary in UTC; never read a `DATE` in local
   time.
