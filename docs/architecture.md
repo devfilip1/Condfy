@@ -130,25 +130,32 @@ sequenceDiagram
     participant Sv as service
     participant DB as PostgreSQL
 
-    S->>H: adicionarVisitante(entrada)
-    H->>H: validarNovoVisitante — invalid stops here, no network
-    H->>Svc: POST /visitors
-    Svc->>C: HTTP request
-    C->>C: validarNovoVisitante (server copy)
+    S->>H: addVisitor(input)
+    H->>H: validateNewVisitor — invalid stops here, no network
+    H->>Svc: POST /visitors { name, type, expectedDate, unitId }
+    Svc->>C: HTTP request + Authorization: Bearer
+    C->>C: validateNewVisitor (server copy)
     alt invalid
-        C-->>Svc: 400 { erros: { campo: mensagem } }
-        Svc-->>H: ErroHttp("validacao")
+        C-->>Svc: 400 { errors: { field: message } }
+        Svc-->>H: HttpError("validation")
         H-->>S: errors under each field, form stays open
     else valid
-        C->>Sv: criarVisitante(dados)
+        C->>Sv: createVisitor(data, request.authUser.id)
+        Sv->>DB: find the unit, read its condominiumId
+        Sv->>DB: find the membership in that condominium
         Sv->>DB: insert (date as midnight UTC)
-        DB-->>Sv: row
+        DB-->>Sv: row + unit + authorizer
         Sv-->>C: Visitor (contract shape)
         C-->>Svc: 201 + visitor
-        Svc-->>H: Visitante
+        Svc-->>H: Visitor
         H-->>S: inserted in the list, re-sorted, form closes
     end
 ```
+
+The body names only the unit. The condominium comes from that unit and the authorizer comes from the
+token, so neither can be chosen by the caller
+([ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md)). An unknown unit and a
+unit in another condominium get the same `400`, so the API does not reveal which units exist.
 
 The app does not reload the list after creating: it inserts the record the server returned and
 re-sorts locally. Reloading would mean a second request that could fail after a successful save,

@@ -21,7 +21,11 @@ export interface NewVisitor {
   name: string;
   type: VisitType;
   expectedDate: string;
-  authorizedBy: string;
+  /**
+   * Unidade visitada. O condomínio NÃO vem no body: ele é lido da unidade, e quem autorizou vem
+   * do token (FR-022). Assim o body não pode escolher condomínio nem autorizador.
+   */
+  unitId: string;
 }
 
 /** Erros por field, no mesmo formato que o formulário do app exibe. */
@@ -29,7 +33,7 @@ export interface FormErrors {
   name?: string;
   type?: string;
   expectedDate?: string;
-  authorizedBy?: string;
+  unitId?: string;
 }
 
 export type ResultadoValidacao =
@@ -38,7 +42,11 @@ export type ResultadoValidacao =
 
 const NAME_MAX_LENGTH = 60;
 
-/** Cópia de `isValidISODate` do app (`shared/lib/calendario.ts`): data de calendário real. */
+/** Os ids do banco são uuid v4 (`@default(uuid())`). */
+const UUID_FORMAT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Cópia de `isValidISODate` do app (`shared/lib/calendar.ts`): data de calendário real. */
 function isValidISODate(value: string): boolean {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!parts) {
@@ -78,7 +86,7 @@ export function validateNewVisitor(body: unknown): ResultadoValidacao {
   const name = text(asObject, "name");
   const type = text(asObject, "type");
   const expectedDate = text(asObject, "expectedDate");
-  const authorizedBy = text(asObject, "authorizedBy");
+  const unitId = text(asObject, "unitId");
 
   const errors: FormErrors = {};
 
@@ -98,13 +106,15 @@ export function validateNewVisitor(body: unknown): ResultadoValidacao {
     errors.expectedDate = "Enter a real date as DD/MM/YYYY.";
   }
 
-  if (authorizedBy.length === 0) {
-    errors.authorizedBy = "Authorizing resident is required.";
+  // Só a forma é conferida aqui. Se a unidade existe, e se quem autorizou pertence àquele
+  // condomínio, é o service que confere — depende do banco e da identidade do token.
+  if (!UUID_FORMAT.test(unitId)) {
+    errors.unitId = "Select a unit.";
   }
 
   if (Object.keys(errors).length > 0 || !isVisitType(type)) {
     return { ok: false, errors };
   }
 
-  return { ok: true, data: { name, type, expectedDate, authorizedBy } };
+  return { ok: true, data: { name, type, expectedDate, unitId } };
 }

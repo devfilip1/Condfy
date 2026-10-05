@@ -24,16 +24,29 @@ enum VisitType {
   service_provider
 }
 
+/// Visita esperada numa unidade, autorizada por alguém com vínculo naquele condomínio.
 model Visitor {
-  id           String    @id @default(uuid())
-  name         String    @db.VarChar(60)
-  type         VisitType
-  expectedDate DateTime  @map("expected_date") @db.Date
-  authorizedBy String    @map("authorized_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id             String    @id @default(uuid())
+  name           String    @db.VarChar(60)
+  type           VisitType
+  expectedDate   DateTime  @map("expected_date") @db.Date
+  /// Quem autorizou a visita. Vem SEMPRE do token, nunca do body (FR-022).
+  authorizedById String    @map("authorized_by_id")
+  unitId         String    @map("unit_id")
+  /// Repetido de propósito: amarra as duas FKs compostas ao mesmo condomínio (research R-002).
+  condominiumId  String    @map("condominium_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  /// Aponta para o vínculo, e não direto para o usuário: só existe se quem autorizou pertence ao
+  /// condomínio da visita. Mesmo padrão de UnitResident (research R-002).
+  authorizedBy CondominiumMember @relation(fields: [authorizedById, condominiumId], references: [userId, condominiumId], onDelete: Cascade)
+  /// A FK composta garante unidade do MESMO condomínio da visita.
+  unit         Unit              @relation(fields: [unitId, condominiumId], references: [id, condominiumId], onDelete: Restrict)
 
   @@index([expectedDate])
+  @@index([condominiumId, expectedDate])
+  @@index([unitId, condominiumId])
   @@map("visitors")
 }
 
@@ -48,12 +61,12 @@ enum Role {
 // schema: estão na migration create_users_condominiums (research R-005, R-010).
 
 model Condominium {
-  id        String              @id @default(uuid())
-  name      String              @db.VarChar(100)
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
-  units     Unit[]
-  members   CondominiumMember[]
+  id          String              @id @default(uuid())
+  name        String              @db.VarChar(100)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  units       Unit[]
+  members     CondominiumMember[]
 
   @@map("condominiums")
 }
@@ -69,6 +82,7 @@ model Unit {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   condominium   Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
   residents     UnitResident[]
+  visitors      Visitor[]
 
   // Alvo da FK composta de UnitResident: garante unidade do mesmo condomínio do vínculo (R-002).
   @@unique([id, condominiumId])
@@ -95,14 +109,15 @@ model User {
 
 /// Vínculo usuário × condomínio, com o cargo naquele condomínio.
 model CondominiumMember {
-  userId        String         @map("user_id")
-  condominiumId String         @map("condominium_id")
-  role          Role
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  condominium   Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
-  residences    UnitResident[]
+  userId           String         @map("user_id")
+  condominiumId    String         @map("condominium_id")
+  role             Role
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  condominium      Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  residences       UnitResident[]
+  authorizedVisits Visitor[]
 
   @@id([userId, condominiumId])
   // No máximo um síndico por condomínio (research R-003).
