@@ -10,13 +10,22 @@
 
 const TIMEOUT_MS = 10_000;
 
-export type HttpErrorKind = "network" | "validation" | "session" | "server";
+export type HttpErrorKind =
+  | "network"
+  | "validation"
+  | "session"
+  | "conflict"
+  | "server";
 
 /**
  * Falha de uma requisição, já classificada.
  * - `rede`: sem response ou tempo esgotado.
  * - `validation`: `400` com `errors` no body.
  * - `session`: `401` que a renovação não resolveu — a sessão acabou (FR-021).
+ * - `conflict`: `409`. O pedido estava certo quando foi escrito e não está mais quando chegou —
+ *   alguém reservou o horário no meio do caminho. É a ÚNICA falha cuja resposta certa é "mostre
+ *   esta message e recarregue", e não "algo deu errado, tente de novo"; por isso tem tipo próprio
+ *   em vez de cair no `server` junto com os 500 (feature 007, research R-005).
  * - `servidor`: qualquer outra response fora de 2xx, ou response fora do formato esperado.
  */
 export class HttpError extends Error {
@@ -163,6 +172,10 @@ export async function request(
   }
   if (response.status === 401) {
     throw new HttpError("session", body);
+  }
+  // Antes do `server`, de propósito: um 409 tem resposta de interface diferente de um 500.
+  if (response.status === 409) {
+    throw new HttpError("conflict", body);
   }
   throw new HttpError("server", body);
 }
