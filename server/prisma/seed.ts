@@ -224,6 +224,70 @@ const COMMON_AREAS: SampleCommonArea[] = [
 // Nenhuma reserva é carregada: nada nesta feature cria ou remove uma, então uma linha sem caminho
 // de ida nem de volta pela interface seria uma armadilha nos dados de exemplo.
 
+interface SampleNotice {
+  id: string;
+  condominiumId: string;
+  publishedById: string;
+  title: string;
+  /** Guardado como veio: as quebras de linha separam parágrafos e precisam sobreviver (FR-002). */
+  body: string;
+  /** Dia de calendário `YYYY-MM-DD`. */
+  date: string;
+}
+
+// Quatro avisos, todos no Brisas e publicados pelo administrador, escolhidos para que os casos de
+// borda da lista apareçam logo na primeira execução: um longo com parágrafos (o corte de duas
+// linhas), um curto (uma linha só, sem espaço reservado), e um com URL comprida (não pode alargar
+// a linha). Os outros dois condomínios ficam SEM aviso nenhum, para o estado vazio ser alcançável
+// só trocando de login.
+const NOTICES: SampleNotice[] = [
+  {
+    id: id("0501"),
+    condominiumId: BRISAS,
+    publishedById: DANIEL,
+    title: "Manutenção da caixa d'água",
+    body:
+      "A limpeza da caixa d'água acontece na próxima terça-feira, das 8h às 14h.\n\n" +
+      "O fornecimento fica suspenso durante todo o período. Recomendamos armazenar água " +
+      "suficiente para o dia na noite anterior.\n\n" +
+      "Após a religação, a água pode sair turva por alguns minutos. É normal: deixe correr até " +
+      "clarear antes de consumir.",
+    date: "2026-10-03",
+  },
+  {
+    id: id("0502"),
+    condominiumId: BRISAS,
+    publishedById: DANIEL,
+    title: "Portão social com fechamento lento",
+    // Curto de propósito: ocupa uma linha, e a linha não reserva espaço para a segunda (FR-009).
+    body: "O portão social está com o fechamento lento. Aguarde fechar antes de sair.",
+    date: "2026-10-01",
+  },
+  {
+    id: id("0503"),
+    condominiumId: BRISAS,
+    publishedById: DANIEL,
+    title: "Prestação de contas de setembro",
+    // A URL comprida é o caso que não pode alargar a linha da lista.
+    body:
+      "A prestação de contas de setembro já está disponível para consulta no portal da " +
+      "administradora:\n\n" +
+      "https://portal.exemplo.com.br/condominios/residencial-brisas/prestacao-de-contas/2026/09\n\n" +
+      "Dúvidas podem ser enviadas até o dia 20.",
+    date: "2026-09-28",
+  },
+  {
+    id: id("0504"),
+    condominiumId: BRISAS,
+    publishedById: DANIEL,
+    title: "Festa junina do condomínio",
+    body:
+      "A festa acontece no dia 12, a partir das 18h, no salão de festas.\n\n" +
+      "Cada apartamento pode levar um prato. As inscrições ficam na portaria.",
+    date: "2026-09-20",
+  },
+];
+
 async function loadCondominiums(): Promise<void> {
   for (const condominium of CONDOMINIUMS) {
     await prisma.condominium.upsert({ where: { id: condominium.id }, create: condominium, update: {} });
@@ -299,6 +363,20 @@ async function loadCommonAreas(): Promise<void> {
   }
 }
 
+async function loadNotices(): Promise<void> {
+  for (const { date, ...notice } of NOTICES) {
+    await prisma.notice.upsert({
+      where: { id: notice.id },
+      create: {
+        ...notice,
+        // Meia-noite UTC para a coluna DATE guardar exatamente o dia (research R-007).
+        date: new Date(`${date}T00:00:00.000Z`),
+      },
+      update: {},
+    });
+  }
+}
+
 async function main(): Promise<void> {
   await loadCondominiums();
   await loadUnits();
@@ -308,11 +386,14 @@ async function main(): Promise<void> {
   await loadVisitors();
   // Depende só do condomínio.
   await loadCommonAreas();
+  // Depende do vínculo do administrador.
+  await loadNotices();
 
   console.log(
     `Example data loaded: ${CONDOMINIUMS.length} condominiums, ${UNITS.length} units, ` +
       `${USERS.length} users, ${MEMBERSHIPS.length} memberships, ${RESIDENCE_COUNT} residences, ` +
-      `${VISITORS.length} visitors, ${COMMON_AREAS.length} common areas.`,
+      `${VISITORS.length} visitors, ${COMMON_AREAS.length} common areas, ` +
+      `${NOTICES.length} notices.`,
   );
 }
 

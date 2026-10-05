@@ -71,8 +71,39 @@ model Condominium {
   units       Unit[]
   members     CondominiumMember[]
   commonAreas CommonArea[]
+  notices     Notice[]
 
   @@map("condominiums")
+}
+
+/// Aviso do condomínio: o mural, com título, corpo e data.
+///
+/// As CHECKs de título e corpo estão na migration add_notices, porque o Prisma não as expressa
+/// (ADR 0004). O corpo NÃO é guardado aparado: cortar espaços comeria a linha em branco que separa
+/// dois parágrafos, e preservá-la é requisito (FR-002).
+model Notice {
+  id            String   @id @default(uuid())
+  condominiumId String   @map("condominium_id")
+  /// Quem publicou. Gravado para responsabilização, nunca exibido (FR-004).
+  publishedById String   @map("published_by_id")
+  title         String   @db.VarChar(120)
+  /// Texto completo, quebras de linha incluídas. Limitado a 5000 caracteres pela CHECK.
+  body          String
+  /// Dia a que o aviso se refere; a lista ordena por ele.
+  date          DateTime @db.Date
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  condominium Condominium       @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  /// A FK composta garante que quem publicou pertence ao condomínio do aviso.
+  ///
+  /// `Restrict`, e não `Cascade` como em visitors, de propósito: uma visita é sobre uma pessoa
+  /// receber alguém e sai com ela, enquanto um aviso é o condomínio falando. Perder o mural porque
+  /// o administrador foi trocado seria defeito, não cascata (research R-008).
+  publishedBy CondominiumMember @relation(fields: [publishedById, condominiumId], references: [userId, condominiumId], onDelete: Restrict)
+
+  @@index([condominiumId, date(sort: Desc), id])
+  @@map("notices")
 }
 
 /// Local do condomínio que dá para reservar: salão, quiosque, quadra, churrasqueira.
@@ -179,6 +210,7 @@ model CondominiumMember {
   condominium      Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
   residences       UnitResident[]
   authorizedVisits Visitor[]
+  notices          Notice[]
   reservations     Reservation[]
 
   @@id([userId, condominiumId])
