@@ -4,12 +4,13 @@ import {
   FormErrors,
   NewVisitor,
   Visitor,
+  VisitorUnit,
   isFormErrors,
   hasNoErrors,
   sortByExpectedDate,
   validateNewVisitor,
 } from "@/features/visitors/domain/visitor";
-import { HttpError } from "@/features/auth";
+import { HttpError, useAuth } from "@/features/auth";
 import {
   addVisitor as adicionarNoServico,
   listVisitors,
@@ -49,6 +50,8 @@ export interface UseVisitorsResult {
   openForm: () => void;
   closeForm: () => void;
   addVisitor: (input: NewVisitor) => void;
+  /** Unidades onde a pessoa mora, para o seletor do formulário (ADR 0009). */
+  units: VisitorUnit[];
   requestRemoval: (visitor: Visitor) => void;
   cancelRemoval: () => void;
   confirmRemoval: () => void;
@@ -59,6 +62,7 @@ export interface UseVisitorsResult {
  * Não retorna JSX e não importa componentes.
  */
 export function useVisitors(): UseVisitorsResult {
+  const { profile } = useAuth();
   const [list, setList] = useState<ListState>({ status: "loading" });
   const [formOpen, setFormOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -137,7 +141,7 @@ export function useVisitors(): UseVisitorsResult {
       ...input,
       name: input.name.trim(),
       expectedDate: input.expectedDate.trim(),
-      authorizedBy: input.authorizedBy.trim(),
+      unitId: input.unitId.trim(),
     })
       .then((created) => {
         if (!mounted.current) {
@@ -246,6 +250,18 @@ export function useVisitors(): UseVisitorsResult {
       });
   }, [pendingRemoval]);
 
+  /**
+   * Todas as unidades onde a pessoa mora, de todos os condomínios dela.
+   *
+   * Vem do perfil (`GET /me`), e não de uma chamada própria: o tipo é da feature de autenticação,
+   * que é dona dele (Princípio III). Vazia para síndico ou portaria sem moradia — e aí o
+   * formulário avisa em vez de deixar registrar uma visita que o banco recusaria.
+   */
+  const units: VisitorUnit[] =
+    profile.status === "ready"
+      ? profile.profile.memberships.flatMap((membership) => membership.units)
+      : [];
+
   return {
     list,
     reload,
@@ -259,6 +275,7 @@ export function useVisitors(): UseVisitorsResult {
     openForm,
     closeForm,
     addVisitor,
+    units,
     requestRemoval,
     cancelRemoval,
     confirmRemoval,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -21,11 +21,14 @@ import {
   NewVisitor,
   VISIT_TYPES,
   VisitType,
+  VisitorUnit,
 } from "@/features/visitors/domain/visitor";
 
 export interface VisitorFormModalProps {
   visible: boolean;
   errors: FormErrors;
+  /** Unidades onde a pessoa mora. Vazia impede registrar visitante. */
+  units: VisitorUnit[];
   /** Envio em andamento: o botão de submit fica desativado (FR-010). */
   submitting: boolean;
   /** Falha que não é de um field específico (rede ou servidor). */
@@ -34,10 +37,15 @@ export interface VisitorFormModalProps {
   onCancel: () => void;
 }
 
+/** `A101`, ou só `101` em condomínio sem blocos. */
+function unitLabel(unit: VisitorUnit): string {
+  return unit.block === null ? unit.number : `${unit.block}${unit.number}`;
+}
+
 const TYPE_LABELS: Record<VisitType, string> = {
   visitor: "Visitor",
-  entrega: "Delivery",
-  prestador: "Service",
+  delivery: "Delivery",
+  service_provider: "Service",
 };
 
 export const styles = StyleSheet.create({
@@ -162,6 +170,7 @@ const DEFAULT_TYPE: VisitType = "visitor";
 export default function VisitorFormModal({
   visible,
   errors,
+  units,
   submitting,
   submitError,
   onSubmit,
@@ -170,23 +179,23 @@ export default function VisitorFormModal({
   const [name, setName] = useState("");
   const [type, setType] = useState<VisitType>(DEFAULT_TYPE);
   const [expectedDate, setExpectedDate] = useState("");
-  const [authorizedBy, setAuthorizedBy] = useState("");
+  const [unitId, setUnitId] = useState("");
 
   const insets = useSafeAreaInsets();
-  const authorizedByField = useRef<TextInput>(null);
 
-  // Limpa os fields ao reabrir, para não vazar data de uma tentativa anterior.
+  // Limpa os fields ao reabrir, para não vazar data de uma tentativa anterior. Com uma unidade
+  // só, ela já vem escolhida: não há o que decidir.
   useEffect(() => {
     if (visible) {
       setName("");
       setType(DEFAULT_TYPE);
       setExpectedDate("");
-      setAuthorizedBy("");
+      setUnitId(units.length === 1 ? units[0].id : "");
     }
-  }, [visible]);
+  }, [visible, units]);
 
   function submit() {
-    onSubmit({ name, type, expectedDate, authorizedBy });
+    onSubmit({ name, type, expectedDate, unitId });
   }
 
   return (
@@ -231,9 +240,9 @@ export default function VisitorFormModal({
                   placeholderTextColor={Colors.textSecondary}
                   maxLength={NAME_MAX_LENGTH}
                   autoCapitalize="words"
-                  returnKeyType="next"
-                  submitBehavior="submit"
-                  onSubmitEditing={() => authorizedByField.current?.focus()}
+                  // Era "next", saltando para o campo de texto do autorizador. Esse campo virou
+                  // seletor de unidade, e não há mais nenhum input de texto depois deste.
+                  returnKeyType="done"
                 />
                 {errors.name ? (
                   <Text style={styles.error}>{errors.name}</Text>
@@ -263,20 +272,36 @@ export default function VisitorFormModal({
                 ) : null}
               </View>
 
+              {/*
+                Era um campo de texto com o nome do morador. Virou seletor porque a visita agora
+                aponta para uma unidade de verdade, e quem autoriza sai do token — o formulário
+                não escolhe mais nenhum dos dois (ADR 0009).
+              */}
               <View style={styles.field}>
-                <Text style={styles.label}>Authorized by</Text>
-                <TextInput
-                  ref={authorizedByField}
-                  style={styles.input}
-                  value={authorizedBy}
-                  onChangeText={setAuthorizedBy}
-                  placeholder="Resident name"
-                  placeholderTextColor={Colors.textSecondary}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                />
-                {errors.authorizedBy ? (
-                  <Text style={styles.error}>{errors.authorizedBy}</Text>
+                <Text style={styles.label}>Unit</Text>
+                <View style={styles.chips}>
+                  {units.map((unit) => {
+                    const selected = unit.id === unitId;
+                    return (
+                      <TouchableOpacity
+                        key={unit.id}
+                        style={[styles.chip, selected ? styles.chipSelected : null]}
+                        onPress={() => setUnitId(unit.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={styles.chipLabel}>{unitLabel(unit)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {units.length === 0 ? (
+                  <Text style={styles.error}>
+                    You do not live in any unit, so you cannot register a visitor.
+                  </Text>
+                ) : null}
+                {errors.unitId ? (
+                  <Text style={styles.error}>{errors.unitId}</Text>
                 ) : null}
               </View>
 

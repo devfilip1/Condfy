@@ -2,8 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Colors } from "@/shared/constants/Colors";
-import { VisitType, Visitor } from "@/features/visitors/domain/visitor";
+import {
+  VisitType,
+  Visitor,
+  VisitorUnit,
+} from "@/features/visitors/domain/visitor";
 import { toDisplayDate } from "@/shared/lib/calendar";
+
+/** `A101`, ou só `101` em condomínio sem blocos. */
+function unitLabel(unit: VisitorUnit): string {
+  return unit.block === null ? unit.number : `${unit.block}${unit.number}`;
+}
 
 export interface VisitorCardProps {
   visitor: Visitor;
@@ -14,8 +23,8 @@ export interface VisitorCardProps {
 /** Rótulos de interface em inglês para os valores de domínio em português (D-005). */
 const TYPE_LABELS: Record<VisitType, string> = {
   visitor: "Visitor",
-  entrega: "Delivery",
-  prestador: "Service",
+  delivery: "Delivery",
+  service_provider: "Service",
 };
 
 export const styles = StyleSheet.create({
@@ -102,7 +111,7 @@ export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
       </View>
       <View style={styles.footer}>
         <Text style={styles.authorizedBy} numberOfLines={1} ellipsizeMode="tail">
-          Access authorized by: {visitor.authorizedBy}
+          {unitLabel(visitor.unit)} · authorized by {visitor.authorizedBy.name}
         </Text>
         <Text style={styles.date}>
           {toDisplayDate(visitor.expectedDate)}

@@ -39,6 +39,7 @@ export default function VisitorsScreen() {
     openForm,
     closeForm,
     addVisitor,
+    units,
     requestRemoval,
     cancelRemoval,
     confirmRemoval,
@@ -63,6 +64,7 @@ export default function VisitorsScreen() {
       <VisitorFormModal
         visible={formOpen}
         errors={formErrors}
+        units={units}
         submitting={submitting}
         submitError={submitError}
         onSubmit={addVisitor}
