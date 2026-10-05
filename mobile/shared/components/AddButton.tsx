@@ -5,6 +5,11 @@ import { Colors } from "@/shared/constants/Colors";
 
 export interface AddButtonProps {
   onPress: () => void;
+  /**
+   * O que o botao adiciona, para quem usa leitor de tela. O padrao preserva o uso original em
+   * visitantes; a feature de newsletter foi o segundo uso e pediu o proprio rotulo.
+   */
+  accessibilityLabel?: string;
 }
 
 export const styles = StyleSheet.create({
@@ -25,13 +30,16 @@ export const styles = StyleSheet.create({
   },
 });
 
-export default function AddButton({ onPress }: AddButtonProps) {
+export default function AddButton({
+  onPress,
+  accessibilityLabel = "Add visitor",
+}: AddButtonProps) {
   return (
     <TouchableOpacity
       style={styles.button}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Add visitor"
+      accessibilityLabel={accessibilityLabel}
     >
       <Octicons name="plus" size={40} color={Colors.textOnAccent} />
     </TouchableOpacity>

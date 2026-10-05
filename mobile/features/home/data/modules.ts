@@ -3,7 +3,7 @@ import { Octicons } from "@expo/vector-icons";
 import { Role } from "@/features/auth";
 
 /** Rotas que os módulos da home abrem. `null` = módulo anunciado mas ainda sem tela. */
-export type ModuleRoute = "/visitors" | "/reservations" | null;
+export type ModuleRoute = "/visitors" | "/reservations" | "/newsletter" | null;
 
 export interface Module {
   icon: React.ComponentProps<typeof Octicons>["name"];
@@ -45,7 +45,7 @@ const modules: Module[] = [
     icon: "log",
     name: "Newsletter",
     description: "See news",
-    route: null,
+    route: "/newsletter",
     visibleTo: ALL_ROLES,
   },
   {
