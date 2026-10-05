@@ -78,4 +78,4 @@ flowchart LR
   screen distinguishes them from residents.
 
 ---
-Last updated: 2026-10-04 (admin role replaces manager and doorman; common area catalogue, feature 005)
+Last updated: 2026-10-05 (newsletter, feature 006, and the first role-gated route, ADR 0010)

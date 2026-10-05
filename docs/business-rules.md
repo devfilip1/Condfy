@@ -386,6 +386,48 @@ decided before any screen depended on it; the booking flow is a later feature.
 - **Where:** `reservations_minutes_check` in
   [the migration](../server/prisma/migrations/20261004161156_add_common_areas_and_reservations/migration.sql)
 
+## Newsletter
+
+### RN-NWS-01 · The board is read by everyone in the condominium
+
+Every member sees the same notices, whatever their role, and nobody sees the notices of a
+condominium they do not belong to. Newest first, with the id breaking ties so the order is stable
+between visits.
+
+The list carries the full text of every notice; the two-line preview is a rendering limit, not a
+transport one, which is why opening a notice costs no request.
+
+- **Where:** `listNotices` in [notice.service.ts](../server/src/condominiums/notice.service.ts)
+
+### RN-NWS-02 · Only the administrator publishes, and the API is what enforces it
+
+A notice may be published only by the `admin` of that condominium. The app hides the action from
+everyone else, and that is a courtesy: the rule is enforced where the request arrives, so a resident
+who reaches the operation by other means is still refused.
+
+The refusal differs by membership on purpose. A member who is not the administrator gets **403** —
+she reads this board daily, and pretending the condominium does not exist would be a lie. Someone
+who is not a member at all gets the same **404** the read route gives, so existence stays hidden
+from outsiders ([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
+
+Who published is recorded and never shown: the board speaks for the condominium, not for a person.
+
+- **Where:** `publishNotice` in [notice.service.ts](../server/src/condominiums/notice.service.ts)
+
+### RN-NWS-03 · Paragraph breaks survive, and the body is the one text that is not trimmed
+
+A notice body keeps its line breaks from the form through to the detail screen, because a wall of
+run-together text is not an acceptable rendering of an announcement. That is why the body is the
+only text column in the project not required to equal its trimmed form — trimming would eat the
+blank line between two paragraphs. It still cannot be only whitespace, and it cannot exceed 5000
+characters.
+
+The list flattens those breaks for the preview only, so the two lines are two lines of content
+rather than one line and an ellipsis.
+
+- **Where:** `notices_body_check` in the migration, and `previewOf` in
+  [notice.ts](../mobile/features/newsletter/domain/notice.ts)
+
 ## Inconsistencies and gaps found
 
 - **~~Visitors are not attached to a condominium or a unit~~ — closed on 2026-10-02.** A visit now
@@ -423,11 +465,11 @@ decided before any screen depended on it; the booking flow is a later feature.
   server; only a direct API call can.
 - **`visitors.updated_at` is never meaningful.** Visitors cannot be edited (RN-VIS-08), so the
   column only ever equals `created_at`.
-- **Roles are read by the app, never by the API.** The home screen hides the Visitors module from an
-  `admin` ([modules.ts](../mobile/features/home/data/modules.ts)), which is presentation only: the
-  API still lets any authenticated account call every route, so an admin reaching `/visitors`
-  directly is served. Hiding a module is not a permission (see
-  [risks](architecture.md#risks-and-technical-debt)).
+- **One route refuses by role; every other one does not.** Publishing a notice is checked against
+  the caller's role (RN-NWS-02), and that is the only such check in the API. Everywhere else, any
+  authenticated account may call any route — an `admin` reaching `/visitors` directly is still
+  served, and the home screen hiding that module from them is presentation only. Hiding a module is
+  not a permission (see [risks](architecture.md#risks-and-technical-debt)).
 - **Validation is duplicated for accounts too**, between
   [sessao.ts](../mobile/features/auth/domain/session.ts) and
   [auth.dto.ts](../server/src/auth/auth.dto.ts), with the same message text.

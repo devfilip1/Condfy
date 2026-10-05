@@ -21,6 +21,8 @@ erDiagram
     CONDOMINIUM_MEMBER ||--o{ VISITOR : authorizes
     UNIT ||--o{ VISITOR : "is visited by"
     CONDOMINIUM ||--o{ COMMON_AREA : offers
+    CONDOMINIUM ||--o{ NOTICE : announces
+    CONDOMINIUM_MEMBER ||--o{ NOTICE : publishes
     COMMON_AREA ||--o{ RESERVATION : "is booked as"
     CONDOMINIUM_MEMBER ||--o{ RESERVATION : books
 
@@ -66,6 +68,14 @@ erDiagram
         decimal usage_fee "10,2 · >= 0 · default 0"
         text image_url "nullable · https only"
         boolean is_available "default true"
+    }
+    NOTICE {
+        uuid id PK
+        uuid condominium_id FK
+        uuid published_by_id FK
+        varchar title "1..120, trimmed"
+        text body "1..5000, NOT trimmed"
+        date date
     }
     RESERVATION {
         uuid id PK
@@ -227,6 +237,50 @@ where Principle IV puts it: the app never sees a minute count, the database neve
 A `GiST` exclusion constraint would let Postgres refuse overlapping reservations declaratively. It
 was not added because nothing can create a reservation yet; it is the natural upgrade when booking is
 built.
+
+### Notice
+
+Something the condominium announced. The first entity whose content is too long to show in a list
+row, which is why the preview and the detail screen are separate views of one record.
+
+| Field | Meaning |
+|---|---|
+| `published_by_id` | The user side of the publisher's membership. Recorded for accountability, **never exposed** by the API |
+| `title` | Stored trimmed, up to 120 characters |
+| `body` | Up to 5000 characters, newlines included, and **not** stored trimmed |
+| `date` | The calendar day the notice refers to; the list orders by it, newest first |
+
+| Constraint | Guarantees |
+|---|---|
+| `(published_by_id, condominium_id) → condominium_members(user_id, condominium_id)` | The publisher belongs to the condominium they published to |
+| `notices_title_check` | `title = btrim(title) AND title <> ''` |
+| `notices_body_check` | `btrim(body) <> '' AND length(body) <= 5000` |
+
+Indexed by `(condominium_id, date DESC, id)` — the list query, and the only one that exists.
+
+#### Why the body is the one column that is not stored trimmed
+
+Every other text column in the project asserts `value = btrim(value)`. The body deliberately does
+not: trimming would eat the blank line a writer put between two paragraphs, and preserving those
+breaks is a requirement. The CHECK therefore asserts only that the body is not *entirely* whitespace.
+
+#### Why the role is not a database constraint
+
+Only an administrator may publish, and that rule is **not** expressible as a foreign key: a composite
+key can require that a membership row exists, not that its `role` column holds a particular value.
+
+A trigger would be worse. The rule belongs to the moment of publishing, not to the row's lifetime —
+an administrator being replaced must not retroactively invalidate what they announced.
+
+So the database guarantees **membership** and the service guarantees **role**
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)). It is the first rule in the
+project that the schema cannot hold, and worth remembering as a pattern rather than an exception.
+
+#### Deletion
+
+Both foreign keys are `Restrict`, a departure from visitors on purpose. A visit is about a person
+receiving someone, so it leaves with their membership. A notice is the condominium speaking; losing
+the board because an administrator was replaced would be a defect, not a cascade.
 
 ## RefreshToken and LoginAttempt
 

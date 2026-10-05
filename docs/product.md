@@ -105,6 +105,7 @@ an administrator calls each thing in conversation.
 | Vínculo | A person's membership in a condominium, carrying the role | `CondominiumMember` |
 | Moradia | The record that a person lives in a given unit | `UnitResident` |
 | Área comum | A place inside a condominium that residents can reserve: salão, quiosque, quadra | `CommonArea` |
+| Aviso | Something the condominium announces to its residents: title, content and a date | `Notice` |
 | Reserva | A held slot of a common area, for a day and a time range | `Reservation` |
 | Taxa de uso | What the condominium charges to use a common area; zero means free | `usageFee` |
 | Visitante | Someone a resident expects to receive | `Visitor`, `visitor` |

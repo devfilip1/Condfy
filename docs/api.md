@@ -150,6 +150,59 @@ Authorization: Bearer <accessToken>
 read-only and the examples come from the seed. There are **no reservation endpoints at all**: the
 `reservations` table exists, and nothing touches it.
 
+## `GET /condominiums/:condominiumId/notices`
+
+The condominium's notice board, newest first. Requires a session.
+
+```ts
+interface Notice {
+  id: string;
+  title: string;
+  /** Complete text, newlines included. The two-line preview is the app's doing, not the API's. */
+  body: string;
+  date: string;   // "YYYY-MM-DD"
+}
+```
+
+`publishedById` is **not** exposed: it is recorded for accountability, and showing it would change
+what the board is. Ordered by `date` descending, then `id` descending, so two notices from the same
+day keep a stable order between visits.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `Notice[]` — `[]` when nothing was announced | The caller has a membership in `:condominiumId` |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `404` | `{ "message": "Condominium not found." }` | Unknown condominium, non-member, or a non-uuid id |
+
+The response carries the **full body of every notice**, deliberately. There is no
+`GET /notices/:id`: the detail screen renders what the list already fetched, which at a handful of
+notices a month is cheaper than a second route plus a loading state plus a failure mode.
+
+## `POST /condominiums/:condominiumId/notices`
+
+Publishes a notice. Requires a session **and** the administrator role in that condominium.
+
+Body: `{ title, body, date }`. `publishedById` cannot be sent — it comes from the token.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | `Notice` | Published |
+| `400` | `{ "errors": { title?, body?, date? } }` | A field is empty, too long, or the date is not a real day |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| **`403`** | `{ "message": "Only the condominium administrator can publish notices." }` | The caller **is** a member, but is not the administrator |
+| `404` | `{ "message": "Condominium not found." }` | The caller is **not** a member, or the condominium does not exist |
+
+### The 403 is the first of its kind
+
+Every other route in this project answers `404` for anything the caller may not reach, so nobody can
+enumerate what the system holds. That reasoning does not apply to an insider: a resident reads this
+condominium's notices daily, so telling her it does not exist would be a lie. Membership is the
+boundary — hide existence from those outside it, explain the refusal to those inside
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
+
+**Not in the contract**: no `PATCH`, no `DELETE` — a published notice stays, and correcting one means
+publishing another.
+
 ## `GET /visitors`
 
 Lists every visitor, ordered by `expectedDate` ascending, then by creation order
