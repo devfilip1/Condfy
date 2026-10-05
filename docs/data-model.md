@@ -18,6 +18,11 @@ erDiagram
     USER ||--o{ CONDOMINIUM_MEMBER : has
     CONDOMINIUM_MEMBER ||--o{ UNIT_RESIDENT : "lives through"
     UNIT ||--o{ UNIT_RESIDENT : houses
+    CONDOMINIUM_MEMBER ||--o{ VISITOR : authorizes
+    UNIT ||--o{ VISITOR : "is visited by"
+    CONDOMINIUM ||--o{ COMMON_AREA : offers
+    COMMON_AREA ||--o{ RESERVATION : "is booked as"
+    CONDOMINIUM_MEMBER ||--o{ RESERVATION : books
 
     CONDOMINIUM {
         uuid id PK
@@ -38,7 +43,7 @@ erDiagram
     CONDOMINIUM_MEMBER {
         uuid user_id PK_FK
         uuid condominium_id PK_FK
-        enum role "resident | manager | doorman"
+        enum role "resident | admin"
     }
     UNIT_RESIDENT {
         uuid user_id PK_FK
@@ -50,14 +55,38 @@ erDiagram
         varchar name "1..60"
         enum type "visitor | delivery | service_provider"
         date expected_date
-        text authorized_by "free text"
+        uuid authorized_by_id FK
+        uuid unit_id FK
+        uuid condominium_id FK "repeated on purpose"
+    }
+    COMMON_AREA {
+        uuid id PK
+        uuid condominium_id FK
+        varchar name "1..60, unique per condominium"
+        decimal usage_fee "10,2 · >= 0 · default 0"
+        text image_url "nullable · https only"
+        boolean is_available "default true"
+    }
+    RESERVATION {
+        uuid id PK
+        uuid common_area_id FK
+        uuid reserved_by_id FK
+        uuid condominium_id FK "repeated on purpose"
+        date date
+        int start_minute "0..1439"
+        int end_minute "1..1440 · > start_minute"
     }
 ```
 
-`VISITOR` sits apart in the diagram because it really is apart: it has no foreign key to a
-condominium, a unit or a user. That is temporary — the author confirmed the link will be added —
-but any query, permission or screen written before then must assume visitors are global. See
-[gaps](business-rules.md#inconsistencies-and-gaps-found).
+`VISITOR` joined the rest of the model in `link_visitors_to_unit_and_member`. It carries
+`condominium_id` for the same reason `UNIT_RESIDENT` does: the column is repeated so that two
+composite foreign keys can pin everything to one condominium (research R-002).
+
+The visit points at the **membership**, not at the user and not at the residence. That single
+choice decides who may authorize a visit: anyone with a membership in the condominium, which
+includes an admin, who lives nowhere in it. Pointing at `UNIT_RESIDENT` instead would
+have restricted it to people who live in the very unit being visited
+([ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md)).
 
 ## Entities
 
@@ -97,11 +126,11 @@ One account per person, for the whole system — not per condominium.
 ### CondominiumMember
 
 The membership of a user in a condominium, and where the role lives. The same person can be a
-manager in one condominium and a resident in another, which is exactly why the role is here and
+admin in one condominium and a resident in another, which is exactly why the role is here and
 not on `User`.
 
-Primary key `(user_id, condominium_id)`; a partial unique index allows at most one `manager` per
-condominium ([RN-MEM-02](business-rules.md#rn-mem-02--at-most-one-manager-per-condominium)).
+Primary key `(user_id, condominium_id)`; a partial unique index allows at most one `admin` per
+condominium ([RN-MEM-02](business-rules.md#rn-mem-02--at-most-one-admin-per-condominium)).
 
 ### UnitResident
 
@@ -117,15 +146,87 @@ with at least one unit ([RN-RES-02](business-rules.md#rn-res-02--every-resident-
 
 ### Visitor
 
-Someone a resident expects. The oldest table, created before the condominium model.
+Someone expected at a unit. The oldest table; it predated the condominium model and was attached
+to it later.
 
 | Field | Meaning |
 |---|---|
 | `expected_date` | `DATE`, a calendar day with no time; converted at the API boundary ([RN-VIS-04](business-rules.md#rn-vis-04--the-date-the-resident-sees-is-the-date-that-was-registered)) |
-| `authorized_by` | Free text, not a foreign key to `users` |
+| `authorized_by_id` | The user who authorized the visit. Comes from the token, never from the request body |
+| `unit_id` | The unit being visited, tied to `condominium_id` by a composite foreign key |
+| `condominium_id` | Repeated on purpose, so both composite foreign keys resolve to the same condominium |
 | `updated_at` | Always equal to `created_at`, since visitors cannot be edited |
 
-Indexed by `expected_date`, the column the list is always sorted by.
+Two composite foreign keys carry the integrity, so no trigger was needed:
+
+| Constraint | Guarantees |
+|---|---|
+| `visitors_unit_id_condominium_id_fkey` → `units(id, condominium_id)` | The unit belongs to the visit's condominium |
+| `visitors_authorized_by_id_condominium_id_fkey` → `condominium_members(user_id, condominium_id)` | Whoever authorized has a membership in that condominium |
+
+Deleting a membership cascades to the visits that person authorized; a unit cannot be deleted while
+visits point at it (`Restrict`), the same asymmetry `unit_residents` uses.
+
+Indexed by `expected_date` (the global list order), by `(condominium_id, expected_date)` for the
+per-condominium list that the resident feature will need, and by `(unit_id, condominium_id)`.
+
+### CommonArea
+
+A place inside a condominium that residents can reserve: a party room, a kiosk, a sports court.
+
+| Field | Meaning |
+|---|---|
+| `usage_fee` | `DECIMAL(10,2)` in BRL. `0` means free to use, never "unknown". The API sends it as a **string** (`"0.00"`), because a JSON number cannot represent every decimal exactly and this is money |
+| `image_url` | Web address of the photograph, or `null`. A CHECK requires `https://` — iOS blocks plain HTTP by default, and the failure would look like a broken image with no explanation |
+| `is_available` | `false` hides the place from the catalogue **without deleting it**, so a room can be closed for renovation and brought back with its reservations intact |
+
+| Constraint | Guarantees |
+|---|---|
+| `@@unique([condominium_id, name])` | Two places of the same building cannot share a name — the card shows the name and nothing else, so a resident could not tell them apart |
+| `@@unique([id, condominium_id])` | Exists only as the target of `Reservation`'s composite key, the same device `units` uses |
+| `common_areas_usage_fee_check` | `usage_fee >= 0` |
+| `common_areas_image_url_check` | `image_url IS NULL OR image_url LIKE 'https://%'` |
+
+Indexed by `(condominium_id, is_available)` — the catalogue query, and the only one that exists.
+
+### Reservation
+
+A held slot of a common area. The table exists; **no route writes to it yet**.
+
+| Field | Meaning |
+|---|---|
+| `date` | The calendar day, like every other date in the project |
+| `start_minute` / `end_minute` | Minutes after midnight on the condominium's clock. `840` is 14:00, `1320` is 22:00. End is exclusive |
+| `condominium_id` | Repeated on purpose, so both composite foreign keys resolve to one condominium |
+
+**There is no status column.** The row's existence *is* the booking; releasing a slot deletes it. The
+trade-off is recorded: the system cannot answer "who booked the party room and gave it up". Approval
+by an admin or a cancellation history would be a new column and a new rule.
+
+| Constraint | Guarantees |
+|---|---|
+| `(common_area_id, condominium_id) → common_areas(id, condominium_id)` | The place belongs to the reservation's condominium |
+| `(reserved_by_id, condominium_id) → condominium_members(user_id, condominium_id)` | Whoever booked has a membership in that condominium |
+| `reservations_minutes_check` | Ends after it starts, never crosses midnight, never zero-length |
+
+Deleting a membership cascades to that person's reservations; a common area with reservations cannot
+be deleted (`Restrict`) — switch `is_available` off instead, which is why that column exists.
+
+#### Why minutes and not a time
+
+A reservation is **civil wall-clock time**: 14:00 on the building's clock, in a system that has no
+timezone column and does not want one. An integer cannot be shifted by a serializer, a timezone or a
+daylight-saving boundary — which is the same class of bug the project already guards against for
+calendar days, in a harder form.
+
+`TIMESTAMPTZ` was rejected because it stores an absolute instant and would need a condominium
+timezone. Prisma's `@db.Time` was rejected because it returns a JavaScript `Date` pinned to
+1970-01-01, so any local-time read shifts it. Conversion to `"HH:MM"` happens at the API boundary,
+where Principle IV puts it: the app never sees a minute count, the database never sees a string.
+
+A `GiST` exclusion constraint would let Postgres refuse overlapping reservations declaratively. It
+was not added because nothing can create a reservation yet; it is the natural upgrade when booking is
+built.
 
 ## RefreshToken and LoginAttempt
 
@@ -154,7 +255,7 @@ The database does more than store: it refuses invalid data. A full list is in
 |---|---|
 | `CHECK` | Trimmed and non-empty names, uppercase unit identifiers, lowercase e-mail with a valid shape |
 | Unique index | E-mail; unit identity within a condominium |
-| Partial unique index | Unit without block; one manager per condominium |
+| Partial unique index | Unit without block; one admin per condominium |
 | Composite foreign key | Residency confined to one condominium |
 | `ON DELETE RESTRICT` | Condominium with units or members; unit with residents |
 | `ON DELETE CASCADE` | Deleting a user or a membership removes the dependent rows |

@@ -1,6 +1,6 @@
 # condfy
 
-Condominium management app: residents, doormen and building managers handle day-to-day condominium
+Condominium management app: residents and administrators handle day-to-day condominium
 life from their phones. The visitor module is the first one running end to end; the data foundation
 for condominiums, units and user accounts is in place.
 
@@ -42,7 +42,7 @@ flowchart LR
 - **The database speaks English, the API speaks Portuguese.** Tables, columns and enums are
   English; the JSON contract keeps the Portuguese domain vocabulary the app already uses. The
   visitor service is the single translation point ([ADR 0006](decisions/0006-english-database-portuguese-contract.md)).
-- **Integrity lives in the database.** Uniqueness, one-manager-per-condominium, normalized
+- **Integrity lives in the database.** Uniqueness, one-admin-per-condominium, normalized
   casing and "a resident must live in at least one unit" are enforced by constraints and triggers,
   not only by application code ([ADR 0004](decisions/0004-integrity-rules-in-the-database.md)).
 - **Validation runs twice on purpose.** The app validates for a friendly error without spending
@@ -78,4 +78,4 @@ flowchart LR
   screen distinguishes them from residents.
 
 ---
-Last updated: 2026-09-29 (authentication feature)
+Last updated: 2026-10-04 (admin role replaces manager and doorman; common area catalogue, feature 005)

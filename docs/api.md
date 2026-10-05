@@ -24,14 +24,16 @@ interface Visitor {
   name: string;
   type: VisitType;
   expectedDate: string;  // "YYYY-MM-DD", calendar day, no time and no timezone
-  authorizedBy: string;
+  condominiumId: string;
+  unit: { id: string; block: string | null; number: string };  // block is null without blocks
+  authorizedBy: { id: string; name: string };                  // read from the token on write
 }
 
 interface FormErrors {  // only the fields that failed appear
   name?: string;
   type?: string;
   expectedDate?: string;
-  authorizedBy?: string;
+  unitId?: string;
 }
 ```
 
@@ -48,9 +50,105 @@ Types: `Credentials` (`accessToken`, `refreshToken`, `expiresAt`, `refreshExpire
 | `POST /sessions` | `{ email, password }` | `200` `Session` | `401` `E-mail or password is incorrect.` — the same answer for a wrong password and an unknown e-mail · `429` + `Retry-After` after 5 failures |
 | `POST /sessions/refresh` | `{ refreshToken }` | `200` `Credentials` — rotates and extends the 30-day deadline | `401` when unknown, expired, or already used — and an already-used one revokes every credential of that user |
 | `DELETE /sessions` | `{ refreshToken }` | `204` always — idempotent | — |
+| `GET /me` | — (needs `Authorization`) | `200` `Profile` | `401` when the token is missing, invalid or expired, **or** when the account no longer exists |
 
-The access token carries only `sub`, `iat`, `exp` and `iss`: no role and no condominium
+The access token carries only `sub`, `iat` and `exp`: no role, no condominium, no unit, and no
+`iss` or `aud` either
 ([RN-AUT-05](business-rules.md#rn-aut-05--the-access-token-carries-identity-and-nothing-else)).
+That is exactly why `GET /me` exists.
+
+## `GET /me`
+
+Who is signed in, and where they belong. The only route whose `preHandler` is declared on the route
+itself instead of in `server.ts`, because the other three routes of that controller are public.
+
+```ts
+interface Profile {
+  id: string;
+  name: string;
+  email: string;        // never the password hash
+  memberships: {
+    condominium: { id: string; name: string };
+    role: "resident" | "admin";
+    units: { id: string; block: string | null; number: string }[];
+  }[];
+}
+```
+
+Three shapes in that type are not accidental, and a client that assumes otherwise will break on the
+example data:
+
+- `memberships` is a **list**: the same person can belong to more than one condominium.
+- `role` lives **inside** each membership, not on the user: the same person can be an admin in one
+  condominium and a resident in another.
+- `units` is a **list** and may be **empty**: a resident can live in two apartments of the same
+  condominium, and an admin lives in none.
+
+`block` plus `number` is the apartment; `block` is `null` in a condominium without blocks. There is
+no separate apartment column ([data-model.md](data-model.md#unit)).
+
+```http
+GET /me
+Authorization: Bearer <accessToken>
+
+200 OK
+{ "id": "00000000-…-0203", "name": "Carla Mendes", "email": "carla@condfy.test",
+  "memberships": [
+    { "condominium": { "id": "00000000-…-0001", "name": "Residencial Brisas" },
+      "role": "admin", "units": [] },
+    { "condominium": { "id": "00000000-…-0002", "name": "Vila das Palmeiras" },
+      "role": "resident",
+      "units": [{ "id": "00000000-…-0105", "block": null, "number": "2" }] }
+  ] }
+```
+
+Unlike every other protected route, this one **does** read the database, so a deleted account gets
+`401` here immediately instead of waiting out the 15 minutes of
+[RN-AUT-06](business-rules.md#rn-aut-06--a-deleted-account-keeps-access-for-at-most-15-minutes).
+
+## `GET /condominiums/:condominiumId/common-areas`
+
+The catalogue of places a condominium offers for booking. Requires a session.
+
+```ts
+interface CommonArea {
+  id: string;
+  name: string;
+  /** Money as a STRING, never a number: "0.00", "150.00". Two decimals always. */
+  usageFee: string;
+  imageUrl: string | null;   // https:// or null
+}
+```
+
+`condominiumId` is not repeated inside each item — every item belongs to the condominium already in
+the path. `isAvailable` is not exposed either: an unavailable place is simply absent, so the field
+would always be `true` and would invite a client to filter on something the server already did.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `CommonArea[]` — `[]` when the condominium has none available | The caller has a membership in `:condominiumId` |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | Token missing, malformed, tampered or expired |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, **or** the caller has no membership in it, **or** the id is not a uuid — deliberately the same answer |
+| `500` | `{ "message": "Internal server error." }` | Unexpected failure |
+
+Ordered by `name` ascending. The `404` is doing security work: answering `403` for "not yours" and
+`404` for "does not exist" would let anyone enumerate which condominiums the system serves — the same
+reasoning as RN-AUT-01 and the `unitId` rejection in ADR 0009.
+
+```http
+GET /condominiums/00000000-…-0001/common-areas
+Authorization: Bearer <accessToken>
+
+200 OK
+[{ "id": "00000000-…-0403", "name": "Churrasqueira",
+   "usageFee": "80.00", "imageUrl": null },
+ { "id": "00000000-…-0401", "name": "Quiosque Quadra",
+   "usageFee": "0.00", "imageUrl": "https://images.unsplash.com/…" }]
+```
+
+**Not in the contract**: there is no `POST`, `PATCH` or `DELETE` for common areas — the catalogue is
+read-only and the examples come from the seed. There are **no reservation endpoints at all**: the
+`reservations` table exists, and nothing touches it.
 
 ## `GET /visitors`
 
@@ -63,35 +161,53 @@ Lists every visitor, ordered by `expectedDate` ascending, then by creation order
 | `401` | `{ "message": "Your session has expired. Sign in again." }` — missing, malformed, tampered or expired token |
 | `500` | `{ "message": "Internal server error." }` |
 
+Still returns **every** condominium's visitors, not only those of the caller. The schema allows
+scoping since [ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md); what each
+role may see is still undecided.
+
 ```http
 GET /visitors
 
 200 OK
 [{ "id": "c286757b-…", "name": "Jane Smith", "type": "visitor",
-   "expectedDate": "2026-09-14", "authorizedBy": "Carlos" }]
+   "expectedDate": "2026-09-14",
+   "condominiumId": "00000000-…-0001",
+   "unit": { "id": "00000000-…-0101", "block": "A", "number": "101" },
+   "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza" } }]
 ```
 
 ## `POST /visitors`
 
-Registers a visitor. `name` and `authorizedBy` are trimmed before storing, and the response
-carries the normalized values. Extra fields are ignored, including an `id` sent by the client —
-the id always comes from the database.
+Registers a visitor. `name` is trimmed before storing and the response carries the normalized
+values. Extra fields are ignored, including an `id` sent by the client — the id always comes from
+the database.
+
+The body names only the unit. **`condominiumId` and `authorizedBy` cannot be sent**: the condominium
+is read from the unit, and the authorizer is the signed-in user, taken from the token
+([RN-AUT-05](business-rules.md#rn-aut-05--the-access-token-carries-identity-and-nothing-else)).
+Whoever is signed
+in must have a membership in that unit's condominium — a resident or an admin.
 
 | Status | Body | When |
 |---|---|---|
 | `201` | `Visitor` | Saved |
-| `400` | `{ "errors": ErrosFormulario }` | One or more rules in [Visitors](business-rules.md#visitors) failed |
-| `400` | Fastify's own error shape, without `erros` | Body is not valid JSON |
+| `400` | `{ "errors": FormErrors }` | One or more rules in [Visitors](business-rules.md#visitors) failed |
+| `400` | `{ "errors": { "unitId": "Select a unit." } }` | Unknown unit, **or** a unit in a condominium the caller does not belong to — deliberately the same answer, so the API does not reveal which units exist |
+| `400` | Fastify's own error shape, without `errors` | Body is not valid JSON |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | Missing, malformed, tampered or expired token |
 | `500` | `{ "message": … }` | Unexpected failure |
 
 ```http
 POST /visitors
-{ "name": "", "type": "resident", "expectedDate": "2026-02-31", "authorizedBy": "Ana" }
+{ "name": "Jane Smith", "type": "delivery", "expectedDate": "2026-10-05",
+  "unitId": "00000000-…-0101" }
 
-400 Bad Request
-{ "errors": { "nome": "Name is required.",
-             "tipo": "Select a visit type.",
-             "dataPrevista": "Enter a real date as DD/MM/YYYY." } }
+201 Created
+{ "id": "c286757b-…", "name": "Jane Smith", "type": "delivery",
+  "expectedDate": "2026-10-05",
+  "condominiumId": "00000000-…-0001",
+  "unit": { "id": "00000000-…-0101", "block": "A", "number": "101" },
+  "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza" } }
 ```
 
 The app shows each message under its field without translating anything, which is why the message
@@ -102,9 +218,13 @@ text is part of the contract and must stay identical on both sides.
 Removes a visitor permanently. Idempotent: an id that no longer exists also returns `204`
 ([RN-VIS-07](business-rules.md#rn-vis-07--removing-a-visitor-twice-is-not-an-error)).
 
+Does **not** check who owns the visitor: any signed-in account can delete any visitor. Same open
+decision as `GET /visitors`.
+
 | Status | Body |
 |---|---|
 | `204` | empty |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` |
 | `500` | `{ "message": … }` |
 
 ## Not in the contract

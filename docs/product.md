@@ -2,7 +2,7 @@
 
 ## Problem and proposal
 
-Condominium life runs on paper notebooks, WhatsApp groups and phone calls: the doorman writes
+Condominium life runs on paper notebooks, WhatsApp groups and phone calls: the front desk writes
 expected visitors in a book, residents warn the front desk by message, and nobody has a reliable
 shared record. condfy replaces that with a single app where each resident registers who they are
 expecting, and the people who run the building see the same list.
@@ -17,17 +17,20 @@ reservations of common areas, notices and lost & found.
 
 ## User roles
 
-Roles are stored per condominium, not per user: the same person can be a manager in one
+Roles are stored per condominium, not per user: the same person can be an admin in one
 condominium and a resident in another ([data model](data-model.md#condominiummember)).
 
 | Role (code) | In Portuguese | What they do in the system |
 |---|---|---|
 | `resident` | morador | Registers and removes the visitors they expect. Must live in at least one unit. |
-| `manager` | síndico | Runs the condominium. At most one per condominium. |
-| `doorman` | portaria | Works the front desk. |
+| `admin` | administrador | Manages the condominium. At most one per condominium, and has no unit. |
 
-Nothing in the app currently branches on role: every screen behaves the same for everyone. Roles
-exist in the database for the features that follow (login and permissions).
+The home screen is the first place that branches on role: an `admin` does not see the Visitors
+module, because receiving a visitor is something a resident does. That is presentation only — the
+API does not yet refuse a route based on role.
+
+`manager` (síndico) and `doorman` (portaria) were replaced by the single `admin` role; nobody held
+either when the change was made.
 
 ## Features
 
@@ -91,19 +94,21 @@ disappears. A failure at any point keeps the list untouched and explains what ha
 
 The domain is named in English everywhere — code, JSON contract and database
 ([ADR 0008](decisions/0008-english-everywhere.md)). The Portuguese column is what a resident or a
-manager calls each thing in conversation.
+an administrator calls each thing in conversation.
 
 | Termo (conversa) | Meaning | In code, contract and database |
 |---|---|---|
 | Condomínio | The gated community or building served by the system; the root of all data | `Condominium` |
 | Unidade | An apartment or house inside a condominium, identified by number and optional block | `Unit` |
 | Morador | A person who lives in one or more units of a condominium | role `resident` |
-| Síndico | The elected manager of a condominium; at most one at a time | role `manager` |
-| Portaria | Front desk staff | role `doorman` |
+| Administrador | Whoever manages a condominium; at most one per condominium, and has no unit | role `admin` |
 | Vínculo | A person's membership in a condominium, carrying the role | `CondominiumMember` |
 | Moradia | The record that a person lives in a given unit | `UnitResident` |
+| Área comum | A place inside a condominium that residents can reserve: salão, quiosque, quadra | `CommonArea` |
+| Reserva | A held slot of a common area, for a day and a time range | `Reservation` |
+| Taxa de uso | What the condominium charges to use a common area; zero means free | `usageFee` |
 | Visitante | Someone a resident expects to receive | `Visitor`, `visitor` |
 | Entrega | A delivery (package, food) | `delivery` |
 | Prestador | A service provider (plumber, technician) | `service_provider` |
 | Data prevista | The calendar day the visitor is expected, no time of day | `expected_date` |
-| Autorizado por | The resident who authorized the visit, free text today | `authorized_by` |
+| Autorizado por | Who authorized the visit — a member of the condominium, taken from the token | `authorizedBy`, `authorized_by_id` |

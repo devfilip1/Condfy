@@ -96,8 +96,8 @@ removing it and registering it again.
 The app never shows an optimistic card. While the request is in flight the confirm button is
 disabled, which also prevents a double tap from creating two visitors.
 
-- **Where:** `adicionarVisitante` in
-  [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts) (the `enviandoRef` guard)
+- **Where:** `addVisitor` in
+  [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts) (the `submittingRef` guard)
 
 ### RN-VIS-10 · A failed load never looks like an empty list
 
@@ -190,12 +190,13 @@ impossible by construction.
 
 - **Where:** `@@id([userId, condominiumId])` in [schema.prisma](../server/prisma/schema.prisma)
 
-### RN-MEM-02 · At most one manager per condominium
+### RN-MEM-02 · At most one admin per condominium
 
-A second `manager` membership is rejected. Having no manager is allowed.
+A second `admin` membership is rejected. Having no admin is allowed. The rule is inherited from the
+síndico, an elected individual; whether a management company may have several people is open.
 
-- **Where:** partial unique index `condominium_members_one_manager_key`
-  (`WHERE role = 'manager'`) in the migration
+- **Where:** partial unique index `condominium_members_one_admin_key`
+  (`WHERE role = 'admin'`) in the migration
 
 ### RN-MEM-03 · Removing a membership removes that person's residency in that condominium
 
@@ -272,10 +273,25 @@ the same credential race in the database and exactly one wins. The loser takes t
 
 ### RN-AUT-05 · The access token carries identity and nothing else
 
-`sub`, `iat`, `exp`, `iss`. No role, no condominium: a token never goes stale because
-something changed elsewhere, and the API never has to trust a claim about permissions.
+`sub`, `iat`, `exp` — and nothing else. No role, no condominium, no unit: a token never goes stale
+because something changed elsewhere, and the API never has to trust a claim about permissions.
+Confirmed on 2026-10-02 by decoding a token returned by `POST /sessions`.
 
-- **Where:** `assinarAcesso` in [auth.controller.ts](../server/src/auth/auth.controller.ts)
+There is no `iss` and no `aud` either, on purpose. One API signs and verifies with one secret, so an
+issuer claim would only be checked against itself; it starts paying off when a second service or a
+second environment shares the key. Worth knowing before changing this: adding `{ issuer: … }` to the
+verify options without also signing it would reject every token already issued.
+
+Why identity and nothing else, concretely: a person can belong to **more than one** condominium with
+a different role in each, and can live in more than one unit of the same condominium — the example
+data covers both cases on purpose. So there is no single condominium or unit that could go in a
+token. And a permission baked into one could not be withdrawn before it expired, since verifying a
+token never touches the database (RN-AUT-06 caps that window at 15 minutes). Endpoints that need a
+condominium read it from the resource or from the path, and check the membership against the
+database each time ([ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md)).
+
+- **Where:** `signAccessToken` in [auth.controller.ts](../server/src/auth/auth.controller.ts), using
+  the plugin registered in [server.ts](../server/src/server.ts)
 
 ### RN-AUT-06 · A deleted account keeps access for at most 15 minutes
 
@@ -305,7 +321,7 @@ membership without a unit would be refused by the database anyway
   `Password must be at least 8 characters.`
 - **Risk accepted:** sign-up is open and visitors are still global, so anyone who reaches the
   server can create an account and see every visitor. Acceptable only on a development network;
-  before publishing, sign-up needs approval by the manager or an invite.
+  before publishing, sign-up needs approval by an admin or an invite.
 
 ---
 
@@ -328,19 +344,75 @@ RN-MEM-03).
 
 ---
 
+## Common areas and reservations
+
+### RN-RSV-01 · A place is hidden by switching it off, never by deleting it
+
+`is_available = false` removes a common area from the catalogue and keeps the row, its name and its
+reservations. A condominium closes the party room for renovation and brings it back untouched. The
+database refuses to delete a place that has reservations (`Restrict`), so switching off is the only
+path that does not lose history.
+
+From the resident's side, a condominium whose places are all switched off is indistinguishable from
+one with nothing registered — both show the same empty state.
+
+- **Where:** `listCommonAreas` in [commonArea.service.ts](../server/src/condominiums/commonArea.service.ts)
+
+### RN-RSV-02 · You only ever see the catalogue of a condominium you belong to
+
+The endpoint checks the caller's membership before reading anything, and answers `404` for an unknown
+condominium, a condominium the caller does not belong to, and an id that is not a uuid — all with the
+same body, so the API never reveals which condominiums exist.
+
+A person who belongs to more than one condominium chooses which one they are looking at; the choice
+is remembered on the device and re-validated against their memberships on every open. It is a
+convenience, never a permission: what they may see is decided by the server, every time.
+
+- **Where:** `listCommonAreas` and `useCommonAreas` in
+  [useCommonAreas.ts](../mobile/features/reservations/hooks/useCommonAreas.ts)
+
+### RN-RSV-03 · A reservation is a time slot inside one day, and has no state
+
+A reservation stores a date, a start and an end, as minutes after midnight. Four rules are enforced
+by the database rather than by code: it ends after it starts, it never crosses midnight, it is never
+zero-length, and it can only exist for a place in a condominium the person belongs to.
+
+It carries **no status**. The row's existence is the booking, and releasing a slot deletes it. The
+consequence, accepted deliberately: the system cannot say who booked a place and gave it up.
+
+**Nothing creates a reservation yet.** The table and its guarantees exist so that the shape was
+decided before any screen depended on it; the booking flow is a later feature.
+
+- **Where:** `reservations_minutes_check` in
+  [the migration](../server/prisma/migrations/20261004161156_add_common_areas_and_reservations/migration.sql)
+
 ## Inconsistencies and gaps found
 
-- **Visitors are not attached to a condominium or a unit yet.** The `visitors` table has no
-  `condominium_id`, no unit and no link to the user who authorized the visit — `authorized_by` is
-  free text. The module predates the condominium model, so today every visitor is visible to every
-  client of the API. This is the largest gap between the two halves of the data model.
+- **~~Visitors are not attached to a condominium or a unit~~ — closed on 2026-10-02.** A visit now
+  carries `unit_id`, `condominium_id` and `authorized_by_id`, held together by two composite foreign
+  keys ([ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md)). Whoever authorizes
+  needs a membership in the condominium, not a residence in the unit, so an admin can
+  authorize too. The single row that existed was deleted, as the author authorized.
 
-  The author confirmed on 2026-09-29 that visitors **will** be linked to a condominium and a unit.
-  Questions that the feature doing it has to answer: whether the link is the unit alone (the
-  condominium being reachable through it) or both columns; whether `authorized_by` becomes a
-  foreign key to the authorizing resident, which would also enforce
-  [RN-RES-01](#rn-res-01--a-resident-only-lives-in-units-of-a-condominium-they-belong-to); and
-  what happens to the rows already registered, which have no condominium to point at.
+  What the link does **not** do yet: `GET /visitors` still returns every condominium's visitors, and
+  `DELETE /visitors/:id` still deletes anyone's. The schema makes scoping possible; deciding what each
+  role may see and delete belongs to the resident feature. Both are marked `TODO` in
+  [visitor.service.ts](../server/src/visitors/visitor.service.ts).
+- **The app's visitor form has not caught up.** `POST /visitors` now requires `unitId` and rejects the
+  old free-text `authorizedBy`, so creating a visitor from the app fails until
+  [VisitorFormModal](../mobile/features/visitors/components/VisitorFormModal.tsx) sends a unit, and
+  reading one fails until the guards in
+  [visitor.ts](../mobile/features/visitors/domain/visitor.ts) expect the new `unit` and
+  `authorizedBy` objects.
+- **The app and the server disagree about `VisitType`.** The app still spells two of the three values
+  in Portuguese — `"entrega"` and `"prestador"` ([visitor.ts](../mobile/features/visitors/domain/visitor.ts)) —
+  while the database and the API use `delivery` and `service_provider`. The English rename
+  ([ADR 0008](decisions/0008-english-everywhere.md)) missed them. Neither typecheck catches it,
+  because the two sides are independent type universes. Creating a delivery from the app is rejected
+  with `400`, and a single delivery row in the database makes the app's whole list fail its guard.
+  The label maps in
+  [VisitorCard](../mobile/features/visitors/components/VisitorCard.tsx) and `VisitorFormModal` are
+  keyed by the stale values too. **The seed now creates such rows**, so this is no longer latent.
 - **The same validation lives in two files by design.** The rules in
   [visitor.ts](../mobile/features/visitors/domain/visitor.ts) (app) and
   [visitor.dto.ts](../server/src/visitors/visitor.dto.ts) (server) must be changed together,
@@ -351,8 +423,11 @@ RN-MEM-03).
   server; only a direct API call can.
 - **`visitors.updated_at` is never meaningful.** Visitors cannot be edited (RN-VIS-08), so the
   column only ever equals `created_at`.
-- **Roles are stored but never checked.** Nothing in the app or API reads `role` yet. Signing in
-  proves who someone is, not what they may do (see [risks](architecture.md#risks-and-technical-debt)).
+- **Roles are read by the app, never by the API.** The home screen hides the Visitors module from an
+  `admin` ([modules.ts](../mobile/features/home/data/modules.ts)), which is presentation only: the
+  API still lets any authenticated account call every route, so an admin reaching `/visitors`
+  directly is served. Hiding a module is not a permission (see
+  [risks](architecture.md#risks-and-technical-debt)).
 - **Validation is duplicated for accounts too**, between
   [sessao.ts](../mobile/features/auth/domain/session.ts) and
   [auth.dto.ts](../server/src/auth/auth.dto.ts), with the same message text.
