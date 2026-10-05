@@ -12,6 +12,7 @@ import {
 import {
   Credentials,
   FormErrors,
+  Profile,
   Session,
   User,
   isFormErrors,
@@ -27,6 +28,7 @@ import {
 import {
   signUp as cadastrarNoServico,
   signIn as entrarNoServico,
+  fetchProfile as buscarPerfilNoServico,
   refresh as renovarNoServico,
   signOut as sairNoServico,
 } from "@/features/auth/services/authService";
@@ -60,8 +62,23 @@ export const MESSAGE_SERVER_ERROR = "Something went wrong. Try again.";
 export const MESSAGE_SESSION_EXPIRED =
   "Your session has expired. Sign in again.";
 
+/**
+ * Perfil de quem entrou: quem é, e em quais condomínios e unidades pertence.
+ *
+ * `null` enquanto está sendo buscado, ou quando a busca falhou — a sessão continua válida nos dois
+ * casos. Quem consome decide o que mostrar na ausência; o perfil nunca derruba a sessão.
+ */
+export type ProfileState =
+  | { status: "loading" }
+  | { status: "ready"; profile: Profile }
+  | { status: "failed" };
+
 export interface UseAuthResult {
   state: SessionState;
+  /** Perfil vindo de `GET /me`. É daqui que outras features leem os vínculos. */
+  profile: ProfileState;
+  /** Tenta buscar o perfil de novo depois de uma falha de rede. */
+  reloadProfile: () => void;
   /** Operação de input ou cadastro em andamento. */
   submitting: boolean;
   /** Falha que não é de um field (credentials, bloqueio, rede). */
@@ -131,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [sessionNotice, setSessionNotice] = useState<string | null>(() => pendingNotice);
+  const [profile, setProfile] = useState<ProfileState>({ status: "loading" });
 
   /** Credentials vivem no ref: o cliente HTTP as lê fora do ciclo de render. */
   const credentials = useRef<Credentials | null>(null);
@@ -150,9 +168,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingNotice = notice;
     if (mounted.current) {
       setSessionNotice(notice);
+      setProfile({ status: "loading" });
       setState({ status: "anonymous" });
     }
   }, []);
+
+  /**
+   * Busca o perfil. Nunca derruba a sessão: uma falha aqui vira `failed`, e a tela que precisa do
+   * perfil decide o que dizer. O `401` já é tratado pelo cliente HTTP, que renova e repete.
+   */
+  const loadProfile = useCallback(async () => {
+    try {
+      const fresh = await buscarPerfilNoServico();
+      if (mounted.current) {
+        setProfile({ status: "ready", profile: fresh });
+      }
+    } catch {
+      if (mounted.current) {
+        setProfile({ status: "failed" });
+      }
+    }
+  }, []);
+
+  const reloadProfile = useCallback(() => {
+    setProfile({ status: "loading" });
+    void loadProfile();
+  }, [loadProfile]);
 
   const applySession = useCallback(async (session: Session) => {
     credentials.current = session.credentials;
@@ -163,8 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setFormErrors({});
       setSubmitError(null);
       setState({ status: "authenticated", user: session.user });
+      void loadProfile();
     }
-  }, []);
+  }, [loadProfile]);
 
   /** Renova e grava. `false` quando a sessão acabou — quem chama decide o que fazer. */
   const refresh = useCallback(async (): Promise<boolean> => {
@@ -215,6 +257,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await writeCredentials(fresh);
         if (!cancelled) {
           setState({ status: "authenticated", user: null });
+          // Sessão restaurada não traz nome nem e-mail; o perfil preenche isso e os vínculos.
+          void loadProfile();
         }
       } catch (error) {
         if (cancelled) {
@@ -305,6 +349,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<UseAuthResult>(
     () => ({
       state,
+      profile,
+      reloadProfile,
       submitting,
       submitError,
       formErrors,
@@ -313,7 +359,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
     }),
-    [state, submitting, submitError, formErrors, sessionNotice, signIn, signUp, signOut]
+    [
+      state,
+      profile,
+      reloadProfile,
+      submitting,
+      submitError,
+      formErrors,
+      sessionNotice,
+      signIn,
+      signUp,
+      signOut,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

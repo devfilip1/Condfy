@@ -6,6 +6,7 @@ import { JWT_SECRET } from "./lib/config.ts";
 import { prisma } from "./lib/prisma.ts";
 import authController from "./auth/auth.controller.ts";
 import { authenticate } from "./auth/authenticate.ts";
+import commonAreaController from "./condominiums/commonArea.controller.ts";
 import visitorController from "./visitors/visitor.controller.ts";
 
 // Os serializers padrão registram método, URL, status e tempo; nunca o body (FR-017).
@@ -21,11 +22,13 @@ await app.register(jwt, { secret: JWT_SECRET });
 
 await app.register(authController);
 
-// Visitantes passam a exigir sessão (FR-023). O módulo de visitors não sabe que isso existe.
+// Rotas que exigem sessão. Os módulos registrados aqui não sabem que isso existe: o `preHandler`
+// é do escopo, não deles (FR-023).
 await app.register(
   async (instancia) => {
     instancia.addHook("preHandler", authenticate);
     await instancia.register(visitorController, { prefix: "/visitors" });
+    await instancia.register(commonAreaController, { prefix: "/condominiums" });
   },
   { name: "rotas-protegidas" }
 );

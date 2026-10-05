@@ -67,8 +67,66 @@ model Condominium {
   updatedAt   DateTime            @updatedAt @map("updated_at")
   units       Unit[]
   members     CondominiumMember[]
+  commonAreas CommonArea[]
 
   @@map("condominiums")
+}
+
+/// Local do condomínio que dá para reservar: salão, quiosque, quadra, churrasqueira.
+///
+/// As CHECKs de nome, taxa e endereço da foto estão na migration
+/// add_common_areas_and_reservations, porque o Prisma não as expressa (ADR 0004).
+model CommonArea {
+  id            String   @id @default(uuid())
+  condominiumId String   @map("condominium_id")
+  name          String   @db.VarChar(60)
+  /// Quanto custa usar, em reais. `0` significa de graça, nunca "não informado" (FR-003).
+  usageFee      Decimal  @default(0) @map("usage_fee") @db.Decimal(10, 2)
+  /// Endereço https da foto. `null` cai no placeholder da tela (research R-007).
+  imageUrl      String?  @map("image_url")
+  /// `false` esconde do catálogo SEM apagar o registro nem o histórico (FR-002a).
+  isAvailable   Boolean  @default(true) @map("is_available")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  condominium  Condominium   @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  reservations Reservation[]
+
+  // Dois locais do mesmo condomínio não podem ter o mesmo nome: o card mostra o nome e mais nada,
+  // então o morador não teria como distinguir (research R-006).
+  @@unique([condominiumId, name])
+  // Alvo da FK composta de Reservation: garante local do mesmo condomínio da reserva (R-002).
+  @@unique([id, condominiumId])
+  @@index([condominiumId, isAvailable])
+  @@map("common_areas")
+}
+
+/// Horário reservado de uma área comum.
+///
+/// NÃO tem coluna de situação: a existência da linha É a reserva, e liberar o horário apaga o
+/// registro (FR-013a). O horário é guardado como minutos desde a meia-noite, e não como hora, para
+/// que nenhum fuso possa deslocá-lo — ver research R-001.
+model Reservation {
+  id            String   @id @default(uuid())
+  commonAreaId  String   @map("common_area_id")
+  reservedById  String   @map("reserved_by_id")
+  /// Repetido de propósito: amarra as duas FKs compostas ao mesmo condomínio (research R-002).
+  condominiumId String   @map("condominium_id")
+  date          DateTime @db.Date
+  /// Minutos desde a meia-noite, no relógio do condomínio. `840` é 14:00.
+  startMinute   Int      @map("start_minute")
+  /// Fim exclusivo, mesma escala. `1320` é 22:00. A CHECK garante maior que `startMinute`.
+  endMinute     Int      @map("end_minute")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  /// A FK composta garante local do MESMO condomínio da reserva.
+  commonArea CommonArea        @relation(fields: [commonAreaId, condominiumId], references: [id, condominiumId], onDelete: Restrict)
+  /// Aponta para o vínculo, não para o usuário: só existe se quem reservou pertence ao condomínio.
+  reservedBy CondominiumMember @relation(fields: [reservedById, condominiumId], references: [userId, condominiumId], onDelete: Cascade)
+
+  @@index([commonAreaId, date])
+  @@map("reservations")
 }
 
 model Unit {
@@ -118,6 +176,7 @@ model CondominiumMember {
   condominium      Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
   residences       UnitResident[]
   authorizedVisits Visitor[]
+  reservations     Reservation[]
 
   @@id([userId, condominiumId])
   // No máximo um síndico por condomínio (research R-003).

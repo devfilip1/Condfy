@@ -133,3 +133,85 @@ export function isFormErrors(value: unknown): value is FormErrors {
     (field) => value[field] === undefined || typeof value[field] === "string"
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Perfil: quem está autenticado e onde pertence (`GET /me`).                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cargo de uma pessoa num condomínio. Os mesmos valores do enum do banco.
+ *
+ * `manager` (síndico) e `doorman` (portaria) foram substituídos por `admin` (administrador):
+ * por enquanto é o único cargo de gestão.
+ */
+export type Role = "resident" | "admin";
+
+/** Unidade onde a pessoa mora. `block` é `null` em condomínio sem blocos. */
+export interface ProfileUnit {
+  id: string;
+  block: string | null;
+  number: string;
+}
+
+/**
+ * Vínculo com um condomínio.
+ *
+ * É uma LISTA no perfil, e `units` é lista dentro dela, porque a mesma pessoa pode pertencer a mais
+ * de um condomínio com cargo diferente em cada, e morar em mais de uma unidade do mesmo condomínio.
+ * É o motivo de o token não carregar condomínio nem unidade (RN-AUT-05).
+ */
+export interface ProfileMembership {
+  condominium: { id: string; name: string };
+  role: Role;
+  /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
+  units: ProfileUnit[];
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  memberships: ProfileMembership[];
+}
+
+const ROLES: readonly string[] = ["resident", "manager", "doorman"];
+
+function isProfileUnit(value: unknown): value is ProfileUnit {
+  if (!isObject(value)) {
+    return false;
+  }
+  return (
+    typeof value.id === "string" &&
+    (value.block === null || typeof value.block === "string") &&
+    typeof value.number === "string"
+  );
+}
+
+function isProfileMembership(value: unknown): value is ProfileMembership {
+  if (!isObject(value)) {
+    return false;
+  }
+  const condominium = value.condominium;
+  return (
+    isObject(condominium) &&
+    typeof condominium.id === "string" &&
+    typeof condominium.name === "string" &&
+    typeof value.role === "string" &&
+    ROLES.includes(value.role) &&
+    Array.isArray(value.units) &&
+    value.units.every(isProfileUnit)
+  );
+}
+
+export function isProfile(value: unknown): value is Profile {
+  if (!isObject(value)) {
+    return false;
+  }
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.email === "string" &&
+    Array.isArray(value.memberships) &&
+    value.memberships.every(isProfileMembership)
+  );
+}

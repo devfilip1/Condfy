@@ -61,7 +61,19 @@ export default function ModuleList() {
 
 export function ModuleItem({ modul }: { modul: Module }) {
   return (
-    <TouchableOpacity onPress={() => router.push("/visitors")}>
+    <TouchableOpacity
+      // Cada módulo abre a SUA rota. Antes todos abriam `/visitors`, então tocar em Reservas
+      // levava para a tela de Visitantes. `null` = módulo anunciado sem tela: não navega.
+      onPress={() => {
+        if (modul.route) {
+          router.push(modul.route);
+        }
+      }}
+      disabled={modul.route === null}
+      accessibilityRole="button"
+      accessibilityLabel={`${modul.name}. ${modul.description}`}
+      accessibilityState={{ disabled: modul.route === null }}
+    >
       <View key={modul.name} style={styles.container}>
         <View style={styles.iconContainer}>
           <Octicons style={styles.icon} name={modul.icon} size={40} />

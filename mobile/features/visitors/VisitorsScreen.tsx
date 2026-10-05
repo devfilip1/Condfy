@@ -4,7 +4,7 @@ import { StyleSheet, View } from "react-native";
 import AddButton from "@/shared/components/AddButton";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
-import LoadErrorState from "@/features/visitors/components/LoadErrorState";
+import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
 import VisitorFormModal from "@/features/visitors/components/VisitorFormModal";
 import VisitorList from "@/features/visitors/components/VisitorList";

@@ -1,7 +1,9 @@
 import {
   Credentials,
+  Profile,
   Session,
   isCredentials,
+  isProfile,
   isSession,
   normalizeEmail,
 } from "@/features/auth/domain/session";
@@ -72,4 +74,18 @@ export async function signOut(refreshToken: string): Promise<void> {
   } catch {
     // Ignorado de propósito: a credencial órfã morre por expiração ou no primeiro reúso.
   }
+}
+
+/**
+ * Perfil de quem está autenticado: nome, e-mail e os vínculos com condomínios e unidades.
+ *
+ * Diferente das quatro chamadas acima, esta EXIGE sessão — por isso não leva `skipAuth`: o cliente
+ * anexa o accessToken e, num `401`, renova e repete sozinho.
+ */
+export async function fetchProfile(): Promise<Profile> {
+  const response = await request("/me");
+  if (!isProfile(response)) {
+    throw new HttpError("server", response);
+  }
+  return response;
 }

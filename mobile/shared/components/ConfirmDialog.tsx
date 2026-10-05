@@ -11,6 +11,19 @@ export interface ConfirmDialogProps {
   busy?: boolean;
   /** Falha da ação, exibida abaixo da message. */
   errorMessage?: string | null;
+  /**
+   * Rótulos e segundo botão são configuráveis desde o segundo uso (feature de reservas, que só
+   * avisa em vez de confirmar). Os defaults preservam o diálogo de remoção, que não mudou.
+   */
+  confirmLabel?: string;
+  busyLabel?: string;
+  /** `false` esconde o botão de cancelar: diálogo de aviso, sem nada a recusar. */
+  showCancel?: boolean;
+  /**
+   * `destructive` (padrão) pinta o botão de confirmar de vermelho; `neutral` usa o acento.
+   * Um "Got it" vermelho leria como se fosse apagar alguma coisa.
+   */
+  tone?: "destructive" | "neutral";
 }
 
 export const styles = StyleSheet.create({
@@ -56,6 +69,10 @@ export const styles = StyleSheet.create({
   confirmButton: {
     backgroundColor: Colors.danger,
   },
+  /** Aviso, não ação destrutiva: vermelho aqui leria como "isso apaga alguma coisa". */
+  confirmButtonNeutral: {
+    backgroundColor: Colors.accent,
+  },
   cancelLabel: {
     fontWeight: "600",
     color: Colors.textPrimary,
@@ -80,6 +97,10 @@ export default function ConfirmDialog({
   onCancel,
   busy = false,
   errorMessage = null,
+  confirmLabel = "Remove",
+  busyLabel = "Removing…",
+  showCancel = true,
+  tone = "destructive",
 }: ConfirmDialogProps) {
   return (
     <Modal
@@ -97,23 +118,27 @@ export default function ConfirmDialog({
             </Text>
           ) : null}
           <View style={styles.actions}>
+            {showCancel ? (
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.cancelButton,
+                  busy ? styles.buttonDisabled : null,
+                ]}
+                onPress={onCancel}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
+              >
+                <Text style={styles.cancelLabel}>Cancel</Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               style={[
                 styles.button,
-                styles.cancelButton,
-                busy ? styles.buttonDisabled : null,
-              ]}
-              onPress={onCancel}
-              disabled={busy}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: busy }}
-            >
-              <Text style={styles.cancelLabel}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.confirmButton,
+                tone === "neutral"
+                  ? styles.confirmButtonNeutral
+                  : styles.confirmButton,
                 busy ? styles.buttonDisabled : null,
               ]}
               onPress={onConfirm}
@@ -122,7 +147,7 @@ export default function ConfirmDialog({
               accessibilityState={{ disabled: busy, busy }}
             >
               <Text style={styles.confirmLabel}>
-                {busy ? "Removing…" : "Remove"}
+                {busy ? busyLabel : confirmLabel}
               </Text>
             </TouchableOpacity>
           </View>

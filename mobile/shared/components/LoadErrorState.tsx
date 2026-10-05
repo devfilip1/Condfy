@@ -35,7 +35,10 @@ export const styles = StyleSheet.create({
 });
 
 /**
- * Falha ao load a list, com a ação de tentar novamente (FR-005).
+ * Falha ao load uma list, com a ação de tentar novamente.
+ *
+ * Promovido de `features/visitors/` para `shared/` no segundo uso, como manda o Princípio II:
+ * visitors e reservations usam o mesmo componente.
  * Ocupa o lugar da list: o state empty nunca aparece quando a busca falhou.
  */
 export default function LoadErrorState({ message, onRetry }: LoadErrorStateProps) {
