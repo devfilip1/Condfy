@@ -1,6 +1,5 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
 
-import { Condominium } from "@/features/reservations/hooks/useCommonAreas";
 import { Colors } from "@/shared/constants/Colors";
 
 /**
@@ -12,8 +11,17 @@ import { Colors } from "@/shared/constants/Colors";
  * Também é o que responde "de qual prédio são estes locais?" sem a pessoa ter de lembrar (SC-008).
  */
 
+/**
+ * O mínimo que o seletor precisa saber. Declarado aqui, e não importado de uma feature, porque
+ * `shared/` não pode depender de `features/` (constituição, regras de dependência).
+ */
+export interface PickerCondominium {
+  id: string;
+  name: string;
+}
+
 export interface CondominiumPickerProps {
-  condominiums: Condominium[];
+  condominiums: PickerCondominium[];
   selectedId: string | null;
   onSelect: (condominiumId: string) => void;
 }

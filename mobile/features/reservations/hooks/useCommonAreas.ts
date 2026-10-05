@@ -3,11 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { HttpError, useAuth } from "@/features/auth";
 import { CommonArea } from "@/features/reservations/domain/commonArea";
 import { listCommonAreas } from "@/features/reservations/services/commonAreaService";
-import {
-  clearSelectedCondominium,
-  readSelectedCondominium,
-  writeSelectedCondominium,
-} from "@/features/reservations/services/selectedCondominium";
 
 /**
  * Estado do catálogo de áreas comuns.
@@ -57,9 +52,8 @@ function messageFor(error: unknown): string {
 }
 
 export function useCommonAreas(): UseCommonAreasResult {
-  const { profile } = useAuth();
+  const { profile, selectedCondominiumId, selectCondominium } = useAuth();
   const [state, setState] = useState<CatalogueState>({ status: "loading" });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -74,7 +68,8 @@ export function useCommonAreas(): UseCommonAreasResult {
       ? profile.profile.memberships.map((membership) => membership.condominium)
       : [];
 
-  // Enquanto o perfil não chega não dá para pedir catálogo nenhum: é dele que sai o condomínio.
+  // A escolha do condomínio vive no contexto de autenticação desde a feature 006: aqui só sobra
+  // refletir o que o perfil diz sobre carregar, falhar ou não ter vínculo nenhum.
   useEffect(() => {
     if (profile.status === "loading") {
       setState({ status: "loading" });
@@ -84,54 +79,9 @@ export function useCommonAreas(): UseCommonAreasResult {
       setState({ status: "failed", message: MESSAGE_LOAD_FAILED });
       return;
     }
-
-    const memberships = profile.profile.memberships;
-    if (memberships.length === 0) {
-      setSelectedId(null);
+    if (profile.profile.memberships.length === 0) {
       setState({ status: "noCondominium" });
-      // Vínculo que acabou não deve deixar palpite guardado para a próxima vez.
-      void clearSelectedCondominium();
-      return;
     }
-
-    let cancelled = false;
-    void (async () => {
-      const belongs = (id: string | null): id is string =>
-        id !== null &&
-        memberships.some((membership) => membership.condominium.id === id);
-
-      // O que já está em uso vence, desde que ainda seja um vínculo válido.
-      let next: string | null = null;
-      setSelectedId((current) => {
-        next = belongs(current) ? current : null;
-        return current;
-      });
-
-      if (next === null) {
-        const stored = await readSelectedCondominium();
-        if (cancelled) {
-          return;
-        }
-        if (belongs(stored)) {
-          next = stored;
-        } else {
-          // Palpite apontando para condomínio que não é mais dela: descarta em vez de mostrar
-          // catálogo vazio ou alheio (FR-021).
-          if (stored !== null) {
-            await clearSelectedCondominium();
-          }
-          next = memberships[0].condominium.id;
-        }
-      }
-
-      if (!cancelled) {
-        setSelectedId(next);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [profile]);
 
   const load = useCallback(async (condominiumId: string) => {
@@ -149,40 +99,22 @@ export function useCommonAreas(): UseCommonAreasResult {
   }, []);
 
   useEffect(() => {
-    if (selectedId === null) {
+    if (selectedCondominiumId === null) {
       return;
     }
-    void load(selectedId);
-  }, [selectedId, load]);
+    void load(selectedCondominiumId);
+  }, [selectedCondominiumId, load]);
 
   const reload = useCallback(() => {
-    if (selectedId !== null) {
-      void load(selectedId);
+    if (selectedCondominiumId !== null) {
+      void load(selectedCondominiumId);
     }
-  }, [selectedId, load]);
-
-  /**
-   * Troca o condomínio em exibição. Só aceita um que a pessoa realmente tenha: a escolha é
-   * conveniência de tela, e quem decide o que ela pode ver continua sendo o servidor.
-   */
-  const selectCondominium = useCallback(
-    (condominiumId: string) => {
-      const allowed = condominiums.some(
-        (condominium) => condominium.id === condominiumId
-      );
-      if (!allowed || condominiumId === selectedId) {
-        return;
-      }
-      setSelectedId(condominiumId);
-      void writeSelectedCondominium(condominiumId);
-    },
-    [condominiums, selectedId]
-  );
+  }, [selectedCondominiumId, load]);
 
   return {
     state,
     condominiums,
-    selectedCondominiumId: selectedId,
+    selectedCondominiumId: selectedCondominiumId,
     selectCondominium,
     reload,
   };

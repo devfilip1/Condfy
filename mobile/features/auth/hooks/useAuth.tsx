@@ -21,6 +21,11 @@ import {
   validateSignIn,
 } from "@/features/auth/domain/session";
 import {
+  clearSelectedCondominium,
+  readSelectedCondominium,
+  writeSelectedCondominium,
+} from "@/features/auth/services/selectedCondominium";
+import {
   clearCredentials,
   writeCredentials,
   readCredentials,
@@ -79,6 +84,16 @@ export interface UseAuthResult {
   profile: ProfileState;
   /** Tenta buscar o perfil de novo depois de uma falha de rede. */
   reloadProfile: () => void;
+  /**
+   * Em qual condomínio a pessoa está olhando. Contexto de sessão, não de uma feature: Reservas e
+   * Newsletter leem o mesmo valor, então as duas telas nunca discordam sobre qual prédio é.
+   *
+   * `null` enquanto o perfil não chegou. O valor guardado no aparelho é um PALPITE, validado
+   * contra os vínculos a cada abertura e descartado quando não bate mais.
+   */
+  selectedCondominiumId: string | null;
+  /** Só aceita um condomínio que a pessoa realmente tenha. */
+  selectCondominium: (condominiumId: string) => void;
   /** Operação de input ou cadastro em andamento. */
   submitting: boolean;
   /** Falha que não é de um field (credentials, bloqueio, rede). */
@@ -149,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [sessionNotice, setSessionNotice] = useState<string | null>(() => pendingNotice);
   const [profile, setProfile] = useState<ProfileState>({ status: "loading" });
+  const [selectedCondominiumId, setSelectedCondominiumId] = useState<string | null>(null);
 
   /** Credentials vivem no ref: o cliente HTTP as lê fora do ciclo de render. */
   const credentials = useRef<Credentials | null>(null);
@@ -194,6 +210,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile({ status: "loading" });
     void loadProfile();
   }, [loadProfile]);
+
+  /**
+   * Resolve em qual condomínio a pessoa está olhando, sempre que o perfil muda.
+   *
+   * O que já está em uso vence, desde que ainda seja um vínculo válido. Senão vale o palpite
+   * guardado no aparelho — e um palpite que aponta para condomínio que não é mais dela é
+   * descartado, em vez de abrir uma tela vazia ou alheia.
+   */
+  useEffect(() => {
+    if (profile.status !== "ready") {
+      return;
+    }
+
+    const memberships = profile.profile.memberships;
+    if (memberships.length === 0) {
+      setSelectedCondominiumId(null);
+      void clearSelectedCondominium();
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const belongs = (id: string | null): id is string =>
+        id !== null &&
+        memberships.some((membership) => membership.condominium.id === id);
+
+      let next: string | null = null;
+      setSelectedCondominiumId((current) => {
+        next = belongs(current) ? current : null;
+        return current;
+      });
+
+      if (next === null) {
+        const stored = await readSelectedCondominium();
+        if (cancelled) {
+          return;
+        }
+        if (belongs(stored)) {
+          next = stored;
+        } else {
+          if (stored !== null) {
+            await clearSelectedCondominium();
+          }
+          next = memberships[0].condominium.id;
+        }
+      }
+
+      if (!cancelled && mounted.current) {
+        setSelectedCondominiumId(next);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
+
+  /** Só aceita um condomínio que a pessoa realmente tenha: a escolha é conveniência de tela. */
+  const selectCondominium = useCallback(
+    (condominiumId: string) => {
+      if (profile.status !== "ready") {
+        return;
+      }
+      const allowed = profile.profile.memberships.some(
+        (membership) => membership.condominium.id === condominiumId
+      );
+      if (!allowed || condominiumId === selectedCondominiumId) {
+        return;
+      }
+      setSelectedCondominiumId(condominiumId);
+      void writeSelectedCondominium(condominiumId);
+    },
+    [profile, selectedCondominiumId]
+  );
+
 
   const applySession = useCallback(async (session: Session) => {
     credentials.current = session.credentials;
@@ -351,6 +442,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       profile,
       reloadProfile,
+      selectedCondominiumId,
+      selectCondominium,
       submitting,
       submitError,
       formErrors,
@@ -363,6 +456,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       profile,
       reloadProfile,
+      selectedCondominiumId,
+      selectCondominium,
       submitting,
       submitError,
       formErrors,

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import CommonAreaList from "@/features/reservations/components/CommonAreaList";
-import CondominiumPicker from "@/features/reservations/components/CondominiumPicker";
+import CondominiumPicker from "@/shared/components/CondominiumPicker";
 import { CommonArea } from "@/features/reservations/domain/commonArea";
 import { useCommonAreas } from "@/features/reservations/hooks/useCommonAreas";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
