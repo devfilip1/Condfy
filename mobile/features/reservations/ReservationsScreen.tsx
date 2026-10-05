@@ -1,12 +1,10 @@
 import { router } from "expo-router";
-import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import CommonAreaList from "@/features/reservations/components/CommonAreaList";
 import CondominiumPicker from "@/shared/components/CondominiumPicker";
 import { CommonArea } from "@/features/reservations/domain/commonArea";
 import { useCommonAreas } from "@/features/reservations/hooks/useCommonAreas";
-import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
 import { Colors } from "@/shared/constants/Colors";
 
@@ -30,8 +28,6 @@ export default function ReservationsScreen() {
     selectCondominium,
     reload,
   } = useCommonAreas();
-  /** Local tocado, à espera do aviso. Reservar em si é de outra feature (FR-016). */
-  const [tapped, setTapped] = useState<CommonArea | null>(null);
 
   return (
     <View style={styles.screen}>
@@ -46,20 +42,15 @@ export default function ReservationsScreen() {
         />
       ) : null}
 
-      <CommonAreaList state={state} onSelect={setTapped} onRetry={reload} />
-
       {/*
-        Confirmação própria em vez de `Alert.alert`, que não faz nada na web — é o motivo de
-        `ConfirmDialog` existir. Um botão só: não há nada a confirmar, só a avisar (FR-015).
+        Tocar num local abre a tela de reserva. Até a feature 007 isto abria um aviso de "em breve";
+        o `ConfirmDialog` que o mostrava saiu junto, e o condomínio em exibição continua vindo do
+        contexto de sessão, então a rota leva só o id do local.
       */}
-      <ConfirmDialog
-        visible={tapped !== null}
-        message={`${tapped?.name ?? ""}\n\nBooking is coming soon. For now you can only see what the condominium offers.`}
-        confirmLabel="Got it"
-        showCancel={false}
-        tone="neutral"
-        onConfirm={() => setTapped(null)}
-        onCancel={() => setTapped(null)}
+      <CommonAreaList
+        state={state}
+        onSelect={(area: CommonArea) => router.push(`/reservations/${area.id}`)}
+        onRetry={reload}
       />
     </View>
   );

@@ -18,6 +18,8 @@ export const Colors = {
   border: "#E2E2E2",
   accent: "#FFB133",
   danger: "#D64545",
+  /** Verde de "tem vaga". Contraste suficiente sobre `cardBackground` e sobre `accentSoft`. */
+  success: "#2E9E5B",
 
   inputBackground: "#FFFFFF",
   inputBorder: "#E2E2E2",
