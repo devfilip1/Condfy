@@ -58,6 +58,28 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
 | How to run or verify anything | [docs/development.md](docs/development.md) |
 | Why something is built this way | [docs/decisions/README.md](docs/decisions/README.md) |
 
+## Commit messages
+
+Conventional Commits, in English like everything else, and **always** one of these types:
+
+```
+feat:     a new capability someone can use
+fix:      a defect corrected
+refactor: the behaviour is the same, the shape is not
+docs:     only documentation
+chore:    tooling, dependencies, ignore files — nothing a user sees
+```
+
+- **The scope is optional and says which project**: `feat(server):`, `fix(mobile):`. Leave it out
+  when the change spans both.
+- **The subject is a sentence in the imperative**, lower case, no full stop, under ~72 characters:
+  `feat(server): publish and read notices, with the first role-gated route`.
+- **The body says why, not what** — the diff already says what. Worth a body: a decision with a
+  rejected alternative, a trap the next person would fall into, a trade-off accepted on purpose.
+  A one-line change rarely needs one.
+- **One logical change per commit.** A feature, its documentation and an unrelated fix are three
+  commits, even when they were written in one sitting.
+
 ## Keeping the docs current
 
 - Changed a business rule, a route, an entity or an environment variable → update the matching
