@@ -27,3 +27,7 @@ server/skills-lock.json
 
 # Estado do editor de notas
 docs/.obsidian/
+
+# artefatos gerados
+server/generated/
+mobile/.expo/
