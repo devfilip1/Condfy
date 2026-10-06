@@ -6,6 +6,7 @@ import {
   bookSlot,
   cancelReservation,
   listAvailability,
+  listOwnReservations,
 } from "./reservation.service.ts";
 
 /**
@@ -16,6 +17,7 @@ import {
  * o prefixo `/condominiums`, dentro do escopo que exige sessão.
  */
 
+const MESSAGE_UNKNOWN_CONDOMINIUM = "Condominium not found.";
 const MESSAGE_UNKNOWN_COMMON_AREA = "Common area not found.";
 const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
 const MESSAGE_SLOT_TAKEN = "That time was just taken. Pick another one.";
@@ -104,6 +106,31 @@ const reservationController: FastifyPluginAsync = async (app) => {
           return error.reason === "taken"
             ? reply.code(409).send({ message: MESSAGE_SLOT_TAKEN })
             : reply.code(404).send({ message: MESSAGE_UNKNOWN_COMMON_AREA });
+        }
+        throw error;
+      }
+    }
+  );
+
+  // As reservas de quem pediu, em todos os locais do condomínio. Pende do condomínio pelo mesmo
+  // motivo do DELETE abaixo: a lista atravessa locais.
+  app.get<{ Params: { condominiumId: string } }>(
+    "/:condominiumId/reservations",
+    async (request, reply) => {
+      // De quem são as reservas vem do token: não existe parâmetro para pedir as de outra pessoa.
+      const requesterId = request.authUser?.id;
+      if (!requesterId) {
+        return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+      }
+
+      try {
+        return reply.send(
+          await listOwnReservations(request.params.condominiumId, requesterId)
+        );
+      } catch (error) {
+        // Condomínio inexistente e condomínio alheio recebem a MESMA resposta, como no catálogo.
+        if (error instanceof ReservationError) {
+          return reply.code(404).send({ message: MESSAGE_UNKNOWN_CONDOMINIUM });
         }
         throw error;
       }

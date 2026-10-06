@@ -53,8 +53,17 @@ export interface DayAvailability {
   slots: AvailableSlot[];
 }
 
+/** O local sendo reservado, como vai junto da disponibilidade. */
+export interface BookedCommonArea {
+  id: string;
+  name: string;
+  usageFee: string;
+  /** A foto que abre a tela de reserva, ou `null`. */
+  imageUrl: string | null;
+}
+
 export interface Availability {
-  commonArea: { id: string; name: string; usageFee: string };
+  commonArea: BookedCommonArea;
   /** `YYYY-MM` do mês pedido. */
   month: string;
   /** Só os dias RESERVÁVEIS do mês: hoje até hoje + 60, dentro do mês pedido. */
@@ -70,6 +79,18 @@ export interface Reservation {
   endMinute: number;
 }
 
+/**
+ * Uma reserva de quem pediu, com o nome do local junto: a lista de "minhas reservas" mistura locais,
+ * e sem o nome o app teria de cruzar com o catálogo — que não traz local indisponível.
+ */
+export interface OwnReservation {
+  id: string;
+  commonArea: { id: string; name: string };
+  date: string;
+  startMinute: number;
+  endMinute: number;
+}
+
 /** Dados já validados de uma nova reserva. Quem reserva vem do token, nunca daqui. */
 export interface NewReservation {
   date: string;
@@ -79,6 +100,7 @@ export interface NewReservation {
 /**
  * Motivo da recusa que o controller traduz em status code.
  *
+ * - `condominium` → 404. Quem pediu não tem vínculo com o condomínio, ou ele não existe.
  * - `commonArea` → 404. Local inexistente, indisponível, de outro condomínio, ou quem pediu não tem
  *   vínculo: a MESMA resposta para os quatro, senão daria para mapear quais locais existem.
  * - `reservation` → 404. O mesmo, para uma reserva.
@@ -87,6 +109,7 @@ export interface NewReservation {
  * - `started` → 409. O horário já começou; não há o que liberar.
  */
 export type ReservationFailure =
+  | "condominium"
   | "commonArea"
   | "reservation"
   | "forbidden"
@@ -130,10 +153,10 @@ async function membershipOf(
 async function availableCommonArea(
   condominiumId: string,
   commonAreaId: string
-): Promise<{ id: string; name: string; usageFee: string } | null> {
+): Promise<BookedCommonArea | null> {
   const row = await prisma.commonArea.findFirst({
     where: { id: commonAreaId, condominiumId: condominiumId, isAvailable: true },
-    select: { id: true, name: true, usageFee: true },
+    select: { id: true, name: true, usageFee: true, imageUrl: true },
   });
 
   if (!row) {
@@ -141,7 +164,12 @@ async function availableCommonArea(
   }
 
   // `toFixed(2)` fixa as duas casas sem passar por float em momento nenhum.
-  return { id: row.id, name: row.name, usageFee: row.usageFee.toFixed(2) };
+  return {
+    id: row.id,
+    name: row.name,
+    usageFee: row.usageFee.toFixed(2),
+    imageUrl: row.imageUrl,
+  };
 }
 
 /** Os dias do mês que dá para reservar: a interseção do mês com a janela de hoje até hoje + 60. */
@@ -267,7 +295,62 @@ export async function listAvailability(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Reservar                                                                   */
+/* Minhas reservas                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * As reservas de quem pediu neste condomínio que ainda não terminaram, da mais próxima para a mais
+ * distante.
+ *
+ * Só as de quem pediu, inclusive para o administrador: ele pode LIBERAR a reserva de qualquer
+ * pessoa, mas isso continua acontecendo pelo horário `held` da disponibilidade. Esta lista responde
+ * "o que eu reservei", e por isso não diz nome de ninguém.
+ *
+ * A reserva de hoje fica até o horário TERMINAR, e não até começar: quem está usando o salão agora
+ * ainda tem aquela reserva. Local que ficou indisponível depois continua aparecendo — a reserva
+ * existe, e sumir com ela da lista seria esconder um compromisso.
+ */
+export async function listOwnReservations(
+  condominiumId: string,
+  requesterId: string
+): Promise<OwnReservation[]> {
+  const membership = await membershipOf(condominiumId, requesterId);
+  if (!membership) {
+    throw new ReservationError("condominium");
+  }
+
+  const today = todayLocalISODate();
+  const rows = await prisma.reservation.findMany({
+    where: {
+      condominiumId: condominiumId,
+      reservedById: requesterId,
+      date: { gte: toDateColumn(today) },
+    },
+    select: {
+      id: true,
+      date: true,
+      startMinute: true,
+      endMinute: true,
+      commonArea: { select: { id: true, name: true } },
+    },
+    orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+  });
+
+  const nowMinutes = minutesSinceMidnightLocal();
+
+  return rows
+    .map((row) => ({
+      id: row.id,
+      commonArea: row.commonArea,
+      date: fromDateColumn(row.date),
+      startMinute: row.startMinute,
+      endMinute: row.endMinute,
+    }))
+    .filter((row) => row.date > today || row.endMinute > nowMinutes);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reservar                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
