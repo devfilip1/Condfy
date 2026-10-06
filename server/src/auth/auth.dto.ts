@@ -28,11 +28,11 @@ export type SignUpValidation =
   | { ok: false; errors: FormErrors };
 
 const NAME_MAX_LENGTH = 100;
-const EMAIL_MAX_LENGTH = 254;
-const PASSWORD_MIN_LENGTH = 8;
+export const EMAIL_MAX_LENGTH = 254;
+export const PASSWORD_MIN_LENGTH = 8;
 
 /** Mesmo formato exigido pela CHECK `users_email_check` no banco (feature 003). */
-const EMAIL_FORMAT = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+export const EMAIL_FORMAT = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function asObject(body: unknown): Record<string, unknown> {
   return typeof body === "object" && body !== null && !Array.isArray(body)

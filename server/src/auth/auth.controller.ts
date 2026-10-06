@@ -4,8 +4,17 @@ import { ACCESS_TOKEN_TTL_SECONDS } from "../lib/config.ts";
 import { authenticate } from "./authenticate.ts";
 import { validateSignIn, validateSignUp } from "./auth.dto.ts";
 import {
+  validateAccountDeletion,
+  validateEmailChange,
+  validatePasswordChange,
+} from "./account.dto.ts";
+import {
+  AccountError,
   AuthError,
   SignUpError,
+  changeEmail,
+  changePassword,
+  deleteAccount,
   getProfile,
   refresh,
   signIn,
@@ -43,6 +52,59 @@ function replyWithFailure(error: AuthError, reply: FastifyReply): FastifyReply {
     return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
   }
   return reply.code(401).send({ message: MESSAGE_BAD_CREDENTIALS });
+}
+
+const MESSAGE_WRONG_CURRENT_PASSWORD = "Current password is incorrect.";
+const MESSAGE_IS_ADMINISTRATOR =
+  "An administrator's account cannot be deleted while they administer a condominium.";
+const MESSAGE_HAS_RECORDS =
+  "This account cannot be deleted because a condominium still keeps notices or found items it published.";
+
+/**
+ * Traduz a recusa de uma mudança na própria conta.
+ *
+ * **Password atual errada é `400` no campo, NUNCA `401`.** Neste projeto `401` quer dizer "sua
+ * sessão não vale mais": o aplicativo reage renovando a sessão e repetindo o pedido, o que enviaria
+ * a password errada uma segunda vez — contando duas vezes para o bloqueio — e ainda poderia ser
+ * lido como sessão vencida. A pessoa ESTÁ autenticada; o que falhou foi um campo de um formulário
+ * (ADR 0015).
+ *
+ * O `409` é para o que a conta, no estado em que está, não permite: o pedido estava certo e a
+ * pessoa provou ser dona da conta.
+ */
+function replyWithAccountFailure(error: unknown, reply: FastifyReply): FastifyReply {
+  if (error instanceof AuthError) {
+    return replyWithFailure(error, reply);
+  }
+  if (!(error instanceof AccountError)) {
+    throw error;
+  }
+
+  switch (error.reason) {
+    case "currentPassword":
+      return reply
+        .code(400)
+        .send({ errors: { currentPassword: MESSAGE_WRONG_CURRENT_PASSWORD } });
+    case "sameEmail":
+      return reply
+        .code(400)
+        .send({ errors: { email: "This is already your e-mail." } });
+    // Não diz POR QUE não pode: "já é de outra conta" contaria a quem perguntou quais existem.
+    case "emailTaken":
+      return reply
+        .code(400)
+        .send({ errors: { email: "This e-mail cannot be used." } });
+    case "samePassword":
+      return reply.code(400).send({
+        errors: {
+          newPassword: "Choose a password different from the current one.",
+        },
+      });
+    case "administrator":
+      return reply.code(409).send({ message: MESSAGE_IS_ADMINISTRATOR });
+    case "hasRecords":
+      return reply.code(409).send({ message: MESSAGE_HAS_RECORDS });
+  }
 }
 
 function refreshTokenFromBody(body: unknown): string | null {
@@ -126,6 +188,74 @@ const authController: FastifyPluginAsync = async (app) => {
         return replyWithFailure(error, reply);
       }
       throw error;
+    }
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /* Mudar a própria conta (feature 010)                                      */
+  /* ------------------------------------------------------------------------ */
+  //
+  // As três rotas abaixo agem sobre a conta de QUEM PEDIU. Nenhuma tem id no caminho nem no body:
+  // de quem é a conta vem do token, então não há id para adulterar (FR-022). E as três pedem a
+  // password atual de novo, no BODY — nunca na URL, que vai para o log.
+
+  app.patch("/me/email", { preHandler: authenticate }, async (request, reply) => {
+    const userId = request.authUser?.id;
+    if (!userId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    const result = validateEmailChange(request.body);
+    if (!result.ok) {
+      return reply.code(400).send({ errors: result.errors });
+    }
+
+    try {
+      return reply.send(await changeEmail(userId, result.data, request.ip));
+    } catch (error) {
+      return replyWithAccountFailure(error, reply);
+    }
+  });
+
+  app.patch("/me/password", { preHandler: authenticate }, async (request, reply) => {
+    const userId = request.authUser?.id;
+    if (!userId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    const result = validatePasswordChange(request.body);
+    if (!result.ok) {
+      return reply.code(400).send({ errors: result.errors });
+    }
+
+    try {
+      // Devolve um par NOVO de credenciais: todas as sessões da conta foram encerradas, e esta é a
+      // de quem pediu. O aplicativo precisa guardar este par no lugar do antigo.
+      return reply.send(
+        await changePassword(userId, result.data, request.ip, signAccessToken)
+      );
+    } catch (error) {
+      return replyWithAccountFailure(error, reply);
+    }
+  });
+
+  // `DELETE` com body é incomum, e é de propósito: a password não pode viajar na URL.
+  app.delete("/me", { preHandler: authenticate }, async (request, reply) => {
+    const userId = request.authUser?.id;
+    if (!userId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    const result = validateAccountDeletion(request.body);
+    if (!result.ok) {
+      return reply.code(400).send({ errors: result.errors });
+    }
+
+    try {
+      await deleteAccount(userId, result.data, request.ip);
+      return reply.code(204).send();
+    } catch (error) {
+      return replyWithAccountFailure(error, reply);
     }
   });
 
