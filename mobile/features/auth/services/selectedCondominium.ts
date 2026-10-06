@@ -2,7 +2,10 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 /**
- * Qual condomínio a pessoa escolheu ver, guardado no aparelho.
+ * Em qual condomínio a pessoa está nesta sessão, guardado no aparelho.
+ *
+ * Vale do momento em que ela escolhe até sair da conta: reabrir o aplicativo ainda logado volta
+ * ao mesmo condomínio, e entrar de novo pergunta de novo (feature 009).
  *
  * É uma CONVENIÊNCIA, não uma permissão: o que ela pode ver continua sendo decidido pelo servidor,
  * que confere o vínculo a cada chamada. Por isso o value guardado é tratado como palpite — o hook
@@ -15,7 +18,13 @@ import { Platform } from "react-native";
  * Nenhuma falha de armazenamento vira error de tela: sem palpite guardado, a pessoa escolhe de novo.
  */
 
-const STORAGE_KEY = "condfy.reservations.condominium";
+const STORAGE_KEY = "condfy.condominium";
+
+/**
+ * A chave de quando só a tela de Reservas usava esta escolha. Nada mais a lê; ela só existe aqui
+ * para ser apagada junto, e não ficar um valor velho num aparelho que já tinha um.
+ */
+const LEGACY_STORAGE_KEY = "condfy.reservations.condominium";
 
 const onWeb = Platform.OS === "web";
 
@@ -49,9 +58,11 @@ export async function clearSelectedCondominium(): Promise<void> {
   try {
     if (onWeb) {
       globalThis.localStorage?.removeItem(STORAGE_KEY);
+      globalThis.localStorage?.removeItem(LEGACY_STORAGE_KEY);
       return;
     }
     await SecureStore.deleteItemAsync(STORAGE_KEY);
+    await SecureStore.deleteItemAsync(LEGACY_STORAGE_KEY);
   } catch {
     // Ignorado de propósito.
   }

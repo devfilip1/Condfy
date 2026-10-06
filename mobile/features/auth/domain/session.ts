@@ -161,7 +161,8 @@ export interface ProfileUnit {
  * É o motivo de o token não carregar condomínio nem unidade (RN-AUT-05).
  */
 export interface ProfileMembership {
-  condominium: { id: string; name: string };
+  /** `imageUrl` é a foto do condomínio, ou `null` — quem exibe mostra o placeholder. */
+  condominium: { id: string; name: string; imageUrl: string | null };
   role: Role;
   /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
   units: ProfileUnit[];
@@ -172,6 +173,16 @@ export interface Profile {
   name: string;
   email: string;
   memberships: ProfileMembership[];
+}
+
+/**
+ * A unidade como a pessoa a lê: `A-101`, ou só `101` em condomínio sem blocos.
+ *
+ * Mora aqui, ao lado de `ProfileUnit`, desde o segundo uso — o cabeçalho da home e o card da
+ * escolha de condomínio (feature 009).
+ */
+export function unitLabel(unit: ProfileUnit): string {
+  return unit.block === null ? unit.number : `${unit.block}-${unit.number}`;
 }
 
 const ROLES: readonly string[] = ["resident", "admin"];
@@ -196,6 +207,7 @@ function isProfileMembership(value: unknown): value is ProfileMembership {
     isObject(condominium) &&
     typeof condominium.id === "string" &&
     typeof condominium.name === "string" &&
+    (condominium.imageUrl === null || typeof condominium.imageUrl === "string") &&
     typeof value.role === "string" &&
     ROLES.includes(value.role) &&
     Array.isArray(value.units) &&

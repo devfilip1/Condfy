@@ -1,6 +1,6 @@
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 
 export interface ConfirmDialogProps {
   visible: boolean;
@@ -26,62 +26,64 @@ export interface ConfirmDialogProps {
   tone?: "destructive" | "neutral";
 }
 
-export const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: "center",
-    paddingHorizontal: 30,
-  },
-  dialog: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    padding: 25,
-    gap: 25,
-  },
-  message: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: Colors.textPrimary,
-  },
-  error: {
-    marginTop: -15,
-    fontSize: 13,
-    lineHeight: 18,
-    color: Colors.danger,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 10,
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  cancelButton: {
-    backgroundColor: Colors.chipBackground,
-  },
-  confirmButton: {
-    backgroundColor: Colors.danger,
-  },
-  /** Aviso, não ação destrutiva: vermelho aqui leria como "isso apaga alguma coisa". */
-  confirmButtonNeutral: {
-    backgroundColor: Colors.accent,
-  },
-  cancelLabel: {
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  confirmLabel: {
-    fontWeight: "600",
-    color: Colors.cardBackground,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      justifyContent: "center",
+      paddingHorizontal: 30,
+    },
+    dialog: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 20,
+      padding: 25,
+      gap: 25,
+    },
+    message: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.textPrimary,
+    },
+    error: {
+      marginTop: -15,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.danger,
+    },
+    actions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: 10,
+    },
+    button: {
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    cancelButton: {
+      backgroundColor: colors.chipBackground,
+    },
+    confirmButton: {
+      backgroundColor: colors.danger,
+    },
+    /** Aviso, não ação destrutiva: vermelho aqui leria como "isso apaga alguma coisa". */
+    confirmButtonNeutral: {
+      backgroundColor: colors.accent,
+    },
+    cancelLabel: {
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    confirmLabel: {
+      fontWeight: "600",
+      color: colors.textOnStrong,
+    },
+  })
+);
 
 /**
  * Diálogo de confirmação genérico (FR-011).
@@ -102,6 +104,7 @@ export default function ConfirmDialog({
   showCancel = true,
   tone = "destructive",
 }: ConfirmDialogProps) {
+  const styles = useStyles();
   return (
     <Modal
       visible={visible}

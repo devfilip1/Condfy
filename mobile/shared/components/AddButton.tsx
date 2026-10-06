@@ -1,7 +1,7 @@
 import { Octicons } from "@expo/vector-icons";
 import { StyleSheet, TouchableOpacity } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles, useTheme } from "@/shared/theme";
 
 export interface AddButtonProps {
   onPress: () => void;
@@ -12,28 +12,32 @@ export interface AddButtonProps {
   accessibilityLabel?: string;
 }
 
-export const styles = StyleSheet.create({
-  button: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    position: "absolute",
-    bottom: 80,
-    right: 30,
-    backgroundColor: Colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-    boxShadow: "3px 4px 5px rgba(0, 0, 0, 0.1)",
-  },
-  label: {
-    fontWeight: "bold",
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    button: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      position: "absolute",
+      bottom: 80,
+      right: 30,
+      backgroundColor: colors.accent,
+      justifyContent: "center",
+      alignItems: "center",
+      boxShadow: "3px 4px 5px rgba(0, 0, 0, 0.1)",
+    },
+    label: {
+      fontWeight: "bold",
+    },
+  })
+);
 
 export default function AddButton({
   onPress,
   accessibilityLabel = "Add visitor",
 }: AddButtonProps) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       style={styles.button}
@@ -41,7 +45,7 @@ export default function AddButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
     >
-      <Octicons name="plus" size={40} color={Colors.textOnAccent} />
+      <Octicons name="plus" size={40} color={colors.textOnAccent} />
     </TouchableOpacity>
   );
 }

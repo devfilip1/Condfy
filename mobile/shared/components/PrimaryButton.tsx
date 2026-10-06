@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 
 export interface PrimaryButtonProps {
   label: string;
@@ -10,22 +10,24 @@ export interface PrimaryButtonProps {
   onPress: () => void;
 }
 
-export const styles = StyleSheet.create({
-  button: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: Colors.textOnAccent,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    button: {
+      backgroundColor: colors.accent,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    label: {
+      fontSize: 15,
+      fontWeight: "bold",
+      color: colors.textOnAccent,
+    },
+  })
+);
 
 /** Botão principal das telas de sessão. Desativa enquanto a operação está em andamento. */
 export default function PrimaryButton({
@@ -34,6 +36,7 @@ export default function PrimaryButton({
   busy,
   onPress,
 }: PrimaryButtonProps) {
+  const styles = useStyles();
   return (
     <TouchableOpacity
       style={[styles.button, busy ? styles.disabled : null]}

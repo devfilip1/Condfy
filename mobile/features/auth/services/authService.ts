@@ -89,3 +89,53 @@ export async function fetchProfile(): Promise<Profile> {
   }
   return response;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Mudar a própria conta (feature 010)                                        */
+/* -------------------------------------------------------------------------- */
+//
+// As três chamadas agem sobre a conta de QUEM ESTÁ CONECTADO: não levam id nenhum, porque de quem
+// é a conta vem do token. E as três levam a password atual, sempre no body.
+
+/** Troca o e-mail e devolve o endereço como ficou gravado — normalizado pelo servidor. */
+export async function changeEmail(
+  email: string,
+  currentPassword: string
+): Promise<{ email: string }> {
+  const response = await request("/me/email", {
+    method: "PATCH",
+    body: { email: normalizeEmail(email), currentPassword },
+  });
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    typeof (response as { email?: unknown }).email !== "string"
+  ) {
+    throw new HttpError("server", response);
+  }
+  return { email: (response as { email: string }).email };
+}
+
+/**
+ * Troca a password e devolve um par NOVO de credenciais: o servidor encerrou todas as sessões da
+ * conta e abriu esta. Quem chama precisa guardar o par no lugar do antigo — esquecer disso passa
+ * despercebido por uns minutos e depois desconecta a pessoa.
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<Credentials> {
+  const response = await request("/me/password", {
+    method: "PATCH",
+    body: { currentPassword, newPassword },
+  });
+  if (!isCredentials(response)) {
+    throw new HttpError("server", response);
+  }
+  return response;
+}
+
+/** Apaga a conta. A password vai no body de um `DELETE`, nunca na URL. */
+export async function deleteAccount(currentPassword: string): Promise<void> {
+  await request("/me", { method: "DELETE", body: { currentPassword } });
+}

@@ -9,53 +9,56 @@ import {
   View,
 } from "react-native";
 
-import FormField from "@/features/auth/components/FormField";
-import PrimaryButton from "@/features/auth/components/PrimaryButton";
+import FormField from "@/shared/components/FormField";
+import PrimaryButton from "@/shared/components/PrimaryButton";
 import { PASSWORD_MIN_LENGTH } from "@/features/auth/domain/session";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 
-export const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.screenBackground,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 28,
-    gap: 18,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-  },
-  error: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: Colors.danger,
-  },
-  footer: {
-    marginTop: 4,
-    fontSize: 14,
-    textAlign: "center",
-    color: Colors.textSecondary,
-  },
-  link: {
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.screenBackground,
+    },
+    content: {
+      flexGrow: 1,
+      justifyContent: "center",
+      paddingHorizontal: 28,
+      gap: 18,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.textSecondary,
+      marginBottom: 6,
+    },
+    error: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.danger,
+    },
+    footer: {
+      marginTop: 4,
+      fontSize: 14,
+      textAlign: "center",
+      color: colors.textSecondary,
+    },
+    link: {
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+  })
+);
 
 /** Tela de cadastro: apenas composição. A conta nasce sem condomínio (FR-027). */
 export default function SignUpScreen() {
+  const styles = useStyles();
   const { submitting, submitError, formErrors, signUp } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles, useTheme } from "@/shared/theme";
 import {
   WEEKDAY_INITIALS,
   CalendarMonth,
@@ -24,127 +24,129 @@ export interface DateFieldProps {
   error?: string;
 }
 
-export const styles = StyleSheet.create({
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    color: Colors.textMuted,
-    marginBottom: 8,
-  },
-  trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: Colors.inputBackground,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-  },
-  triggerOpen: {
-    borderColor: Colors.accent,
-  },
-  triggerValue: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.textPrimary,
-  },
-  triggerPlaceholder: {
-    color: Colors.textSecondary,
-  },
-  shortcuts: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
-  shortcut: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: Colors.chipBackground,
-  },
-  shortcutSelected: {
-    backgroundColor: Colors.accent,
-  },
-  shortcutLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  calendar: {
-    marginTop: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 16,
-    backgroundColor: Colors.cardBackground,
-  },
-  calendarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  monthButton: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: Colors.chipBackground,
-  },
-  monthLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  week: {
-    flexDirection: "row",
-  },
-  weekdayCell: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  weekdayLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    color: Colors.textMuted,
-  },
-  dayCell: {
-    flex: 1,
-    // Altura fixa: com `aspectRatio` a grade fica alta demais e empurra os botões da sheet.
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayTouchable: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 999,
-  },
-  dayToday: {
-    backgroundColor: Colors.accentSoft,
-  },
-  daySelected: {
-    backgroundColor: Colors.accent,
-  },
-  dayLabel: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  dayLabelSelected: {
-    fontWeight: "700",
-    color: Colors.textOnAccent,
-  },
-  error: {
-    marginTop: 6,
-    fontSize: 12,
-    color: Colors.danger,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    label: {
+      fontSize: 12,
+      fontWeight: "600",
+      textTransform: "uppercase",
+      color: colors.textMuted,
+      marginBottom: 8,
+    },
+    trigger: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: colors.inputBackground,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 12,
+      paddingHorizontal: 15,
+      paddingVertical: 14,
+    },
+    triggerOpen: {
+      borderColor: colors.accent,
+    },
+    triggerValue: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    triggerPlaceholder: {
+      color: colors.textSecondary,
+    },
+    shortcuts: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 10,
+    },
+    shortcut: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+      backgroundColor: colors.chipBackground,
+    },
+    shortcutSelected: {
+      backgroundColor: colors.accent,
+    },
+    shortcutLabel: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    calendar: {
+      marginTop: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.cardBackground,
+    },
+    calendarHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    monthButton: {
+      padding: 8,
+      borderRadius: 999,
+      backgroundColor: colors.chipBackground,
+    },
+    monthLabel: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    week: {
+      flexDirection: "row",
+    },
+    weekdayCell: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 6,
+    },
+    weekdayLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      textTransform: "uppercase",
+      color: colors.textMuted,
+    },
+    dayCell: {
+      flex: 1,
+      // Altura fixa: com `aspectRatio` a grade fica alta demais e empurra os botões da sheet.
+      height: 42,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dayTouchable: {
+      width: 38,
+      height: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 999,
+    },
+    dayToday: {
+      backgroundColor: colors.accentSoft,
+    },
+    daySelected: {
+      backgroundColor: colors.accent,
+    },
+    dayLabel: {
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    dayLabelSelected: {
+      fontWeight: "700",
+      color: colors.textOnAccent,
+    },
+    error: {
+      marginTop: 6,
+      fontSize: 12,
+      color: colors.danger,
+    },
+  })
+);
 
 /**
  * Campo de data com calendário embutido (FR-005).
@@ -159,6 +161,8 @@ export default function DateField({
   onChange,
   error,
 }: DateFieldProps) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [aberto, setAberto] = useState(false);
   const [mesVisivel, setMesVisivel] = useState<CalendarMonth>(() =>
     initialCalendarMonth(value)
@@ -203,7 +207,7 @@ export default function DateField({
         <Ionicons
           name="calendar-outline"
           size={20}
-          color={Colors.textPrimary}
+          color={colors.textPrimary}
         />
         <Text
           style={[
@@ -216,7 +220,7 @@ export default function DateField({
         <Ionicons
           name={aberto ? "chevron-up" : "chevron-down"}
           size={18}
-          color={Colors.textMuted}
+          color={colors.textMuted}
         />
       </TouchableOpacity>
 
@@ -252,7 +256,7 @@ export default function DateField({
               <Ionicons
                 name="chevron-back"
                 size={18}
-                color={Colors.textPrimary}
+                color={colors.textPrimary}
               />
             </TouchableOpacity>
             <Text style={styles.monthLabel}>{monthLabel(mesVisivel)}</Text>
@@ -265,7 +269,7 @@ export default function DateField({
               <Ionicons
                 name="chevron-forward"
                 size={18}
-                color={Colors.textPrimary}
+                color={colors.textPrimary}
               />
             </TouchableOpacity>
           </View>

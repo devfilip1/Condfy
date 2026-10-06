@@ -48,6 +48,29 @@ export function toDisplayDate(isoDate: string): string {
   return `${parts[3]}/${parts[2]}/${parts[1]}`;
 }
 
+/**
+ * Converte um INSTANTE (`2026-10-05T23:10:00.000Z`) para exibição, no horário local do aparelho:
+ * `05/10/2026, 20:10`.
+ *
+ * É a única função deste arquivo que lê um instante, e a única que converte fuso. Todas as outras
+ * tratam de DIA DE CALENDÁRIO, que não tem fuso — nunca passe um dia para esta nem um instante
+ * para aquelas. Um item postado às 21:30 em São Paulo é 00:30 do dia seguinte em UTC, e mostrá-lo
+ * sem converter diria "amanhã" (feature 008, research R-009).
+ *
+ * Devolve o texto recebido quando ele não é uma data, como `toDisplayDate` faz.
+ */
+export function toDisplayDateTime(isoInstant: string): string {
+  const moment = new Date(isoInstant);
+  if (Number.isNaN(moment.getTime())) {
+    return isoInstant;
+  }
+  const two = (value: number): string => (value < 10 ? `0${value}` : String(value));
+  return (
+    `${two(moment.getDate())}/${two(moment.getMonth() + 1)}/${moment.getFullYear()}, ` +
+    `${two(moment.getHours())}:${two(moment.getMinutes())}`
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Calendário: regras puras usadas pelo seletor de data prevista.              */
 /* Todo cálculo usa o fuso local do aparelho; nenhuma conversão UTC é feita,   */

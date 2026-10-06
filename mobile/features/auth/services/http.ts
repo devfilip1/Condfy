@@ -8,7 +8,7 @@
  * Não conhece Visitor e não gera text de interface: quem decide a message é quem chama.
  */
 
-const TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 10_000;
 
 export type HttpErrorKind =
   | "network"
@@ -41,8 +41,15 @@ export class HttpError extends Error {
 }
 
 export interface RequestOptions {
-  method?: "GET" | "POST" | "DELETE";
+  /** `PATCH` entrou com a troca de status de um item de achados e perdidos (feature 008). */
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  /**
+   * Quanto esperar antes de desistir. O padrão de 10 segundos serve para JSON de poucos kilobytes;
+   * um envio com foto, numa rede de celular, precisa de mais — sem isto um envio CERTO numa rede
+   * lenta seria relatado como "sem conexão".
+   */
+  timeoutMs?: number;
   /**
    * Não anexa credencial e não tenta refresh em caso de `401`. É o que as próprias rotas de
    * sessão usam — sem isso, refresh uma sessão vencida chamaria renovação de novo, em recursão.
@@ -93,6 +100,16 @@ function baseUrl(): string {
   return url.replace(/\/+$/, "");
 }
 
+/**
+ * Um caminho da API como endereço completo, para o que não passa por `request` — hoje, a foto de
+ * um item de achados e perdidos, que o componente de imagem busca sozinho.
+ *
+ * O servidor devolve esse caminho RELATIVO porque não sabe por qual endereço o aparelho o alcança.
+ */
+export function apiUrl(path: string): string {
+  return `${baseUrl()}${path}`;
+}
+
 function hasFieldErrors(body: unknown): boolean {
   return typeof body === "object" && body !== null && "errors" in body;
 }
@@ -112,7 +129,10 @@ async function readJson(response: Response): Promise<unknown> {
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const base = baseUrl();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  );
 
   const accessToken = options.skipAuth ? null : bridge?.getAccessToken() ?? null;
   const headers: Record<string, string> = {};
