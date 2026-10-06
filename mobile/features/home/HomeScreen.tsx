@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import { useAuth } from "@/features/auth";
@@ -15,23 +16,34 @@ export const styles = StyleSheet.create({
 });
 
 export default function HomeScreen() {
-  const { profile } = useAuth();
+  const { currentMembership, canSwitchCondominium } = useAuth();
 
   /**
-   * Cargos da pessoa, de todos os condomínios dela. Enquanto o perfil não chega a lista é vazia, e
-   * `modulesForRoles` cai na visão de morador — a mais completa. Mostrar e tirar é menos ruim que
-   * piscar um módulo que a pessoa não deveria ver.
+   * O cargo da pessoa NO CONDOMÍNIO EM QUE ELA ESTÁ. Até a feature 009 isto era a união dos cargos
+   * de todos os condomínios dela, porque não existia um "atual" para ler; com a escolha, mostrar
+   * num prédio um módulo que só o cargo dela em outro permite seria a confusão que a escolha veio
+   * tirar.
+   *
+   * Sem condomínio atual a lista é vazia, e `modulesForRoles` cai na visão de morador.
    */
-  const roles =
-    profile.status === "ready"
-      ? profile.profile.memberships.map((membership) => membership.role)
-      : [];
+  const roles = currentMembership ? [currentMembership.role] : [];
 
   return (
     <>
       <HeaderHome />
       <View style={styles.screen}>
-        <Banner />
+        {/*
+          Trocar só é oferecido a quem tem para o que trocar. Para quem tem um condomínio só — quase
+          todo mundo — o banner não ganha botão nenhum (FR-025).
+        */}
+        <Banner
+          condominium={currentMembership?.condominium ?? null}
+          onSwitch={
+            canSwitchCondominium
+              ? () => router.push("/choose-condominium")
+              : undefined
+          }
+        />
         <ModuleList modules={modulesForRoles(roles)} />
       </View>
     </>

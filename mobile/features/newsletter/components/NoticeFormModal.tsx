@@ -20,7 +20,7 @@ import {
   TITLE_MAX_LENGTH,
 } from "@/features/newsletter/domain/notice";
 import DateField from "@/shared/components/DateField";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles, useTheme } from "@/shared/theme";
 
 /**
  * Formulário de publicação de aviso.
@@ -38,52 +38,54 @@ export interface NoticeFormModalProps {
   onCancel: () => void;
 }
 
-export const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: Colors.overlay, justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: Colors.screenBackground,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    maxHeight: "90%",
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    color: Colors.textPrimary,
-    marginBottom: 20,
-  },
-  field: { marginBottom: 18 },
-  label: {
-    fontSize: 12,
-    textTransform: "uppercase",
-    color: Colors.textMuted,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: Colors.inputBackground,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: Colors.textPrimary,
-  },
-  // O corpo é o primeiro campo longo do projeto: precisa de altura e de crescer para cima.
-  bodyInput: { minHeight: 140, textAlignVertical: "top" },
-  counter: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, textAlign: "right" },
-  error: { fontSize: 13, color: Colors.danger, marginTop: 6 },
-  actions: { flexDirection: "row", gap: 12, marginTop: 8 },
-  button: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
-  cancel: { backgroundColor: Colors.chipBackground },
-  submit: { backgroundColor: Colors.accent },
-  disabled: { opacity: 0.5 },
-  cancelLabel: { fontWeight: "600", color: Colors.textPrimary },
-  submitLabel: { fontWeight: "bold", color: Colors.textOnAccent },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
+    sheet: {
+      backgroundColor: colors.screenBackground,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      maxHeight: "90%",
+    },
+    heading: {
+      fontSize: 20,
+      fontWeight: "bold",
+      textTransform: "uppercase",
+      color: colors.textPrimary,
+      marginBottom: 20,
+    },
+    field: { marginBottom: 18 },
+    label: {
+      fontSize: 12,
+      textTransform: "uppercase",
+      color: colors.textMuted,
+      marginBottom: 6,
+    },
+    input: {
+      backgroundColor: colors.inputBackground,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    // O corpo é o primeiro campo longo do projeto: precisa de altura e de crescer para cima.
+    bodyInput: { minHeight: 140, textAlignVertical: "top" },
+    counter: { fontSize: 12, color: colors.textSecondary, marginTop: 4, textAlign: "right" },
+    error: { fontSize: 13, color: colors.danger, marginTop: 6 },
+    actions: { flexDirection: "row", gap: 12, marginTop: 8 },
+    button: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+    cancel: { backgroundColor: colors.chipBackground },
+    submit: { backgroundColor: colors.accent },
+    disabled: { opacity: 0.5 },
+    cancelLabel: { fontWeight: "600", color: colors.textPrimary },
+    submitLabel: { fontWeight: "bold", color: colors.textOnAccent },
+  })
+);
 
 export default function NoticeFormModal({
   visible,
@@ -93,6 +95,8 @@ export default function NoticeFormModal({
   onSubmit,
   onCancel,
 }: NoticeFormModalProps) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [date, setDate] = useState("");
@@ -134,7 +138,7 @@ export default function NoticeFormModal({
                   value={title}
                   onChangeText={setTitle}
                   placeholder="What is this about"
-                  placeholderTextColor={Colors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   maxLength={TITLE_MAX_LENGTH}
                 />
                 {errors.title ? <Text style={styles.error}>{errors.title}</Text> : null}
@@ -147,7 +151,7 @@ export default function NoticeFormModal({
                   value={body}
                   onChangeText={setBody}
                   placeholder="Leave a blank line between paragraphs"
-                  placeholderTextColor={Colors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   maxLength={BODY_MAX_LENGTH}
                 />

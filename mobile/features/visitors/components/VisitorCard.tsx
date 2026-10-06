@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles, useTheme } from "@/shared/theme";
 import {
   VisitType,
   Visitor,
@@ -27,72 +27,76 @@ const TYPE_LABELS: Record<VisitType, string> = {
   service_provider: "Service",
 };
 
-export const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: 25,
-    marginBottom: 15,
-    padding: 20,
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    boxShadow: "0px 4px 3px rgba(0, 0, 0, 0.1)",
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  containerUpSide: {
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 20,
-    boxShadow: "0px 2px 0px rgba(0, 0, 0, 0.1)",
-    paddingBottom: 10,
-  },
-  identity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 14,
-    textTransform: "uppercase",
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  role: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  removeButton: {
-    padding: 6,
-  },
-  footer: {
-    display: "flex",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 10,
-  },
-  authorizedBy: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 12,
-    color: Colors.textPrimary,
-  },
-  date: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    container: {
+      marginHorizontal: 25,
+      marginBottom: 15,
+      padding: 20,
+      backgroundColor: colors.cardBackground,
+      borderRadius: 20,
+      boxShadow: "0px 4px 3px rgba(0, 0, 0, 0.1)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    containerUpSide: {
+      display: "flex",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 20,
+      boxShadow: "0px 2px 0px rgba(0, 0, 0, 0.1)",
+      paddingBottom: 10,
+    },
+    identity: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      fontSize: 14,
+      textTransform: "uppercase",
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    role: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    removeButton: {
+      padding: 6,
+    },
+    footer: {
+      display: "flex",
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+    },
+    authorizedBy: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 12,
+      color: colors.textPrimary,
+    },
+    date: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+  })
+);
 
 /** Card de um visitor, com controle de remoção sempre visível (FR-002, FR-010). */
 export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <View style={styles.container}>
       <View style={styles.containerUpSide}>
         <Ionicons
           name="person-circle-outline"
           size={50}
-          color={Colors.textPrimary}
+          color={colors.textPrimary}
         />
         <View style={styles.identity}>
           <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
@@ -106,7 +110,7 @@ export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
           accessibilityRole="button"
           accessibilityLabel={`Remove ${visitor.name}`}
         >
-          <Ionicons name="trash-outline" size={22} color={Colors.danger} />
+          <Ionicons name="trash-outline" size={22} color={colors.danger} />
         </TouchableOpacity>
       </View>
       <View style={styles.footer}>

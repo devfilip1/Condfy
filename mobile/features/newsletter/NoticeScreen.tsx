@@ -5,7 +5,7 @@ import { useNotices } from "@/features/newsletter/hooks/useNotices";
 import EmptyState from "@/shared/components/EmptyState";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadingState from "@/shared/components/LoadingState";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
@@ -17,34 +17,37 @@ import { toDisplayDate } from "@/shared/lib/calendar";
 
 const MESSAGE_NOT_FOUND = "This notice is no longer available.";
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.screenBackground,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 60,
-    gap: 12,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-  },
-  date: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  body: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: Colors.textPrimary,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.screenBackground,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 60,
+      gap: 12,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+    },
+    date: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    body: {
+      fontSize: 16,
+      lineHeight: 24,
+      color: colors.textPrimary,
+    },
+  })
+);
 
 export default function NoticeScreen() {
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state } = useNotices();
 

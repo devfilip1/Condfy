@@ -62,7 +62,7 @@ export interface UseVisitorsResult {
  * Não retorna JSX e não importa componentes.
  */
 export function useVisitors(): UseVisitorsResult {
-  const { profile } = useAuth();
+  const { currentMembership, selectedCondominiumId } = useAuth();
   const [list, setList] = useState<ListState>({ status: "loading" });
   const [formOpen, setFormOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -251,19 +251,39 @@ export function useVisitors(): UseVisitorsResult {
   }, [pendingRemoval]);
 
   /**
-   * Todas as unidades onde a pessoa mora, de todos os condomínios dela.
+   * As unidades onde a pessoa mora NO CONDOMÍNIO EM QUE ELA ESTÁ (feature 009). Até então eram as
+   * de todos os condomínios dela, e o formulário oferecia a unidade de um prédio dentro de outro.
    *
    * Vem do perfil (`GET /me`), e não de uma chamada própria: o tipo é da feature de autenticação,
-   * que é dona dele (Princípio III). Vazia para síndico ou portaria sem moradia — e aí o
-   * formulário avisa em vez de deixar registrar uma visita que o banco recusaria.
+   * que é dona dele (Princípio III). Vazia para o administrador sem moradia — e aí o formulário
+   * avisa em vez de deixar registrar uma visita que o banco recusaria.
    */
-  const units: VisitorUnit[] =
-    profile.status === "ready"
-      ? profile.profile.memberships.flatMap((membership) => membership.units)
-      : [];
+  const units: VisitorUnit[] = currentMembership?.units ?? [];
+
+  /**
+   * A lista como a tela a mostra: só os visitantes do condomínio em que a pessoa está.
+   *
+   * **Isto é um filtro DE TELA, não uma proteção.** `GET /visitors` ainda devolve os visitantes de
+   * todos os condomínios — a lacuna registrada em `docs/business-rules.md` desde a feature 003, que
+   * depende de decidir o que cada cargo pode ver. O filtro faz esta tela concordar com o resto do
+   * aplicativo sobre qual é o prédio; ele não torna visitante nenhum privado, e fechar a lacuna
+   * continua sendo trabalho do servidor (feature 009, research R-009).
+   *
+   * O state guarda a lista inteira e o filtro é aplicado aqui, na saída: trocar de condomínio
+   * muda o que aparece sem buscar de novo.
+   */
+  const visibleList: ListState =
+    list.status === "ready"
+      ? {
+          status: "ready",
+          visitors: list.visitors.filter(
+            (visitor) => visitor.condominiumId === selectedCondominiumId
+          ),
+        }
+      : list;
 
   return {
-    list,
+    list: visibleList,
     reload,
     formOpen,
     formErrors,

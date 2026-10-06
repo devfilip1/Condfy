@@ -72,7 +72,8 @@ function sortNewestFirst(list: Notice[]): Notice[] {
 }
 
 export function useNotices(): UseNoticesResult {
-  const { profile, selectedCondominiumId } = useAuth();
+  const { profile, selectedCondominiumId, isAdminOfSelectedCondominium } =
+    useAuth();
   const [state, setState] = useState<BoardState>({ status: "loading" });
   const [formOpen, setFormOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -88,14 +89,9 @@ export function useNotices(): UseNoticesResult {
     };
   }, []);
 
-  const canPublish =
-    profile.status === "ready" &&
-    selectedCondominiumId !== null &&
-    profile.profile.memberships.some(
-      (membership) =>
-        membership.condominium.id === selectedCondominiumId &&
-        membership.role === "admin"
-    );
+  // A conta de "é administrador deste condomínio" mora no contexto de autenticação desde o segundo
+  // uso (feature 008); aqui ela só ganha o nome que esta tela usa.
+  const canPublish = isAdminOfSelectedCondominium;
 
   // O condomínio em exibição vem do contexto de autenticação; aqui só sobra reagir ao perfil.
   useEffect(() => {

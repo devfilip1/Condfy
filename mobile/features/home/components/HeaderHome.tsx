@@ -1,43 +1,43 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { ProfileUnit, useAuth } from "@/features/auth";
-import { Colors } from "@/shared/constants/Colors";
+import { unitLabel, useAuth } from "@/features/auth";
+import { makeStyles, useTheme } from "@/shared/theme";
 
-export const styles = StyleSheet.create({
-  container: {
-    height: 100,
-    justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingTop: 45,
-  },
-  settings: {
-    position: "absolute",
-    right: 20,
-    top: 60,
-  },
-  unit: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: "semibold",
-    textTransform: "uppercase",
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    color: Colors.textPrimary,
-  },
-});
-
-/** `BV-1303`, ou só `1303` em condomínio sem blocos. */
-function unitLabel(unit: ProfileUnit): string {
-  return unit.block === null ? unit.number : `${unit.block}-${unit.number}`;
-}
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    container: {
+      height: 100,
+      justifyContent: "center",
+      paddingHorizontal: 20,
+      paddingTop: 45,
+    },
+    settings: {
+      position: "absolute",
+      right: 20,
+      top: 60,
+    },
+    unit: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: "semibold",
+      textTransform: "uppercase",
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: "bold",
+      textTransform: "uppercase",
+      color: colors.textPrimary,
+    },
+  })
+);
 
 export default function HeaderHome() {
-  const { state, profile, signOut } = useAuth();
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const { state, profile, currentMembership } = useAuth();
 
   /**
    * Nome: vem do perfil quando ele chega, e do state da sessão enquanto não chega.
@@ -54,14 +54,13 @@ export default function HeaderHome() {
         : "";
 
   /**
-   * Todas as unidades onde a pessoa mora, de todos os condomínios dela. Normalmente é uma só;
-   * quem mora em duas vê as duas, porque esconder uma seria mentir sobre onde ela mora.
-   * Vazia para síndico e portaria, que têm vínculo sem moradia — e aí o cabeçalho mostra só o nome.
+   * As unidades onde a pessoa mora NO CONDOMÍNIO EM QUE ELA ESTÁ. Normalmente é uma só; quem mora
+   * em duas do mesmo condomínio vê as duas. Até a feature 009 eram as de todos os condomínios
+   * dela — e aí a unidade de um prédio aparecia ao lado da foto de outro.
+   *
+   * Vazia para o administrador, que tem vínculo sem moradia — e aí o cabeçalho mostra só o nome.
    */
-  const units =
-    profile.status === "ready"
-      ? profile.profile.memberships.flatMap((membership) => membership.units)
-      : [];
+  const units = currentMembership?.units ?? [];
 
   const heading =
     units.length > 0
@@ -76,16 +75,20 @@ export default function HeaderHome() {
           {heading}
         </Text>
       </View>
+      {/*
+        Até a feature 010 este era o botão de sair. Sair foi para a barra de baixo, ao lado da
+        Home, com confirmação; aqui ficou a entrada das configurações (FR-001).
+      */}
       <TouchableOpacity
         style={styles.settings}
-        onPress={signOut}
+        onPress={() => router.push("/settings")}
         accessibilityRole="button"
-        accessibilityLabel="Sign out"
+        accessibilityLabel="Settings"
       >
         <Ionicons
-          name="log-out-outline"
+          name="settings-outline"
           size={35}
-          color={Colors.textPrimary}
+          color={colors.textPrimary}
         />
       </TouchableOpacity>
     </View>

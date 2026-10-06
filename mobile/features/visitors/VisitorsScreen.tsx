@@ -8,24 +8,27 @@ import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
 import VisitorFormModal from "@/features/visitors/components/VisitorFormModal";
 import VisitorList from "@/features/visitors/components/VisitorList";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 import {
   MESSAGE_LOAD_FAILED,
   useVisitors,
 } from "@/features/visitors/hooks/useVisitors";
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.screenBackground,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.screenBackground,
+    },
+  })
+);
 
 /**
  * Tela do módulo de Visitantes: apenas composição.
  * Todo o state vem do hook `useVisitors`.
  */
 export default function VisitorsScreen() {
+  const styles = useStyles();
   const {
     list,
     reload,

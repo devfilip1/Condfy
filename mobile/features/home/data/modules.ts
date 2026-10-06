@@ -3,7 +3,12 @@ import { Octicons } from "@expo/vector-icons";
 import { Role } from "@/features/auth";
 
 /** Rotas que os módulos da home abrem. `null` = módulo anunciado mas ainda sem tela. */
-export type ModuleRoute = "/visitors" | "/reservations" | "/newsletter" | null;
+export type ModuleRoute =
+  | "/visitors"
+  | "/reservations"
+  | "/newsletter"
+  | "/lost-and-found"
+  | null;
 
 export interface Module {
   icon: React.ComponentProps<typeof Octicons>["name"];
@@ -52,7 +57,7 @@ const modules: Module[] = [
     icon: "search",
     name: "Lost & Found",
     description: "Find lost items",
-    route: null,
+    route: "/lost-and-found",
     visibleTo: ALL_ROLES,
   },
 ];

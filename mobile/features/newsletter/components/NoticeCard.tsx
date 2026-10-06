@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Notice, previewOf } from "@/features/newsletter/domain/notice";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
@@ -20,39 +20,42 @@ export interface NoticeCardProps {
   onPress: (notice: Notice) => void;
 }
 
-export const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 16,
-    gap: 6,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  title: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-  },
-  date: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  preview: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: Colors.textMuted,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      gap: 6,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    title: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+    },
+    date: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    preview: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textMuted,
+    },
+  })
+);
 
 export default function NoticeCard({ notice, onPress }: NoticeCardProps) {
+  const styles = useStyles();
   return (
     <TouchableOpacity
       style={styles.card}

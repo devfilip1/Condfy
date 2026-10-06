@@ -6,21 +6,24 @@ import NoticeList from "@/features/newsletter/components/NoticeList";
 import { useNotices } from "@/features/newsletter/hooks/useNotices";
 import AddButton from "@/shared/components/AddButton";
 import HeaderModule from "@/shared/components/HeaderModule";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 
 /**
  * Tela do módulo de Newsletter: apenas composição.
  * Todo o state vem do hook `useNotices` (constituição, Princípio I).
  */
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.screenBackground,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.screenBackground,
+    },
+  })
+);
 
 export default function NewsletterScreen() {
+  const styles = useStyles();
   const {
     state,
     canPublish,

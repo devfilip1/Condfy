@@ -9,42 +9,49 @@ import {
   View,
 } from "react-native";
 import { Module } from "@/features/home/data/modules";
+import { makeStyles, useTheme } from "@/shared/theme";
 
-export const styles = StyleSheet.create({
-  overContainer: {
-    display: "flex",
-    marginTop: 20,
-  },
-  container: {
-    padding: 25,
-    backgroundColor: "white",
-    display: "flex",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "#E2E2E2",
-    borderRadius: 35,
-    width: 160,
-  },
-  iconContainer: {
-    borderRadius: 15,
-    padding: 10,
-    marginBottom: 10,
-    backgroundColor: "#E2E2E2",
-    height: 70,
-    width: 70,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  icon: {},
-  title: {
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  desc: {
-    color: "#B7B7B7",
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    overContainer: {
+      display: "flex",
+      marginTop: 20,
+    },
+    row: {
+      justifyContent: "space-between",
+      marginBottom: 20,
+    },
+    container: {
+      padding: 25,
+      backgroundColor: colors.cardBackground,
+      display: "flex",
+      borderStyle: "solid",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 35,
+      width: 160,
+    },
+    iconContainer: {
+      borderRadius: 15,
+      padding: 10,
+      marginBottom: 10,
+      backgroundColor: colors.iconSurface,
+      height: 70,
+      width: 70,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    title: {
+      fontWeight: "bold",
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    desc: {
+      color: colors.textSecondary,
+    },
+  })
+);
 
 export interface ModuleListProps {
   /** Já filtrados por cargo pela tela. O componente não decide quem vê o quê. */
@@ -52,6 +59,7 @@ export interface ModuleListProps {
 }
 
 export default function ModuleList({ modules }: ModuleListProps) {
+  const styles = useStyles();
   return (
     <FlatList
       style={styles.overContainer}
@@ -59,12 +67,14 @@ export default function ModuleList({ modules }: ModuleListProps) {
       keyExtractor={(item) => item.name}
       renderItem={({ item }) => <ModuleItem modul={item} />}
       numColumns={2}
-      columnWrapperStyle={{ justifyContent: "space-between", marginBottom: 20 }}
+      columnWrapperStyle={styles.row}
     />
   );
 }
 
 export function ModuleItem({ modul }: { modul: Module }) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       // Cada módulo abre a SUA rota. Antes todos abriam `/visitors`, então tocar em Reservas
@@ -81,7 +91,8 @@ export function ModuleItem({ modul }: { modul: Module }) {
     >
       <View key={modul.name} style={styles.container}>
         <View style={styles.iconContainer}>
-          <Octicons style={styles.icon} name={modul.icon} size={40} />
+          {/* Sem cor o ícone é preto, e preto some na aparência escura (ADR 0014). */}
+          <Octicons name={modul.icon} size={40} color={colors.textPrimary} />
         </View>
         <Text style={styles.title}>{modul.name}</Text>
         <Text style={styles.desc}>{modul.description}</Text>
