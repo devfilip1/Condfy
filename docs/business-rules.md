@@ -456,6 +456,40 @@ already gone answers `404`. Telling a stranger "already deleted" would leak that
 - **Where:** `cancelReservation` in
   [reservation.service.ts](../server/src/condominiums/reservation.service.ts)
 
+### RN-RSV-09 · Picking a time does not book it; a confirmation does
+
+Touching a free time on the booking screen only **selects** it — one at a time, and touching it
+again clears the choice. The booking is made by the button at the end of the screen, which stays
+disabled until a time is selected and asks for confirmation naming the place, the day and the time
+before anything is sent. Changing the day, or any reload of the month, clears the selection: the
+chosen time has either just become a reservation or just been taken by somebody else.
+
+A time the person already holds is not selectable. Touching it is still the way to cancel it
+(RN-RSV-08), and it looks different from a free time for that reason.
+
+- **Where:** `selectSlot` and `book` in
+  [useBooking.ts](../mobile/features/reservations/hooks/useBooking.ts), and
+  [BookingScreen.tsx](../mobile/features/reservations/BookingScreen.tsx)
+
+### RN-RSV-10 · "My bookings" lists only your own, and only what has not ended
+
+Under the catalogue, a resident sees the reservations **they** made in the condominium on screen:
+place, day and time, soonest first. A reservation leaves the list when its slot ends — not when it
+starts — and one made for a place that was later switched off still appears, because the
+commitment still exists (RN-RSV-01).
+
+Each card carries a cancel button, which asks for confirmation and then follows RN-RSV-08 exactly
+— it is the same `DELETE`, reached from a second place. A refusal is shown inside the confirmation
+and the list is read again, since a refusal other than a network failure means the list was stale.
+
+The administrator sees only their own here as well. The list answers "what did I book", so it
+never needs to say a name. It is read again every time the screen regains focus, since the booking
+itself happens one screen ahead; and it failing does not take the catalogue down with it.
+
+- **Where:** `listOwnReservations` in
+  [reservation.service.ts](../server/src/condominiums/reservation.service.ts), and
+  [useOwnReservations.ts](../mobile/features/reservations/hooks/useOwnReservations.ts)
+
 ## Newsletter
 
 ### RN-NWS-01 · The board is read by everyone in the condominium
@@ -498,6 +532,205 @@ rather than one line and an ellipsis.
 - **Where:** `notices_body_check` in the migration, and `previewOf` in
   [notice.ts](../mobile/features/newsletter/domain/notice.ts)
 
+## Account and appearance
+
+### RN-ACC-01 · Every change to your own account asks for the current password again
+
+Changing the e-mail, changing the password and deleting the account each require the current
+password. A session alone is not enough — an unlocked phone in the wrong hands must not be able to
+take an account over. Whose account it is comes from the session; no request names an account.
+
+A wrong password is refused with a message under the field, and it counts toward the same lockout
+that protects signing in: five wrong passwords in fifteen minutes, wherever they were typed, block
+further attempts for fifteen minutes.
+
+- **Where:** `verifyCurrentPassword` in [auth.service.ts](../server/src/auth/auth.service.ts);
+  [ADR 0015](decisions/0015-changing-the-account-asks-for-the-password-again.md)
+
+### RN-ACC-02 · An e-mail belongs to one account, and changing it takes effect at once
+
+The new address passes the same rules as at sign-up and is compared ignoring case and surrounding
+spaces. One that belongs to another account is refused, without saying why. Changing to the address
+you already have is refused too. There is no confirmation message — the system sends no e-mail — and
+the person stays signed in everywhere.
+
+- **Where:** `changeEmail` in [auth.service.ts](../server/src/auth/auth.service.ts) and the unique
+  index on `users.email`
+
+### RN-ACC-03 · Changing the password signs out every other device
+
+The new password must be at least 8 characters and differ from the current one. Afterwards the
+device that made the change stays signed in and every other device is signed out — within 15
+minutes, the time the short-lived access they already hold takes to expire.
+
+- **Where:** `changePassword` in [auth.service.ts](../server/src/auth/auth.service.ts)
+
+### RN-ACC-04 · Deleting an account is permanent, and removes what belonged to the person
+
+After a warning, the current password and an explicit confirmation, the account is deleted at once
+and for good: its sessions on every device, its memberships, the visitors it authorized and the
+reservations it made, whose slots become free. Signing in afterwards fails exactly as for an account
+that never existed, and the address can be used for a new, unrelated account.
+
+- **Where:** `deleteAccount` in [auth.service.ts](../server/src/auth/auth.service.ts) and the
+  cascading foreign keys
+
+### RN-ACC-05 · An administrator's account cannot be deleted
+
+Notices and found items belong to the condominium and record who published them. So the account of
+someone who administers a condominium cannot be deleted — and neither can the account of a former
+administrator while such records still point at them. The app says so before asking for a password;
+the system refuses regardless.
+
+There is no way yet to hand a condominium to another administrator, so in practice an administrator
+cannot close their account through the app. Known and accepted.
+
+- **Where:** `deleteAccount` in [auth.service.ts](../server/src/auth/auth.service.ts);
+  `useDeleteAccount` in [useAccountForms.ts](../mobile/features/settings/hooks/useAccountForms.ts)
+
+### RN-APP-01 · The appearance is chosen per device and survives signing out
+
+A person chooses a light or a dark appearance in Settings and the whole app changes at once. The
+choice belongs to the device, not to the account: it applies to the sign-in screen and is kept when
+someone signs out. Until a choice is made the app follows the device's own setting.
+
+- **Where:** [useAppearance.tsx](../mobile/features/settings/hooks/useAppearance.tsx);
+  [ADR 0014](decisions/0014-colours-come-from-context-and-styles-are-made-from-the-palette.md)
+
+### RN-APP-02 · Signing out asks first
+
+Signing out lives in the bottom bar, beside Home, and asks for confirmation. Settings took its old
+place at the top of the home screen.
+
+- **Where:** [app/(tabs)/_layout.tsx](../mobile/app/%28tabs%29/_layout.tsx)
+
+## Choosing a condominium
+
+### RN-CHO-01 · Someone with more than one condominium chooses one at sign-in, before anything else
+
+After signing in, a person who belongs to two or more condominiums is shown a chooser before the
+home screen. Until they pick, the home screen and every module are unreachable — by navigation and
+by direct link alike. A person with exactly one condominium never sees the chooser and goes straight
+in; a person with none goes to the home screen as before.
+
+- **Where:** `condominiumGate` in [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx), obeyed
+  by [app/_layout.tsx](../mobile/app/_layout.tsx)
+
+### RN-CHO-02 · The choice lasts as long as the session
+
+Reopening the app while still signed in returns to the condominium the person was in. Signing out
+forgets it, and so does signing in — so the next sign-in on that device, by anyone, starts from
+RN-CHO-01. A remembered condominium the person no longer belongs to is discarded.
+
+- **Where:** `applySession`, `endSession` and the selection effect in
+  [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx)
+
+### RN-CHO-03 · A card shows the role only when it is not resident, and the unit only when there is one
+
+Each condominium is a card with its photo, its name and the unit or units where the person lives
+there. The role appears **only when it is not resident** — today, "Administrator". A resident's
+card carries no role label of any kind, and a membership without a unit carries no unit line: both
+are absent, not empty.
+
+- **Where:** `roleLabel` and `unitsLine` in
+  [membership.ts](../mobile/features/condominiums/domain/membership.ts)
+
+### RN-CHO-04 · One choice for the whole app, switched only from the home screen
+
+The home screen and every module show the chosen condominium: the banner is its photo and name, the
+header shows the units there, and the modules offered follow the role there. A person with two or
+more condominiums can reopen the chooser from the home screen; nobody else is offered it. No module
+has a control of its own to change condominium.
+
+- **Where:** `currentMembership` in [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx),
+  [HomeScreen.tsx](../mobile/features/home/HomeScreen.tsx)
+
+### RN-CHO-05 · The choice is a convenience and never a permission
+
+Which condominium the app has selected decides what it asks for, not what it is allowed to get.
+Every request names its condominium and is refused unless the caller belongs to it, whatever the
+device holds ([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
+
+- **Where:** the membership check at the top of every service under
+  [server/src/condominiums/](../server/src/condominiums)
+
+## Lost & found
+
+### RN-LAF-01 · The shelf is read by everyone in the condominium
+
+Every member sees what was found in their condominium, whatever their role, and nobody sees the
+items of a condominium they do not belong to. Newest first, with the id breaking ties. Each item
+shows its photo, what it is, where it was found in smaller text, when it was posted and its status.
+
+- **Where:** `listFoundItems` in
+  [foundItem.service.ts](../server/src/condominiums/foundItem.service.ts)
+
+### RN-LAF-02 · Only the administrator posts, and the API is what enforces it
+
+An item may be posted only by the `admin` of that condominium. The app hides the action from
+everyone else, and that is a courtesy. A member who is not the administrator gets **403**; someone
+who is not a member gets the **404** the read route gives
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
+
+Who posted is recorded and never shown.
+
+- **Where:** `postFoundItem` in
+  [foundItem.service.ts](../server/src/condominiums/foundItem.service.ts)
+
+### RN-LAF-03 · An item is found or returned, and only the administrator says which
+
+A new item starts as **found**. The administrator may mark it **returned**, and back to found, any
+number of times — the way back exists for the wrong item or the wrong person. No third status
+exists, and the database enum is what guarantees it.
+
+A returned item **stays on the shelf**, marked. Changing the status changes nothing else: the route
+accepts that one field, so the description, the place, the posting moment and the photo have no way
+to move.
+
+The refusals follow RN-LAF-02, and the `403` is decided before the item is looked up, so a member
+who may not change anything learns nothing about whether an id exists.
+
+- **Where:** `changeFoundItemStatus` in
+  [foundItem.service.ts](../server/src/condominiums/foundItem.service.ts), and
+  `validateStatusChange` in [foundItem.dto.ts](../server/src/condominiums/foundItem.dto.ts)
+
+### RN-LAF-04 · Every item has a photo, taken or chosen on the device, and the server decides what it is
+
+An item cannot be posted without a photo. It must be a JPEG, PNG or WebP of at most 5 MB. The type
+is detected by the server from the file's first bytes; nothing the client says about it is read.
+
+The description (up to 200 characters) and the place (up to 120) are required and stored trimmed.
+
+These rules are enforced three times on purpose: in the app for the person typing, in the API for a
+client that is not the app, and in the database for a writer that is not the API.
+
+- **Where:** `validateNewFoundItem` in
+  [foundItem.dto.ts](../server/src/condominiums/foundItem.dto.ts) and in
+  [foundItem.ts](../mobile/features/lostAndFound/domain/foundItem.ts); the four CHECKs in the
+  migration
+
+### RN-LAF-05 · A photo is visible only to someone the item was shown to
+
+The photo is not public and is not behind the session either: each item in the list carries a path
+signed for that one photo and valid for one hour
+([ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)). A wrong,
+expired or missing signature gets the same `404` as a photo that does not exist.
+
+Someone removed from the condominium can still open a photo for up to an hour if they kept the
+path. They had already seen it; this is accepted.
+
+- **Where:** [signedPath.ts](../server/src/lib/signedPath.ts) and
+  [foundItemPhoto.controller.ts](../server/src/condominiums/foundItemPhoto.controller.ts)
+
+### RN-LAF-06 · The posting moment is the server's, and it is read in local time
+
+When an item was posted is recorded by the database at the moment of posting and cannot be chosen
+or edited. It is the one date in the system that is an **instant** rather than a calendar day, so
+it is shown in the reader's local time, with the time of day.
+
+- **Where:** the `posted_at` default in the migration, and `toDisplayDateTime` in
+  [calendar.ts](../mobile/shared/lib/calendar.ts)
+
 ## Inconsistencies and gaps found
 
 - **~~Visitors are not attached to a condominium or a unit~~ — closed on 2026-10-02.** A visit now
@@ -505,6 +738,10 @@ rather than one line and an ellipsis.
   keys ([ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md)). Whoever authorizes
   needs a membership in the condominium, not a residence in the unit, so an admin can
   authorize too. The single row that existed was deleted, as the author authorized.
+
+  **Since 2026-10-05 the visitors screen filters by the condominium the person is in**, and its form
+  offers only the units there (RN-CHO-04). That is a filter on the screen and protects nothing: the
+  route below is unchanged.
 
   What the link does **not** do yet: `GET /visitors` still returns every condominium's visitors, and
   `DELETE /visitors/:id` still deletes anyone's. The schema makes scoping possible; deciding what each

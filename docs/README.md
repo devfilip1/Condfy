@@ -72,10 +72,8 @@ flowchart LR
 - [ ] **What is the product's commercial shape?** Sold per condominium, per unit, or to
   administrators managing many condominiums? This affects the roles model (the administradora role
   was deliberately left out).
-- [ ] **Which module comes after login?** `mobile/features/home/data/modules.ts` advertises
-  Reservations, Newsletter and Lost & Found, none of which exist yet.
 - [ ] **Do doormen need a different app experience?** They are a role in the data model, but no
   screen distinguishes them from residents.
 
 ---
-Last updated: 2026-10-05 (booking a common area, feature 007, and the unique index that makes a double booking impossible, ADR 0011)
+Last updated: 2026-10-05 (settings, feature 010: a dark appearance built from a palette in context, ADR 0014, and account changes that ask for the password again, ADR 0015)

@@ -79,16 +79,19 @@ disappears. A failure at any point keeps the list untouched and explains what ha
 
 ## Out of scope today
 
-- **Login and sessions.** There are no accounts in the app, no token, no permission checks. The
-  API is open to anyone on the network.
+- **Recovering a forgotten password, and confirming a new e-mail by message.** Every change to an
+  account asks for the current password, and the system sends no e-mail yet.
+- **Changing your name, and handing a condominium to another administrator.** The second is why an
+  administrator cannot delete their account today.
 - **Screens for condominiums, units and users.** They exist only in the database, created by the
   seed script.
 - **Editing a visitor.** Deliberately excluded: correcting a visitor means removing and
   registering it again ([RN-VIS-08](business-rules.md#rn-vis-08--visitors-cannot-be-edited)).
-- **Reservations, Newsletter, Lost & Found.** Advertised on the home screen, not implemented.
+- **Editing or deleting a found item, and claiming one.** The administrator posts an item and
+  changes its status; nothing else about it changes, and the app does not record who collected it.
 - **Offline use.** The app needs the server to show anything.
-- **Multi-condominium in the app.** The database supports a user in several condominiums; the app
-  has no notion of "current condominium" yet.
+- **Changing a condominium's photo in the app.** A person in several condominiums chooses one at
+  sign-in and can switch from the home screen; the photo on each card is example data.
 
 ## Glossary
 
@@ -110,6 +113,15 @@ an administrator calls each thing in conversation.
 | Horário | One of the eight fixed two-hour slots a common area can be booked for, 07:00 to 23:00 | `Slot`, `startMinute` / `endMinute` |
 | Janela de reserva | How far ahead a booking may go: today plus 60 days, counted in whole days | `BOOKING_WINDOW_DAYS` |
 | Taxa de uso | What the condominium charges to use a common area; zero means free | `usageFee` |
+| Configurações | The screen that gathers what belongs to the person rather than to a condominium | `settings` (app feature) |
+| Aparência | Light or dark; chosen per device, kept across sign-outs | `appearance`, `scheme` |
+| Senha atual | What every change to the account asks for again | `currentPassword` |
+| Condomínio atual | The condominium the person chose to act in for this session; kept on the device, never a permission | `selectedCondominiumId`, `currentMembership` |
+| Escolha de condomínio | The screen, after sign-in, where someone with more than one condominium picks one | `ChooseCondominiumScreen` |
+| Achados e perdidos | The module listing what was found in the building | `lostAndFound` (app feature) |
+| Item encontrado | One thing found and waiting for its owner: photo, description, place | `FoundItem` |
+| Encontrado | Status of an item still waiting to be collected | `found` |
+| Devolvido | Status of an item given back to its owner; it stays listed | `returned` |
 | Visitante | Someone a resident expects to receive | `Visitor`, `visitor` |
 | Entrega | A delivery (package, food) | `delivery` |
 | Prestador | A service provider (plumber, technician) | `service_provider` |

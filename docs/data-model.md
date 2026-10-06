@@ -25,6 +25,8 @@ erDiagram
     CONDOMINIUM_MEMBER ||--o{ NOTICE : publishes
     COMMON_AREA ||--o{ RESERVATION : "is booked as"
     CONDOMINIUM_MEMBER ||--o{ RESERVATION : books
+    CONDOMINIUM ||--o{ FOUND_ITEM : shelves
+    CONDOMINIUM_MEMBER ||--o{ FOUND_ITEM : posts
 
     CONDOMINIUM {
         uuid id PK
@@ -108,6 +110,18 @@ notices, bills). Only fields worth explaining:
 | Field | Meaning |
 |---|---|
 | `name` | Not unique — two condominiums may share a name ([RN-CON-01](business-rules.md#rn-con-01--a-condominium-needs-a-non-empty-trimmed-name)) |
+| `image_url` | Address of the condominium's photo, shown on its card in the chooser and on the home banner. Nullable: without one the app shows a placeholder |
+
+| Constraint | Guarantees |
+|---|---|
+| `condominiums_image_url_check` | `image_url IS NULL OR image_url LIKE 'https://%'` — the same rule the common areas have |
+
+The photo is an address, not stored bytes. [ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)
+is about photos taken in the app; nobody uploads this one, it is example data.
+
+**Which condominium a person is currently in is not in the database.** It is a choice kept on the
+device for the length of the session and never trusted by the server
+([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
 
 ### Unit
 
@@ -303,6 +317,70 @@ project that the schema cannot hold, and worth remembering as a pattern rather t
 Both foreign keys are `Restrict`, a departure from visitors on purpose. A visit is about a person
 receiving someone, so it leaves with their membership. A notice is the condominium speaking; losing
 the board because an administrator was replaced would be a defect, not a cascade.
+
+### FoundItem
+
+Something found in the condominium and waiting for its owner: the lost & found shelf. It is the
+first entity whose state **changes after it is created**, the first with an **instant** instead of
+a calendar day, and the first that keeps a **file**.
+
+| Field | Meaning |
+|---|---|
+| `posted_by_id` | The user side of the poster's membership. Recorded for accountability, **never exposed** by the API |
+| `description` | What the item is. Stored trimmed, up to 200 characters |
+| `place` | Where it was found. Stored trimmed, up to 120 characters |
+| `status` | The enum `FoundItemStatus`: `found` (the default) or `returned` |
+| `posted_at` | `TIMESTAMPTZ`, filled by the database, never accepted from the client |
+| `photo` | The image itself, `BYTEA NOT NULL` ([ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)) |
+| `photo_content_type` | Detected by the server from the bytes, never claimed by the uploader |
+
+| Constraint | Guarantees |
+|---|---|
+| `(posted_by_id, condominium_id) → condominium_members(user_id, condominium_id)` | The poster belongs to the item's condominium |
+| `found_items_description_check` | `description = btrim(description) AND description <> ''` |
+| `found_items_place_check` | `place = btrim(place) AND place <> ''` |
+| `found_items_photo_size_check` | `octet_length(photo)` between 1 and 5 242 880 (5 MB) |
+| `found_items_photo_content_type_check` | `photo_content_type` is `image/jpeg`, `image/png` or `image/webp` |
+
+Indexed by `(condominium_id, posted_at DESC, id)` — the list query, and the only one that reads
+more than one row.
+
+#### The status is an enum, and that is the whole state machine
+
+Two values, both directions allowed any number of times. So there is no transition to guard: every
+value is reachable from every value, and the enum alone guarantees a third cannot be stored by any
+means. A new item starts as `found` by the column default.
+
+#### `posted_at` is an instant, unlike every other date here
+
+Every other date in the model is a `DATE` — a calendar day, converted in UTC at the server boundary
+and never read in local time. `posted_at` is the opposite case: a moment something happened, which
+**must** be read in local time, or an item posted at 21:30 in São Paulo shows as posted the next
+day.
+
+It is separate from `created_at` because the column name is the JSON name (ADR 0008), and
+`created_at` is bookkeeping every table carries. They hold the same value; only one is contract.
+
+#### The photo is in the row, and no list may select it
+
+`NOT NULL` is what makes an item without a photo impossible, and one `INSERT` is what makes posting
+atomic. PostgreSQL moves large values out of the row, so a query that does not name `photo` does not
+read it — and every query in the service names its columns. Exactly one function selects the bytes.
+
+The two CHECKs constrain the **label and the size**. That the bytes really are an image of that type
+is checked by the server before writing, by file signature; a CHECK cannot read an image format.
+
+#### Why the role is not a database constraint
+
+The same limit as notices: a composite key can require that a membership exists, not that its
+`role` is `admin`. The database guarantees **membership**, the service guarantees **role**
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
+
+#### Deletion
+
+Nothing deletes a found item in the application. The poster's membership is `Restrict`, as on
+notices and unlike visitors: the shelf is the condominium's, and must not empty because the
+administrator was replaced.
 
 ## RefreshToken and LoginAttempt
 

@@ -30,7 +30,22 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
 - **The database is English, the API contract is Portuguese.** Only the resource service
   translates. Never rename a JSON field to match a column.
 - **Validation is duplicated on purpose** between `mobile/features/visitors/domain/visitor.ts`
-  and `server/src/visitors/visitor.dto.ts`, message text included. Change both together.
+  and `server/src/visitors/visitor.dto.ts`, message text included. Change both together. The same
+  holds for notices (`newsletter/domain/notice.ts` ↔ `condominiums/notice.dto.ts`) and found items
+  (`lostAndFound/domain/foundItem.ts` ↔ `condominiums/foundItem.dto.ts`).
+  And for the account forms (`settings/domain/account.ts` ↔ `auth/account.dto.ts`).
+- **Colours never come from a constant.** Every component gets its styles from `makeStyles` and any
+  loose colour from `useTheme()` (`@/shared/theme`); every `<Text>` and every icon has a colour from
+  the palette. There is no `Colors` export, on purpose — do not add one back to quiet the typecheck
+  (ADR 0014). `tsc` catches an unconverted file; it does **not** catch colourless text.
+- **A wrong current password answers `400` on the field, never `401`.** A `401` makes the app renew
+  the session and send the request again (ADR 0015).
+- **Ending an account's sessions after a password change means deleting its refresh tokens, not
+  revoking them.** A revoked token that is used again signs out every device, the new one included.
+- **A found item's photo is a column, and no list may select it.** Every query in
+  `foundItem.service.ts` names its columns; only `readFoundItemPhoto` reads `photo` (ADR 0012).
+- **The found-item photo route is outside the session group on purpose.** An `<img>` tag cannot
+  send a token; its permission is the signed path. Moving it inside breaks the web silently.
 - **The slot grid is duplicated on purpose** between `mobile/features/reservations/domain/slot.ts`
   and `server/src/condominiums/slot.ts` — the same eight start minutes. Change both together, and
   the `reservations_slot_grid_check` CHECK with them (ADR 0011).
@@ -42,7 +57,8 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
   from the request body. `request.user` is the raw payload from `@fastify/jwt` — a different thing.
 - **`JWT_SECRET` is required** for the server to start; it lives in `server/.env`.
 - **Dates are calendar days.** Convert at the server boundary in UTC; never read a `DATE` in local
-  time.
+  time. The one exception is a found item's `postedAt`: it is an **instant**, travels as full
+  ISO 8601 and is read in local time (`toDisplayDateTime`). Never mix the two kinds of function.
 - **Never `npm audit fix --force` in `server/`** — it downgrades Prisma across a major version.
 - **No personal data in logs** (names, e-mails).
 - **A fresh clone needs `npm run db:generate`** before typecheck or dev will work.

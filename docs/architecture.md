@@ -85,13 +85,46 @@ already is one.
 [app/(tabs)/_layout.tsx](../mobile/app/%28tabs%29/_layout.tsx) declares the bottom `Tabs` with
 Home and About. Route files are one line — [app/visitors.tsx](../mobile/app/visitors.tsx)
 re-exports `@/features/visitors` — so screens live with their feature and the route file only
-declares that the URL exists. There is no route guard: every screen is reachable by anyone.
+declares that the URL exists. The only guards are the two in the root layout, described below.
 
 **Global state.** One context: `AuthProvider` in `features/auth`, holding the session as
 `loading`, `anonymous` or `authenticated`. While it is `loading` no screen decides
 anything, which is what stops the sign-in screen from flashing for someone who is already signed
-in. The root layout redirects between the `(auth)` group and the rest based on that state. Apart
-from it, each screen still gets its state from its feature hook — the visitor list lives in
+in. The root layout redirects between the `(auth)` group and the rest based on that state.
+
+The same layout also holds the **condominium gate**. The context derives `condominiumGate` —
+`resolving`, `choose`, `failed` or `open` — from the profile and the selected condominium. While it
+is `resolving` no route is rendered at all; while it is `choose` or `failed` the only route allowed
+is `/choose-condominium`. It lives in the root layout because that is the one place every route
+passes through, so a direct link to a module is held as well as a tap
+([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
+Features read which condominium is current — `selectedCondominiumId`, `currentMembership` — from
+`@/features/auth`; none has a control of its own to change it.
+
+**Theming.** Colours are never read from a constant. `shared/constants/Colors.ts` holds two palettes
+with the same keys, and `shared/theme/` carries the one in use through context. A component builds
+its stylesheet from it, and this is the only way a component is styled:
+
+```ts
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({ card: { backgroundColor: colors.cardBackground } })
+);
+// inside the component
+const styles = useStyles();
+const { colors } = useTheme();   // only for a colour outside a style, such as an icon's
+```
+
+Which palette is in use is decided by `AppearanceProvider` in `features/settings`, wrapped around
+the whole app in the root layout — outside the session, so the sign-in screen is themed too. It
+reads the person's choice from the device and, until there is one, follows the device's own
+setting. `shared/theme/` does no I/O. Every `<Text>` and every icon takes its colour from the
+palette; text with no colour is black, and black is invisible on dark
+([ADR 0014](decisions/0014-colours-come-from-context-and-styles-are-made-from-the-palette.md)).
+
+**The bottom bar** has two entries and only one is a screen: Home, and Sign out, whose press is
+intercepted to ask for confirmation instead of navigating.
+
+Apart from it, each screen still gets its state from its feature hook — the visitor list lives in
 [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts). That hook models the
 remote list as three exclusive states — `loading`, `erro`, `pronto` — plus independent flags
 for a submission in flight (`enviando`, `erroEnvio`) and a removal in flight (`removendo`,

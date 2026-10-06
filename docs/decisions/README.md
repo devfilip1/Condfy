@@ -16,6 +16,10 @@ forces at the time, the alternatives, and what it costs.
 | [0009](0009-visitors-belong-to-a-unit-and-a-membership.md) | A visit belongs to a unit and to a membership | Accepted | 2026-10 |
 | [0010](0010-permission-rules-live-in-the-service.md) | Permission rules live in the service; 403 for a member, 404 for an outsider | Accepted | 2026-10 |
 | [0011](0011-no-double-booking-is-a-unique-index.md) | No double booking is a unique index, not a check in the code | Accepted | 2026-10 |
+| [0012](0012-files-live-in-the-database-and-are-served-by-signed-paths.md) | Files live in the database and are served by signed paths | Accepted | 2026-10 |
+| [0013](0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md) | The current condominium is chosen once, gates the app, and is never a permission | Accepted | 2026-10 |
+| [0014](0014-colours-come-from-context-and-styles-are-made-from-the-palette.md) | Colours come from context, and styles are made from the palette | Accepted | 2026-10 |
+| [0015](0015-changing-the-account-asks-for-the-password-again.md) | Changing the account asks for the password again, and a wrong one is not a 401 | Accepted | 2026-10 |
 
 Decisions reconstructed from code carry the status `Reconstructed`. When a decision replaces
 another, the old one becomes `Superseded by NNNN` and is kept.

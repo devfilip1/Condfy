@@ -68,12 +68,22 @@ interface Profile {
   name: string;
   email: string;        // never the password hash
   memberships: {
-    condominium: { id: string; name: string };
+    condominium: { id: string; name: string; imageUrl: string | null };
     role: "resident" | "admin";
     units: { id: string; block: string | null; number: string }[];
   }[];
 }
 ```
+
+`condominium.imageUrl` is the condominium's photo, or `null`. It is delivered **here** rather than
+by a route of its own on purpose: the profile is built from the caller's own memberships, so it
+cannot carry the name or the photo of a condominium that is not theirs. Memberships come ordered by
+condominium name, which is the order of the cards in the app's chooser.
+
+**No route receives a "current condominium".** The app lets a person with several condominiums
+choose one, but that choice stays on the device: every route that needs a condominium takes it in
+the path and checks the caller's membership there
+([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
 
 Three shapes in that type are not accidental, and a client that assumes otherwise will break on the
 example data:
@@ -105,6 +115,68 @@ Authorization: Bearer <accessToken>
 Unlike every other protected route, this one **does** read the database, so a deleted account gets
 `401` here immediately instead of waiting out the 15 minutes of
 [RN-AUT-06](business-rules.md#rn-aut-06--a-deleted-account-keeps-access-for-at-most-15-minutes).
+
+## Changing your own account
+
+Three routes on the **caller's own** account. None takes an account id — whose account it is comes
+from the token — and all three ask for the current password again, in the body
+([ADR 0015](decisions/0015-changing-the-account-asks-for-the-password-again.md)).
+
+What the three share:
+
+| Status | Body | When |
+|---|---|---|
+| `400` | `{ "errors": { "currentPassword": "Enter your current password." } }` | Missing |
+| **`400`** | `{ "errors": { "currentPassword": "Current password is incorrect." } }` | Wrong. **Not `401`** — see below |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `429` | `{ "message": "Too many attempts. Try again in a few minutes." }`, with `Retry-After` | Too many wrong passwords. The counter is the sign-in one, with the same keys |
+
+**A wrong current password is a field error, never a `401`.** In this API a `401` means the session
+is no longer valid, and the app answers it by renewing the session and repeating the request — which
+here would send the wrong password twice. The caller is authenticated; one field of a form failed.
+
+### `PATCH /me/email`
+
+Body: `{ email, currentPassword }`. The address is normalised as at sign-up — trimmed, lower case —
+before anything else.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `{ "email": "<normalised address>" }` | Changed. Sessions are untouched |
+| `400` | `{ "errors": { "email": "Enter a valid e-mail." } }` | Missing, too long or not an e-mail |
+| `400` | `{ "errors": { "email": "This is already your e-mail." } }` | Equal to the current one |
+| `400` | `{ "errors": { "email": "This e-mail cannot be used." } }` | It belongs to another account |
+
+"Cannot be used" is the unique index refusing the write, not a lookup beforehand, and it does not
+say why. There is no confirmation message to the new address: the system sends no e-mail.
+
+### `PATCH /me/password`
+
+Body: `{ currentPassword, newPassword }`.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `{ accessToken, refreshToken, expiresAt, refreshExpiresAt }` | Changed |
+| `400` | `{ "errors": { "newPassword": "Password must be at least 8 characters." } }` | Too short |
+| `400` | `{ "errors": { "newPassword": "Choose a password different from the current one." } }` | Equal to the current one |
+
+On success **every renewal credential of the account is deleted** and one fresh pair is returned.
+The caller must store it in place of the old one. Other devices can no longer renew; each keeps
+working until the access token it already holds expires — at most 15 minutes.
+
+### `DELETE /me`
+
+Body: `{ currentPassword }` — on a `DELETE`, deliberately: the password must not travel in a URL.
+
+| Status | Body | When |
+|---|---|---|
+| `204` | — | Deleted, with every session, membership, authorized visitor and reservation |
+| **`409`** | `{ "message": "An administrator's account cannot be deleted while they administer a condominium." }` | The caller is `admin` of at least one condominium |
+| **`409`** | `{ "message": "This account cannot be deleted because a condominium still keeps notices or found items it published." }` | Not an admin now, but such records exist |
+
+The password is checked **before** either `409`, so the answer about the account's state is only
+given to someone who proved they own it. Afterwards, signing in with the account's details answers
+exactly as for an address that never existed, and the address is free for a new account.
 
 ## `GET /condominiums/:condominiumId/common-areas`
 
@@ -147,7 +219,7 @@ Authorization: Bearer <accessToken>
 ```
 
 **Not in the contract**: there is no `POST`, `PATCH` or `DELETE` for common areas — the catalogue is
-read-only and the examples come from the seed. Reserving one of them is the next three routes.
+read-only and the examples come from the seed. Reserving one of them is the next four routes.
 
 ## `GET /condominiums/:condominiumId/common-areas/:commonAreaId/availability`
 
@@ -167,7 +239,7 @@ interface Slot {
 }
 
 interface Availability {
-  commonArea: { id: string; name: string; usageFee: string };
+  commonArea: { id: string; name: string; usageFee: string; imageUrl: string | null };
   month: string;            // "YYYY-MM", echoing what was asked for
   days: { date: string; slots: Slot[] }[];   // date is "YYYY-MM-DD"
 }
@@ -175,6 +247,9 @@ interface Availability {
 
 Reading it is the whole screen, so each shape means one thing:
 
+- `commonArea.imageUrl` is the photo that opens the screen. It repeats what the catalogue already
+  sent on purpose: the booking screen is reachable by its own route, and a screen that needed the
+  catalogue to have been loaded first would open without a photo from a deep link.
 - `days` carries **only bookable days** — today through today + 60, intersected with the month asked
   for. A day in the past, or past the window, is **absent**, so the app has one rule and not three:
   no entry, no dot, not selectable.
@@ -233,6 +308,35 @@ the slot; the server only translates its refusal
 The window check is a `400` on `date` rather than a `409` for the same reason in reverse: that
 request was already wrong when it was written, not overtaken by events.
 
+## `GET /condominiums/:condominiumId/reservations`
+
+The caller's **own** reservations in that condominium that have not ended yet, soonest first. It is
+what the "My bookings" section under the catalogue shows. Requires a session.
+
+```ts
+interface OwnReservation {
+  id: string;
+  commonArea: { id: string; name: string };
+  date: string;          // "YYYY-MM-DD"
+  startMinute: number;   // minutes after midnight: 420 is 07:00
+  endMinute: number;
+}
+```
+
+- Whose reservations comes from the token. There is no parameter to ask for somebody else's, and
+  the administrator gets only their own too — releasing another person's booking still happens
+  through the `"held"` slot of the availability.
+- A reservation of **today** stays in the list until its slot **ends**, not until it starts:
+  somebody using the room right now still holds that booking.
+- The place's name travels with each item because the list crosses places, and a place switched
+  off after the booking is gone from the catalogue while the reservation is not.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `OwnReservation[]` | The caller has a membership; `[]` when nothing is booked |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller has no membership — the same answer, as in the catalogue |
+
 ## `DELETE /condominiums/:condominiumId/reservations/:reservationId`
 
 Releases a slot. The reservation is removed and nothing records that it existed.
@@ -256,6 +360,111 @@ cancel does not learn whether the slot has started.
 **Not idempotent, on purpose.** Deleting a reservation that is already gone answers `404`, not `204`
 — the opposite of `DELETE /visitors/:id`. The reason is the permission: telling a stranger "already
 deleted" for an id they never had a claim on would leak that the id once existed.
+
+## Lost & found
+
+Four routes. Three require a session, like everything else under `/condominiums`. The fourth — the
+photo — does not, and checks a signature instead
+([ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)).
+
+```ts
+type FoundItemStatus = "found" | "returned";
+
+interface FoundItem {
+  id: string;
+  description: string;      // up to 200 characters
+  place: string;            // where it was found, up to 120 characters
+  status: FoundItemStatus;
+  postedAt: string;         // ISO 8601 INSTANT, UTC: "2026-10-05T23:10:00.000Z"
+  photoPath: string;        // relative, signed, valid for one hour
+}
+```
+
+`postedAt` is the one **instant** in the API. Every other date is a calendar day (`"YYYY-MM-DD"`);
+this one has a time and a zone, and the app shows it in local time.
+
+`photoPath` is relative to the API's own address and **different on every response**. Do not store
+or compare it. `condominiumId`, who posted, and the photo bytes are absent on purpose.
+
+### `GET /condominiums/:condominiumId/found-items`
+
+Everything found in the condominium, newest first, returned items included. Any membership will do.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `FoundItem[]` — `[]` when nothing was found | The caller has a membership |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller has no membership — the same answer |
+
+Ordered by `postedAt` descending, then `id` descending, so two items of the same instant never swap.
+There is no route for a single item: the card shows everything.
+
+### `POST /condominiums/:condominiumId/found-items`
+
+Posts an item. Requires the **admin** role in that condominium.
+
+Body: `{ description, place, photo }`, where `photo` is the image in **base64**, with no `data:`
+prefix. Nothing else is read: `status` always starts `found`, `postedAt` is the server's clock,
+who posted comes from the token, and the image type is detected from the bytes.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | `FoundItem` | Posted, as `found` |
+| `400` | `{ "errors": { description?, place?, photo? } }` | See the messages below |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| **`403`** | `{ "message": "Only the condominium administrator can post found items." }` | The caller **is** a member, but not the administrator |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller is **not** a member |
+| `413` | Fastify's own body | The body is over 8 MB |
+
+| Field | Message | When |
+|---|---|---|
+| `description` | `Describe the item.` | Missing or blank |
+| `description` | `Use up to 200 characters.` | Too long |
+| `place` | `Say where it was found.` | Missing or blank |
+| `place` | `Use up to 120 characters.` | Too long |
+| `photo` | `Add a photo of the item.` | Missing or empty |
+| `photo` | `The photo must be a JPEG, PNG or WebP image.` | Not base64, or not one of the three |
+| `photo` | `The photo must be 5 MB or smaller.` | Too large |
+
+This route's body limit is 8 MB; every other route keeps Fastify's default. It is deliberately above
+what a 5 MB photo needs (about 6.7 MB encoded), so a photo slightly over the limit reaches the
+validation and is refused with a message naming the field, instead of dying with a bare `413`.
+
+### `PATCH /condominiums/:condominiumId/found-items/:itemId`
+
+Changes the status, and only the status. Requires the **admin** role. The API's only `PATCH`.
+
+Body: `{ status: "found" | "returned" }`. Any other field is ignored, which is what makes it
+impossible for this route to change the description, the place, the posting moment or the photo.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `FoundItem` | The item now has that status — including when it already had it |
+| `400` | `{ "errors": { "status": "Choose found or returned." } }` | `status` is missing or not one of the two |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| **`403`** | `{ "message": "Only the condominium administrator can change the status of a found item." }` | The caller **is** a member, but not the administrator |
+| `404` | `{ "message": "Found item not found." }` | No such item in that condominium, or the caller is **not** a member of it |
+
+The `403` is decided **before** the item is looked up, so a member who may not change anything gets
+the same answer whether or not the id exists. Idempotent: the same request twice answers `200`
+twice.
+
+### `GET /condominiums/:condominiumId/found-items/:itemId/photo?expires=…&signature=…`
+
+The photo's bytes. **No session** — the query string is the permission, because an `<img>` tag
+cannot send an `Authorization` header.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | The image | The signature is valid for this item and has not expired |
+| `404` | `{ "message": "Photo not found." }` | Missing, wrong or expired signature, **or** no such item — the same answer |
+
+On `200`: `Content-Type` is the type the server detected when the photo was posted,
+`X-Content-Type-Options: nosniff`, and `Cache-Control: private, max-age=3600`.
+
+The signature covers the **path** and the expiry, so one item's signature does not open another's
+photo. A path is only ever produced inside a `FoundItem`, so it only reaches someone the list was
+shown to.
 
 ## `GET /condominiums/:condominiumId/notices`
 
