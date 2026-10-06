@@ -350,7 +350,12 @@ export interface ProfileUnit {
  * condomínio. É também o motivo de o token não carregar condomínio nem unidade (RN-AUT-05).
  */
 export interface ProfileMembership {
-  condominium: { id: string; name: string };
+  /**
+   * `imageUrl` é a foto do condomínio, ou `null`. Vai AQUI, e não numa rota própria, de propósito:
+   * o perfil parte dos vínculos de quem pediu, então não tem como trazer nome ou foto de um
+   * condomínio alheio (feature 009, research R-001).
+   */
+  condominium: { id: string; name: string; imageUrl: string | null };
   role: Role;
   /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
   units: ProfileUnit[];
@@ -383,7 +388,7 @@ export async function getProfile(userId: string): Promise<Profile> {
       memberships: {
         select: {
           role: true,
-          condominium: { select: { id: true, name: true } },
+          condominium: { select: { id: true, name: true, imageUrl: true } },
           residences: {
             select: {
               unit: { select: { id: true, block: true, number: true } },

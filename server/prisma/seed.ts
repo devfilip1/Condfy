@@ -18,12 +18,26 @@ const BRISAS = id("0001");
 const PALMEIRAS = id("0002");
 const AURORA = id("0003");
 
-// Três condomínios porque a carga tem três contas, uma em cada: é isso que torna o isolamento
-// entre clientes verificável só trocando de login.
+// Três condomínios: é isso que torna o isolamento entre clientes verificável só trocando de login.
+//
+// Cada um tem a SUA foto, e as três são diferentes de propósito: é ela que distingue os cards na
+// escolha de condomínio e que aparece no banner da home (feature 009).
 const CONDOMINIUMS = [
-  { id: BRISAS, name: "Residencial Brisas" },
-  { id: PALMEIRAS, name: "Vila das Palmeiras" },
-  { id: AURORA, name: "Residencial Aurora" },
+  {
+    id: BRISAS,
+    name: "Residencial Brisas",
+    imageUrl: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=70",
+  },
+  {
+    id: PALMEIRAS,
+    name: "Vila das Palmeiras",
+    imageUrl: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=70",
+  },
+  {
+    id: AURORA,
+    name: "Residencial Aurora",
+    imageUrl: "https://images.unsplash.com/photo-1460317442991-0ec209397118?w=800&q=70",
+  },
 ];
 
 // Bloco e número já em maiúsculas: o banco recusa outra forma (research R-005).
@@ -70,11 +84,19 @@ interface SampleMembership {
 }
 
 /**
- * Um vínculo por morador, em condomínios diferentes, mais o administrador.
+ * Um vínculo por morador, em condomínios diferentes, mais o administrador — que tem DOIS.
  *
- * Nenhum morador pertence a dois condomínios, então o seletor de condomínio da tela de Reservas
- * não aparece para eles (FR-020): trocar de login troca o condomínio inteiro, que é o jeito mais
- * direto de ver o isolamento entre clientes funcionando.
+ * Bruno e Carla pertencem a um condomínio só, então nunca veem a tela de escolha: trocar de login
+ * troca o condomínio inteiro, que é o jeito mais direto de ver o isolamento entre clientes
+ * funcionando.
+ *
+ * Ana mora nos TRÊS, para a tela de escolha poder ser testada com três cards, todos de moradora —
+ * nenhum leva rótulo de cargo. No Palmeiras ela divide a unidade com o Bruno, o que o modelo
+ * permite: moradia é pessoa × unidade.
+ *
+ * Daniel é a conta com dois vínculos, de propósito, para a escolha de condomínio poder ser vista
+ * (feature 009, research R-010): ele ADMINISTRA o Brisas e MORA no Palmeiras. Os dois cards dele
+ * são as duas formas que um card pode ter — cargo sem unidade, e unidade sem cargo.
  *
  * O administrador NÃO tem unidade — `unitIds` vazio. A trigger adiada
  * `condominium_members_resident_has_unit` só exige moradia de quem é `resident`, então o vínculo de
@@ -82,9 +104,12 @@ interface SampleMembership {
  */
 const MEMBERSHIPS: SampleMembership[] = [
   { userId: ANA, condominiumId: BRISAS, role: "resident", unitIds: [BRISAS_A101] },
+  { userId: ANA, condominiumId: PALMEIRAS, role: "resident", unitIds: [PALMEIRAS_1] },
+  { userId: ANA, condominiumId: AURORA, role: "resident", unitIds: [AURORA_T1_202] },
   { userId: BRUNO, condominiumId: PALMEIRAS, role: "resident", unitIds: [PALMEIRAS_1] },
   { userId: CARLA, condominiumId: AURORA, role: "resident", unitIds: [AURORA_T1_201] },
   { userId: DANIEL, condominiumId: BRISAS, role: "admin", unitIds: [] },
+  { userId: DANIEL, condominiumId: PALMEIRAS, role: "resident", unitIds: [PALMEIRAS_2] },
 ];
 
 const RESIDENCE_COUNT = MEMBERSHIPS.reduce((total, membership) => total + membership.unitIds.length, 0);
@@ -290,31 +315,6 @@ const NOTICES: SampleNotice[] = [
   },
 ];
 
-async function loadCondominiums(): Promise<void> {
-  for (const condominium of CONDOMINIUMS) {
-    await prisma.condominium.upsert({ where: { id: condominium.id }, create: condominium, update: {} });
-  }
-}
-
-async function loadUnits(): Promise<void> {
-  for (const unit of UNITS) {
-    await prisma.unit.upsert({ where: { id: unit.id }, create: unit, update: {} });
-  }
-}
-
-async function loadUsers(): Promise<void> {
-  for (const user of USERS) {
-    // Consulta antes de criar para não gastar um scrypt por conta a cada execução nem trocar
-    // o hash de quem já existe (FR-029).
-    const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
-    if (existing) continue;
-
-    await prisma.user.create({ data: { ...user, passwordHash: await hashPassword(SAMPLE_PASSWORD) } });
-  }
-}
-
-async function loadMemberships(): Promise<void> {
-  for (const { userId, condominiumId, role, unitIds } of MEMBERSHIPS) {
 interface SampleFoundItem {
   id: string;
   condominiumId: string;
@@ -411,6 +411,38 @@ function flatColorPng([red, green, blue]: [number, number, number]): Uint8Array<
   return new Uint8Array(file);
 }
 
+async function loadCondominiums(): Promise<void> {
+  for (const condominium of CONDOMINIUMS) {
+    await prisma.condominium.upsert({ where: { id: condominium.id }, create: condominium, update: {} });
+    // O `update: {}` acima nunca toca numa linha que já existe, então um banco carregado antes da
+    // foto existir ficaria sem ela para sempre. Isto COMPLETA a linha — só onde a foto é nula — e
+    // não sobrescreve nada: uma foto trocada à mão continua trocada.
+    await prisma.condominium.updateMany({
+      where: { id: condominium.id, imageUrl: null },
+      data: { imageUrl: condominium.imageUrl },
+    });
+  }
+}
+
+async function loadUnits(): Promise<void> {
+  for (const unit of UNITS) {
+    await prisma.unit.upsert({ where: { id: unit.id }, create: unit, update: {} });
+  }
+}
+
+async function loadUsers(): Promise<void> {
+  for (const user of USERS) {
+    // Consulta antes de criar para não gastar um scrypt por conta a cada execução nem trocar
+    // o hash de quem já existe (FR-029).
+    const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+    if (existing) continue;
+
+    await prisma.user.create({ data: { ...user, passwordHash: await hashPassword(SAMPLE_PASSWORD) } });
+  }
+}
+
+async function loadMemberships(): Promise<void> {
+  for (const { userId, condominiumId, role, unitIds } of MEMBERSHIPS) {
     const existing = await prisma.condominiumMember.findUnique({
       where: { userId_condominiumId: { userId, condominiumId } },
       select: { userId: true },
@@ -475,6 +507,24 @@ async function loadNotices(): Promise<void> {
   }
 }
 
+async function loadFoundItems(): Promise<void> {
+  for (const { color, postedAt, ...item } of FOUND_ITEMS) {
+    await prisma.foundItem.upsert({
+      where: { id: item.id },
+      create: {
+        ...item,
+        // Um instante, e não um dia: ao contrário das outras datas da carga, este vai inteiro.
+        postedAt: new Date(postedAt),
+        photo: flatColorPng(color),
+        photoContentType: "image/png",
+      },
+      update: {},
+      // Sem isto o upsert devolveria a linha inteira, foto incluída, só para ser jogada fora.
+      select: { id: true },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   await loadCondominiums();
   await loadUnits();
@@ -486,6 +536,8 @@ async function main(): Promise<void> {
   await loadCommonAreas();
   // Depende do vínculo do administrador.
   await loadNotices();
+  // Também depende do vínculo do administrador.
+  await loadFoundItems();
 
   console.log(
     `Example data loaded: ${CONDOMINIUMS.length} condominiums, ${UNITS.length} units, ` +
@@ -507,24 +559,4 @@ try {
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
-async function loadFoundItems(): Promise<void> {
-  for (const { color, postedAt, ...item } of FOUND_ITEMS) {
-    await prisma.foundItem.upsert({
-      where: { id: item.id },
-      create: {
-        ...item,
-        // Um instante, e não um dia: ao contrário das outras datas da carga, este vai inteiro.
-        postedAt: new Date(postedAt),
-        photo: flatColorPng(color),
-        photoContentType: "image/png",
-      },
-      update: {},
-      // Sem isto o upsert devolveria a linha inteira, foto incluída, só para ser jogada fora.
-      select: { id: true },
-    });
-  }
 }
-
-}
-  // Também depende do vínculo do administrador.
-  await loadFoundItems();

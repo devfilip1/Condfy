@@ -66,21 +66,21 @@ enum Role {
 model Condominium {
   id          String              @id @default(uuid())
   name        String              @db.VarChar(100)
+  /// Endereço da foto do condomínio: aparece no card da escolha de condomínio e no banner da
+  /// home. `null` é "sem foto", e o app mostra o placeholder. A CHECK de `https://` está na
+  /// migration add_condominium_image (ADR 0004).
+  imageUrl    String?             @map("image_url")
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   units       Unit[]
   members     CondominiumMember[]
   commonAreas CommonArea[]
   notices     Notice[]
+  foundItems  FoundItem[]
 
   @@map("condominiums")
 }
 
-  foundItems  FoundItem[]
-/// Aviso do condomínio: o mural, com título, corpo e data.
-///
-/// As CHECKs de título e corpo estão na migration add_notices, porque o Prisma não as expressa
-/// (ADR 0004). O corpo NÃO é guardado aparado: cortar espaços comeria a linha em branco que separa
 /// Em que pé está um item de achados e perdidos. São dois valores e mais nenhum: o enum é o banco
 /// dizendo que um terceiro não pode ser gravado por caminho nenhum (feature 008, SC-007).
 enum FoundItemStatus {
@@ -130,6 +130,10 @@ model FoundItem {
   @@map("found_items")
 }
 
+/// Aviso do condomínio: o mural, com título, corpo e data.
+///
+/// As CHECKs de título e corpo estão na migration add_notices, porque o Prisma não as expressa
+/// (ADR 0004). O corpo NÃO é guardado aparado: cortar espaços comeria a linha em branco que separa
 /// dois parágrafos, e preservá-la é requisito (FR-002).
 model Notice {
   id            String   @id @default(uuid())
@@ -272,11 +276,11 @@ model CondominiumMember {
   authorizedVisits Visitor[]
   notices          Notice[]
   reservations     Reservation[]
+  foundItems       FoundItem[]
 
   @@id([userId, condominiumId])
   // No máximo um administrador por condomínio. Herdado da regra do síndico (research R-003), que
   // era um cargo eletivo único; vale reavaliar se uma administradora puder ter várias pessoas.
-  foundItems       FoundItem[]
   @@unique([condominiumId], map: "condominium_members_one_admin_key", where: raw("role = 'admin'"))
   @@index([condominiumId])
   @@map("condominium_members")
