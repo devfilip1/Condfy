@@ -1,9 +1,8 @@
-import { Image } from "expo-image";
-import { Octicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { CommonArea } from "@/features/reservations/domain/commonArea";
-import { Colors } from "@/shared/constants/Colors";
+import Photo from "@/shared/components/Photo";
+import { makeStyles } from "@/shared/theme";
 import { formatCurrency } from "@/shared/lib/currency";
 
 /**
@@ -20,51 +19,45 @@ export interface CommonAreaCardProps {
   onPress: (area: CommonArea) => void;
 }
 
-export const styles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-  },
-  // Tamanho fixo: a foto ausente, lenta ou quebrada ocupa o mesmo espaço, então a linha nunca
-  // muda de altura nem empurra as vizinhas (FR-002b).
-  image: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: 16,
-    backgroundColor: Colors.chipBackground,
-  },
-  placeholder: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: 16,
-    backgroundColor: Colors.chipBackground,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  texts: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-    textTransform: "uppercase",
-  },
-  fee: {
-    marginTop: 4,
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    card: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+      backgroundColor: colors.cardBackground,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+    },
+    // Tamanho fixo: a foto ausente, lenta ou quebrada ocupa o mesmo espaço, então a linha nunca
+    // muda de altura nem empurra as vizinhas (FR-002b).
+    image: {
+      width: IMAGE_SIZE,
+      height: IMAGE_SIZE,
+      borderRadius: 16,
+    },
+    texts: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      textTransform: "uppercase",
+    },
+    fee: {
+      marginTop: 4,
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+  })
+);
 
 export default function CommonAreaCard({ area, onPress }: CommonAreaCardProps) {
+  const styles = useStyles();
   return (
     <TouchableOpacity
       style={styles.card}
@@ -72,18 +65,7 @@ export default function CommonAreaCard({ area, onPress }: CommonAreaCardProps) {
       accessibilityRole="button"
       accessibilityLabel={`${area.name}, tax usage ${formatCurrency(area.usageFee)}`}
     >
-      {area.imageUrl ? (
-        <Image
-          style={styles.image}
-          source={area.imageUrl}
-          contentFit="cover"
-          transition={200}
-        />
-      ) : (
-        <View style={styles.placeholder}>
-          <Octicons name="image" size={26} color={Colors.textSecondary} />
-        </View>
-      )}
+      <Photo uri={area.imageUrl} style={styles.image} />
 
       <View style={styles.texts}>
         {/* Duas linhas no máximo: nome comprido quebra sem empurrar a taxa para fora. */}

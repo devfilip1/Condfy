@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
 
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles } from "@/shared/theme";
 
 /**
  * A bolinha embaixo de um day do calendário.
@@ -20,25 +20,28 @@ export interface DayDotProps {
 
 const DOT_SIZE = 6;
 
-const styles = StyleSheet.create({
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    marginTop: 3,
-  },
-  green: {
-    backgroundColor: Colors.success,
-  },
-  red: {
-    backgroundColor: Colors.danger,
-  },
-  // Mesma altura, sem cor: reserva o espaço para a linha não subir.
-  none: {
-    backgroundColor: "transparent",
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    dot: {
+      width: DOT_SIZE,
+      height: DOT_SIZE,
+      borderRadius: DOT_SIZE / 2,
+      marginTop: 3,
+    },
+    green: {
+      backgroundColor: colors.success,
+    },
+    red: {
+      backgroundColor: colors.danger,
+    },
+    // Mesma altura, sem cor: reserva o espaço para a linha não subir.
+    none: {
+      backgroundColor: "transparent",
+    },
+  })
+);
 
 export default function DayDot({ state }: DayDotProps) {
+  const styles = useStyles();
   return <View style={[styles.dot, styles[state]]} />;
 }

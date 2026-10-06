@@ -1,3 +1,4 @@
+import { ReactElement } from "react";
 import { FlatList, StyleSheet } from "react-native";
 
 import { CommonArea } from "@/features/reservations/domain/commonArea";
@@ -24,6 +25,11 @@ export interface CommonAreaListProps {
   state: CatalogueState;
   onSelect: (area: CommonArea) => void;
   onRetry: () => void;
+  /**
+   * O que vem embaixo dos locais, rolando junto com eles. Só aparece com o catálogo carregado: nos
+   * outros três states a tela inteira já é uma message.
+   */
+  footer?: ReactElement;
 }
 
 export const styles = StyleSheet.create({
@@ -39,6 +45,7 @@ export default function CommonAreaList({
   state,
   onSelect,
   onRetry,
+  footer,
 }: CommonAreaListProps) {
   switch (state.status) {
     case "loading":
@@ -62,6 +69,7 @@ export default function CommonAreaList({
             <CommonAreaCard area={item} onPress={onSelect} />
           )}
           ListEmptyComponent={<EmptyState message={MESSAGE_NO_PLACES} />}
+          ListFooterComponent={footer}
         />
       );
   }

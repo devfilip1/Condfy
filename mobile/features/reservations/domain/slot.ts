@@ -53,6 +53,8 @@ export interface BookedCommonArea {
   name: string;
   /** Dinheiro como TEXTO, com duas casas. Quem exibe usa `formatCurrency`. */
   usageFee: string;
+  /** Endereço https da foto que abre a tela, ou `null` — a tela mostra o placeholder. */
+  imageUrl: string | null;
 }
 
 export interface Availability {
@@ -79,8 +81,11 @@ export function minuteLabel(minute: number): string {
   return `${twoDigits(Math.floor(minute / 60))}:${twoDigits(minute % 60)}`;
 }
 
-/** O horário como `07:00 – 09:00`. */
-export function slotLabel(slot: Slot): string {
+/** O horário como `07:00 – 09:00`. Só precisa do início e do fim, então serve a uma reserva também. */
+export function slotLabel(slot: {
+  startMinute: number;
+  endMinute: number;
+}): string {
   return `${minuteLabel(slot.startMinute)} – ${minuteLabel(slot.endMinute)}`;
 }
 
@@ -134,7 +139,8 @@ function isBookedCommonArea(value: unknown): value is BookedCommonArea {
     isObject(value) &&
     typeof value.id === "string" &&
     typeof value.name === "string" &&
-    typeof value.usageFee === "string"
+    typeof value.usageFee === "string" &&
+    (value.imageUrl === null || typeof value.imageUrl === "string")
   );
 }
 

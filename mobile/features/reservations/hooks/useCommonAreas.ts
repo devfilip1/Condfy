@@ -28,19 +28,8 @@ export type CatalogueState =
   | { status: "ready"; areas: CommonArea[] }
   | { status: "failed"; message: string };
 
-export interface Condominium {
-  id: string;
-  name: string;
-}
-
 export interface UseCommonAreasResult {
   state: CatalogueState;
-  /** Todos os condomínios da pessoa. Menos de dois significa não mostrar seletor (FR-020). */
-  condominiums: Condominium[];
-  /** O que está valendo; `null` enquanto o perfil ainda não chegou. */
-  selectedCondominiumId: string | null;
-  /** Troca o condomínio em exibição e lembra a escolha (FR-019, FR-022). */
-  selectCondominium: (condominiumId: string) => void;
   reload: () => void;
 }
 
@@ -52,7 +41,9 @@ function messageFor(error: unknown): string {
 }
 
 export function useCommonAreas(): UseCommonAreasResult {
-  const { profile, selectedCondominiumId, selectCondominium } = useAuth();
+  // Em qual condomínio a pessoa está é decidido uma vez, para o aplicativo inteiro, na tela de
+  // escolha (feature 009). Aqui ele só é lido — a faixa de troca que esta tela tinha saiu.
+  const { profile, selectedCondominiumId } = useAuth();
   const [state, setState] = useState<CatalogueState>({ status: "loading" });
   const mounted = useRef(true);
 
@@ -62,11 +53,6 @@ export function useCommonAreas(): UseCommonAreasResult {
       mounted.current = false;
     };
   }, []);
-
-  const condominiums: Condominium[] =
-    profile.status === "ready"
-      ? profile.profile.memberships.map((membership) => membership.condominium)
-      : [];
 
   // A escolha do condomínio vive no contexto de autenticação desde a feature 006: aqui só sobra
   // refletir o que o perfil diz sobre carregar, falhar ou não ter vínculo nenhum.
@@ -111,11 +97,5 @@ export function useCommonAreas(): UseCommonAreasResult {
     }
   }, [selectedCondominiumId, load]);
 
-  return {
-    state,
-    condominiums,
-    selectedCondominiumId: selectedCondominiumId,
-    selectCondominium,
-    reload,
-  };
+  return { state, reload };
 }

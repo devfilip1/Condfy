@@ -61,17 +61,22 @@ export type BookingState =
   | { status: "loading" }
   | { status: "failed"; message: string }
   | {
-      status: "ready";
-      commonArea: BookedCommonArea;
-      month: CalendarMonth;
-      /** Indexado por dia. Dia ausente não é reservável — passado ou além da janela. */
-      days: Map<string, DayAvailability>;
-      /** O dia cujos horários estão à mostra, ou `null` enquanto nenhum foi tocado. */
-      selectedDate: string | null;
-      busy: BookingBusy | null;
-      /** Recusa a mostrar acima dos horários. Sai no próximo toque. */
-      notice: string | null;
-    };
+    status: "ready";
+    commonArea: BookedCommonArea;
+    month: CalendarMonth;
+    /** Indexado por dia. Dia ausente não é reservável — passado ou além da janela. */
+    days: Map<string, DayAvailability>;
+    /** O dia cujos horários estão à mostra, ou `null` enquanto nenhum foi tocado. */
+    selectedDate: string | null;
+    /**
+     * O início do horário escolhido e ainda não reservado, ou `null`. Escolher não reserva: quem
+     * reserva é `book`, depois da confirmação.
+     */
+    selectedStartMinute: number | null;
+    busy: BookingBusy | null;
+    /** Recusa a mostrar acima dos horários. Sai no próximo toque. */
+    notice: string | null;
+  };
 
 export interface UseBookingResult {
   state: BookingState;
@@ -79,7 +84,10 @@ export interface UseBookingResult {
   goToMonth: (offset: -1 | 1) => void;
   /** `true` quando ainda há mês reservável naquela direção (FR-021a). */
   canGoToMonth: (offset: -1 | 1) => boolean;
-  book: (slot: Slot) => void;
+  /** Escolhe um horário livre; tocar de novo no mesmo desfaz a escolha. */
+  selectSlot: (slot: Slot) => void;
+  /** Reserva o horário escolhido. Sem escolha, não faz nada. */
+  book: () => void;
   /** Só faz sentido num horário `held`; num `open` não faz nada. */
   cancel: (slot: Slot) => void;
   reload: () => void;
@@ -184,6 +192,9 @@ export function useBooking(): UseBookingResult {
           month: target,
           days: daysByDate(availability),
           selectedDate: keepDate,
+          // Toda recarga zera a escolha: o horário escolhido acabou de virar reserva, ou acabou de
+          // ser tomado por outra pessoa. Nos dois casos ele não é mais uma opção.
+          selectedStartMinute: null,
           busy: null,
           notice: null,
         });
@@ -212,10 +223,32 @@ export function useBooking(): UseBookingResult {
   const selectDay = useCallback((date: string) => {
     setState((current) =>
       current.status === "ready"
-        ? // A recusa anterior sai: ela falava do dia que a pessoa acabou de deixar.
-          { ...current, selectedDate: date, notice: null }
+        ? // A recusa anterior sai: ela falava do dia que a pessoa acabou de deixar. A escolha de
+        // horário sai junto, pelo mesmo motivo — 09:00 de um dia não é 09:00 do outro.
+        {
+          ...current,
+          selectedDate: date,
+          selectedStartMinute: null,
+          notice: null,
+        }
         : current
     );
+  }, []);
+
+  const selectSlot = useCallback((slot: Slot) => {
+    setState((current) => {
+      if (current.status !== "ready" || current.busy || slot.status !== "open") {
+        return current;
+      }
+      return {
+        ...current,
+        selectedStartMinute:
+          current.selectedStartMinute === slot.startMinute
+            ? null
+            : slot.startMinute,
+        notice: null,
+      };
+    });
   }, []);
 
   /**
@@ -246,14 +279,17 @@ export function useBooking(): UseBookingResult {
   );
 
   /**
-   * Reserva o horário e recarrega o mês.
+   * Reserva o horário escolhido e recarrega o mês.
    *
    * Recarrega inteiro em vez de tirar o horário da lista na mão: a reserva muda a bolinha do day
    * também, e um estado montado localmente seria uma segunda verdade sobre o que está livre.
    */
   const book = useCallback(
-    (slot: Slot) => {
+    () => {
       if (state.status !== "ready" || state.selectedDate === null || state.busy) {
+        return;
+      }
+      if (state.selectedStartMinute === null) {
         return;
       }
       if (selectedCondominiumId === null || !commonAreaId) {
@@ -261,9 +297,10 @@ export function useBooking(): UseBookingResult {
       }
 
       const date = state.selectedDate;
+      const startMinute = state.selectedStartMinute;
       setState({
         ...state,
-        busy: { kind: "booking", startMinute: slot.startMinute },
+        busy: { kind: "booking", startMinute: startMinute },
         notice: null,
       });
 
@@ -273,7 +310,7 @@ export function useBooking(): UseBookingResult {
             selectedCondominiumId,
             commonAreaId,
             date,
-            slot.startMinute
+            startMinute
           );
           if (mounted.current) {
             await load(selectedCondominiumId, commonAreaId, month, date);
@@ -373,5 +410,14 @@ export function useBooking(): UseBookingResult {
     [state, selectedCondominiumId, commonAreaId, month, load]
   );
 
-  return { state, selectDay, goToMonth, canGoToMonth, book, cancel, reload };
+  return {
+    state,
+    selectDay,
+    selectSlot,
+    goToMonth,
+    canGoToMonth,
+    book,
+    cancel,
+    reload,
+  };
 }

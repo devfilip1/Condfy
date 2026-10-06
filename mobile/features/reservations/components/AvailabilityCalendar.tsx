@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import DayDot, { DayDotProps } from "@/features/reservations/components/DayDot";
 import { DayAvailability } from "@/features/reservations/domain/slot";
-import { Colors } from "@/shared/constants/Colors";
+import { makeStyles, useTheme } from "@/shared/theme";
 import {
   CalendarMonth,
   WEEKDAY_INITIALS,
@@ -37,76 +37,78 @@ export interface AvailabilityCalendarProps {
   canChangeMonth: (offset: -1 | 1) => boolean;
 }
 
-const styles = StyleSheet.create({
-  calendar: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 16,
-    backgroundColor: Colors.cardBackground,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  monthButton: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: Colors.chipBackground,
-  },
-  monthButtonDisabled: {
-    opacity: 0.35,
-  },
-  monthLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  week: {
-    flexDirection: "row",
-  },
-  weekdayCell: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  weekdayLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    color: Colors.textMuted,
-  },
-  dayCell: {
-    flex: 1,
-    height: 46,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayTouchable: {
-    width: 38,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 999,
-    paddingVertical: 4,
-  },
-  daySelected: {
-    backgroundColor: Colors.accent,
-  },
-  dayToday: {
-    backgroundColor: Colors.accentSoft,
-  },
-  dayLabel: {
-    fontSize: 14,
-    color: Colors.textPrimary,
-  },
-  dayLabelDisabled: {
-    color: Colors.textSecondary,
-  },
-});
+const useStyles = makeStyles((colors) =>
+  StyleSheet.create({
+    calendar: {
+      marginHorizontal: 20,
+      marginTop: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: colors.cardBackground,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+    monthButton: {
+      padding: 8,
+      borderRadius: 999,
+      backgroundColor: colors.chipBackground,
+    },
+    monthButtonDisabled: {
+      opacity: 0.35,
+    },
+    monthLabel: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    week: {
+      flexDirection: "row",
+    },
+    weekdayCell: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 6,
+    },
+    weekdayLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      textTransform: "uppercase",
+      color: colors.textMuted,
+    },
+    dayCell: {
+      flex: 1,
+      height: 46,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dayTouchable: {
+      width: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 999,
+      paddingVertical: 4,
+    },
+    daySelected: {
+      backgroundColor: colors.accent,
+    },
+    dayToday: {
+      backgroundColor: colors.accentSoft,
+    },
+    dayLabel: {
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    dayLabelDisabled: {
+      color: colors.textSecondary,
+    },
+  })
+);
 
 /**
  * A cor da bolinha, derivada do que chegou: nada de mapa, nada de bolinha.
@@ -132,6 +134,8 @@ export default function AvailabilityCalendar({
   onChangeMonth,
   canChangeMonth,
 }: AvailabilityCalendarProps) {
+  const styles = useStyles();
+  const { colors } = useTheme();
   const weeks = buildMonthGrid(month);
   const today = todayISODate();
   const canGoBack = canChangeMonth(-1);
@@ -147,7 +151,7 @@ export default function AvailabilityCalendar({
           accessibilityRole="button"
           accessibilityLabel="Previous month"
         >
-          <Ionicons name="chevron-back" size={18} color={Colors.textPrimary} />
+          <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <Text style={styles.monthLabel}>{monthLabel(month)}</Text>
@@ -162,7 +166,7 @@ export default function AvailabilityCalendar({
           accessibilityRole="button"
           accessibilityLabel="Next month"
         >
-          <Ionicons name="chevron-forward" size={18} color={Colors.textPrimary} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 

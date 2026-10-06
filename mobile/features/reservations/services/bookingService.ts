@@ -1,5 +1,9 @@
 import { HttpError, request } from "@/features/auth";
 import {
+  OwnReservation,
+  isOwnReservationList,
+} from "@/features/reservations/domain/reservation";
+import {
   Availability,
   isAvailability,
 } from "@/features/reservations/domain/slot";
@@ -31,6 +35,23 @@ export async function fetchAvailability(
       `/availability?month=${encodeURIComponent(month)}`
   );
   if (!isAvailability(response)) {
+    throw new HttpError("server", response);
+  }
+  return response;
+}
+
+/**
+ * As reservas desta pessoa no condomínio que ainda não terminaram, já na ordem em que acontecem.
+ *
+ * De quem são vem do token: não há parâmetro para pedir as de outra pessoa.
+ */
+export async function listOwnReservations(
+  condominiumId: string
+): Promise<OwnReservation[]> {
+  const response = await request(
+    `/condominiums/${encodeURIComponent(condominiumId)}/reservations`
+  );
+  if (!isOwnReservationList(response)) {
     throw new HttpError("server", response);
   }
   return response;
