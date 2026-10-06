@@ -1,4 +1,6 @@
-import type { Role, VisitType } from "../generated/prisma/enums.ts";
+import { crc32, deflateSync } from "node:zlib";
+
+import type { FoundItemStatus, Role, VisitType } from "../generated/prisma/enums.ts";
 import { hashPassword } from "../src/lib/password.ts";
 import { prisma } from "../src/lib/prisma.ts";
 
@@ -313,6 +315,102 @@ async function loadUsers(): Promise<void> {
 
 async function loadMemberships(): Promise<void> {
   for (const { userId, condominiumId, role, unitIds } of MEMBERSHIPS) {
+interface SampleFoundItem {
+  id: string;
+  condominiumId: string;
+  postedById: string;
+  description: string;
+  place: string;
+  status: FoundItemStatus;
+  /** Instante ISO 8601. Fixo, para a ordem da lista ser a mesma em toda execução. */
+  postedAt: string;
+  /** Cor da foto de exemplo, `[r, g, b]`. */
+  color: [number, number, number];
+}
+
+// Três itens, todos no Brisas e postados pelo administrador: dois à espera do dono e um já
+// devolvido, em três dias diferentes para a ordem ficar visível. Os outros condomínios ficam SEM
+// item nenhum, para o estado vazio ser alcançável só trocando de login.
+//
+// As fotos são retângulos de cor lisa GERADOS aqui, e não arquivos: nenhuma imagem livre para
+// redistribuir foi fornecida, e baixar uma de fora faria a carga depender de rede (feature 008,
+// research R-014). A lista funciona igual; só não parece uma prateleira. Trocar por fotos de
+// verdade é pôr os arquivos em `prisma/seed-assets/` e ler de lá.
+const FOUND_ITEMS: SampleFoundItem[] = [
+  {
+    id: id("0601"),
+    condominiumId: BRISAS,
+    postedById: DANIEL,
+    description: "Molho de chaves com chaveiro azul",
+    place: "Borda da piscina, perto das espreguiçadeiras",
+    status: "found",
+    postedAt: "2026-10-04T21:30:00.000Z",
+    color: [59, 111, 160],
+  },
+  {
+    id: id("0602"),
+    condominiumId: BRISAS,
+    postedById: DANIEL,
+    description: "Guarda-chuva preto, cabo de madeira",
+    place: "Elevador social do bloco A",
+    status: "found",
+    postedAt: "2026-10-02T12:15:00.000Z",
+    color: [70, 70, 78],
+  },
+  {
+    id: id("0603"),
+    condominiumId: BRISAS,
+    postedById: DANIEL,
+    description: "Óculos de grau com armação tartaruga",
+    place: "Salão de festas",
+    status: "returned",
+    postedAt: "2026-09-29T18:40:00.000Z",
+    color: [150, 104, 62],
+  },
+];
+
+/** Um bloco PNG: tamanho, tipo, dados e o CRC do tipo com os dados. */
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, checksum]);
+}
+
+/** Um PNG válido de cor lisa, 480×270, RGB de 8 bits. Alguns poucos kilobytes. */
+function flatColorPng([red, green, blue]: [number, number, number]): Uint8Array<ArrayBuffer> {
+  const width = 480;
+  const height = 270;
+
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8; // bits por canal
+  header[9] = 2; // RGB, sem alfa
+  // Compressão, filtro e entrelaçamento ficam em zero, que é o único valor definido para os três.
+
+  // Cada linha começa com o byte do filtro (0, nenhum) e segue com os pixels.
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x += 1) {
+    row[1 + x * 3] = red;
+    row[2 + x * 3] = green;
+    row[3 + x * 3] = blue;
+  }
+  const pixels = Buffer.concat(Array.from({ length: height }, () => row));
+
+  const file = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(pixels)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+  // Cópia para um `Uint8Array` de buffer próprio, que é o que a coluna `Bytes` do Prisma aceita:
+  // um `Buffer` pode ser uma janela sobre memória compartilhada, e o tipo não deixa passar.
+  return new Uint8Array(file);
+}
+
     const existing = await prisma.condominiumMember.findUnique({
       where: { userId_condominiumId: { userId, condominiumId } },
       select: { userId: true },
@@ -393,7 +491,7 @@ async function main(): Promise<void> {
     `Example data loaded: ${CONDOMINIUMS.length} condominiums, ${UNITS.length} units, ` +
       `${USERS.length} users, ${MEMBERSHIPS.length} memberships, ${RESIDENCE_COUNT} residences, ` +
       `${VISITORS.length} visitors, ${COMMON_AREAS.length} common areas, ` +
-      `${NOTICES.length} notices.`,
+      `${NOTICES.length} notices, ${FOUND_ITEMS.length} found items.`,
   );
 }
 
@@ -409,4 +507,24 @@ try {
   process.exitCode = 1;
 } finally {
   await prisma.$disconnect();
+async function loadFoundItems(): Promise<void> {
+  for (const { color, postedAt, ...item } of FOUND_ITEMS) {
+    await prisma.foundItem.upsert({
+      where: { id: item.id },
+      create: {
+        ...item,
+        // Um instante, e não um dia: ao contrário das outras datas da carga, este vai inteiro.
+        postedAt: new Date(postedAt),
+        photo: flatColorPng(color),
+        photoContentType: "image/png",
+      },
+      update: {},
+      // Sem isto o upsert devolveria a linha inteira, foto incluída, só para ser jogada fora.
+      select: { id: true },
+    });
+  }
 }
+
+}
+  // Também depende do vínculo do administrador.
+  await loadFoundItems();

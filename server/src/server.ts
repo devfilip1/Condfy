@@ -5,6 +5,8 @@ import Fastify from "fastify";
 import authController from "./auth/auth.controller.ts";
 import { authenticate } from "./auth/authenticate.ts";
 import commonAreaController from "./condominiums/commonArea.controller.ts";
+import foundItemController from "./condominiums/foundItem.controller.ts";
+import foundItemPhotoController from "./condominiums/foundItemPhoto.controller.ts";
 import noticeController from "./condominiums/notice.controller.ts";
 import reservationController from "./condominiums/reservation.controller.ts";
 import { JWT_SECRET } from "./lib/config.ts";
@@ -16,13 +18,18 @@ const app = Fastify({ logger: true });
 
 await app.register(cors, {
   origin: process.env.CORS_ORIGIN ?? "http://localhost:8081",
-  methods: ["GET", "POST", "DELETE"],
+  // `PATCH` entrou com a troca de status de um item de achados e perdidos (feature 008).
+  methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
 await app.register(jwt, { secret: JWT_SECRET });
 
 await app.register(authController);
+
+// A foto de um item de achados e perdidos fica FORA do escopo de sessão, de propósito: uma tag
+// `<img>` não envia `Authorization`. A permissão dela é a assinatura na query string (ADR 0012).
+await app.register(foundItemPhotoController, { prefix: "/condominiums" });
 
 // Rotas que exigem sessão. Os módulos registrados aqui não sabem que isso existe: o `preHandler`
 // é do escopo, não deles (FR-023).
@@ -33,6 +40,7 @@ await app.register(
     await instancia.register(commonAreaController, { prefix: "/condominiums" });
     await instancia.register(noticeController, { prefix: "/condominiums" });
     await instancia.register(reservationController, { prefix: "/condominiums" });
+    await instancia.register(foundItemController, { prefix: "/condominiums" });
   },
   { name: "rotas-protegidas" }
 );

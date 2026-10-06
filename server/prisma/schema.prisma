@@ -76,10 +76,60 @@ model Condominium {
   @@map("condominiums")
 }
 
+  foundItems  FoundItem[]
 /// Aviso do condomínio: o mural, com título, corpo e data.
 ///
 /// As CHECKs de título e corpo estão na migration add_notices, porque o Prisma não as expressa
 /// (ADR 0004). O corpo NÃO é guardado aparado: cortar espaços comeria a linha em branco que separa
+/// Em que pé está um item de achados e perdidos. São dois valores e mais nenhum: o enum é o banco
+/// dizendo que um terceiro não pode ser gravado por caminho nenhum (feature 008, SC-007).
+enum FoundItemStatus {
+  /// Encontrado, à espera do dono. É como todo item começa.
+  found
+  /// Devolvido ao dono. O item continua na lista.
+  returned
+}
+
+/// Item encontrado no condomínio, à espera do dono: achados e perdidos.
+///
+/// As CHECKs de descrição, local, tamanho e tipo da foto estão na migration add_found_items,
+/// porque o Prisma não as expressa (ADR 0004).
+///
+/// É a primeira entidade do projeto cujo estado MUDA depois de criada (`status`), a primeira com
+/// um instante em vez de um dia de calendário (`postedAt`) e a primeira a guardar um arquivo.
+model FoundItem {
+  id               String          @id @default(uuid())
+  condominiumId    String          @map("condominium_id")
+  /// Quem postou. Vem SEMPRE do token; gravado para responsabilização, nunca exibido (FR-006).
+  postedById       String          @map("posted_by_id")
+  description      String          @db.VarChar(200)
+  /// Onde foi encontrado.
+  place            String          @db.VarChar(120)
+  status           FoundItemStatus @default(found)
+  /// O momento da postagem, um INSTANTE. Preenchido pelo banco, nunca aceito de quem posta
+  /// (FR-005). Separado de `createdAt` porque o nome da coluna é o nome que trafega no JSON, e
+  /// `createdAt` é contabilidade que toda tabela tem (research R-009).
+  postedAt         DateTime        @default(now()) @map("posted_at") @db.Timestamptz(3)
+  /// A foto em si, dentro da linha: assim item sem foto não existe e postar é uma escrita só
+  /// (research R-001, ADR 0012). NENHUMA listagem pode selecionar esta coluna — ela só sai pela
+  /// rota da foto.
+  photo            Bytes
+  /// Detectado pelo servidor a partir dos bytes, nunca informado por quem envia (research R-004).
+  photoContentType String          @map("photo_content_type") @db.VarChar(20)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  condominium Condominium       @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  /// A FK composta garante que quem postou pertence ao condomínio do item.
+  ///
+  /// `Restrict`, como nos avisos e ao contrário das visitas: a prateleira é do condomínio, e não
+  /// pode esvaziar porque o administrador foi trocado.
+  postedBy    CondominiumMember @relation(fields: [postedById, condominiumId], references: [userId, condominiumId], onDelete: Restrict)
+
+  @@index([condominiumId, postedAt(sort: Desc), id])
+  @@map("found_items")
+}
+
 /// dois parágrafos, e preservá-la é requisito (FR-002).
 model Notice {
   id            String   @id @default(uuid())
@@ -226,6 +276,7 @@ model CondominiumMember {
   @@id([userId, condominiumId])
   // No máximo um administrador por condomínio. Herdado da regra do síndico (research R-003), que
   // era um cargo eletivo único; vale reavaliar se uma administradora puder ter várias pessoas.
+  foundItems       FoundItem[]
   @@unique([condominiumId], map: "condominium_members_one_admin_key", where: raw("role = 'admin'"))
   @@index([condominiumId])
   @@map("condominium_members")
