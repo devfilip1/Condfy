@@ -6,7 +6,9 @@ import {
 } from "@/features/lostAndFound/domain/foundItem";
 
 /**
- * Câmera e galeria do aparelho: o ÚNICO arquivo do app que importa `expo-image-picker`.
+ * Câmera e galeria do aparelho, para a foto de um item encontrado. Um dos DOIS arquivos do app que
+ * importam `expo-image-picker`: o outro é o seletor da foto do condomínio, em
+ * `features/condominiums/services/photoPicker.ts`, que existe à parte de propósito.
  *
  * Pedir permissão, as opções do seletor e qualquer diferença entre web e nativo ficam aqui dentro.
  * O resto da feature recebe um `SelectedPhoto` e não sabe qual biblioteca o produziu — trocar de

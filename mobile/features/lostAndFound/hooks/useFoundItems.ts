@@ -64,6 +64,11 @@ export interface UseFoundItemsResult {
    */
   photoUriOf: (item: FoundItem) => string;
 
+  /** O item cuja foto está aberta sozinha, ou `null`. */
+  viewingItem: FoundItem | null;
+  openPhoto: (item: FoundItem) => void;
+  closePhoto: () => void;
+
   formOpen: boolean;
   /** A foto já escolhida para o item em preenchimento, ou `null`. */
   formPhoto: SelectedPhoto | null;
@@ -111,9 +116,10 @@ function fieldErrorsFrom(error: unknown): FormErrors | null {
 export function useFoundItems(): UseFoundItemsResult {
   // Em qual condomínio a pessoa está é decidido uma vez, para o aplicativo inteiro, na tela de
   // escolha (feature 009). Aqui ele só é lido.
-  const { profile, selectedCondominiumId, isAdminOfSelectedCondominium } =
+  const { profile, selectedCondominiumId, managesSelectedCondominium } =
     useAuth();
   const [state, setState] = useState<ShelfState>({ status: "loading" });
+  const [viewingItem, setViewingItem] = useState<FoundItem | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formPhoto, setFormPhoto] = useState<SelectedPhoto | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -179,6 +185,18 @@ export function useFoundItems(): UseFoundItemsResult {
       void load(selectedCondominiumId);
     }
   }, [selectedCondominiumId, load]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Ver a foto                                                               */
+  /* ------------------------------------------------------------------------ */
+
+  const openPhoto = useCallback((item: FoundItem) => {
+    setViewingItem(item);
+  }, []);
+
+  const closePhoto = useCallback(() => {
+    setViewingItem(null);
+  }, []);
 
   /* ------------------------------------------------------------------------ */
   /* Postar                                                                   */
@@ -353,9 +371,12 @@ export function useFoundItems(): UseFoundItemsResult {
 
   return {
     state,
-    canManage: isAdminOfSelectedCondominium,
+    canManage: managesSelectedCondominium,
     reload,
     photoUriOf,
+    viewingItem,
+    openPhoto,
+    closePhoto,
     formOpen,
     formPhoto,
     formErrors,

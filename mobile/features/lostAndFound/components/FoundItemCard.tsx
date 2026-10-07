@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -33,6 +34,8 @@ export interface FoundItemCardProps {
    * sabe onde o servidor mora.
    */
   photoUri: string;
+  /** Tocar no card — na foto ou no texto — abre a foto sozinha. */
+  onOpenPhoto: (item: FoundItem) => void;
   /** Ausente para quem não pode trocar o status. */
   onToggleStatus?: (item: FoundItem) => void;
   /** A troca deste item está em voo. */
@@ -55,9 +58,8 @@ const useStyles = makeStyles((colors) =>
       width: "100%",
       height: PHOTO_HEIGHT,
     },
-    body: {
+    info: {
       padding: 15,
-      gap: 6,
     },
     description: {
       fontSize: 16,
@@ -84,7 +86,8 @@ const useStyles = makeStyles((colors) =>
     },
     action: {
       height: 44,
-      marginTop: 10,
+      marginHorizontal: 15,
+      marginBottom: 15,
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 12,
@@ -106,6 +109,7 @@ const useStyles = makeStyles((colors) =>
 export default function FoundItemCard({
   item,
   photoUri,
+  onOpenPhoto,
   onToggleStatus,
   changing = false,
   disabled = false,
@@ -119,22 +123,28 @@ export default function FoundItemCard({
   return (
     <View style={styles.card}>
       {/*
-        O caminho da foto é assinado e muda a cada carga da lista; a foto de um item nunca muda. O
-        `id` como chave do cache é o que impede baixar a mesma imagem de novo a cada visita.
+        A área tocável é a foto e o texto, e o botão de status fica FORA dela, como irmão: um botão
+        dentro de outro é HTML inválido na web, e no aparelho o toque no botão abriria a foto junto.
       */}
-      <Photo
-        uri={photoUri}
-        cacheKey={item.id}
-        style={styles.photo}
-        iconSize={40}
-        accessibilityLabel={`Photo of ${item.description}`}
-      />
+      <Pressable
+        onPress={() => onOpenPhoto(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.description}, found at ${item.place}, posted ${postedAt}, ${item.status}`}
+        accessibilityHint="Opens the photo"
+      >
+        {/*
+          O caminho da foto é assinado e muda a cada carga da lista; a foto de um item nunca muda. O
+          `id` como chave do cache é o que impede baixar a mesma imagem de novo a cada visita.
+        */}
+        <Photo
+          uri={photoUri}
+          cacheKey={item.id}
+          style={styles.photo}
+          iconSize={40}
+          accessibilityLabel={`Photo of ${item.description}`}
+        />
 
-      <View style={styles.body}>
-        <View
-          accessible
-          accessibilityLabel={`${item.description}, found at ${item.place}, posted ${postedAt}, ${item.status}`}
-        >
+        <View style={styles.info}>
           <Text style={styles.description} numberOfLines={3}>
             {item.description}
           </Text>
@@ -146,34 +156,34 @@ export default function FoundItemCard({
             <StatusBadge status={item.status} />
           </View>
         </View>
+      </Pressable>
 
-        {/*
-          Sem confirmação: a troca se desfaz apertando o mesmo botão de novo, então um diálogo só
-          acrescentaria um toque a algo que não tem como dar errado de vez.
-        */}
-        {onToggleStatus ? (
-          <TouchableOpacity
-            style={[
-              styles.action,
-              (changing || disabled) && styles.actionDisabled,
-            ]}
-            onPress={() => onToggleStatus(item)}
-            disabled={changing || disabled}
-            accessibilityRole="button"
-            accessibilityLabel={`${actionLabel}: ${item.description}`}
-            accessibilityState={{
-              disabled: changing || disabled,
-              busy: changing,
-            }}
-          >
-            {changing ? (
-              <ActivityIndicator size="small" color={colors.accent} />
-            ) : (
-              <Text style={styles.actionText}>{actionLabel}</Text>
-            )}
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      {/*
+        Sem confirmação: a troca se desfaz apertando o mesmo botão de novo, então um diálogo só
+        acrescentaria um toque a algo que não tem como dar errado de vez.
+      */}
+      {onToggleStatus ? (
+        <TouchableOpacity
+          style={[
+            styles.action,
+            (changing || disabled) && styles.actionDisabled,
+          ]}
+          onPress={() => onToggleStatus(item)}
+          disabled={changing || disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`${actionLabel}: ${item.description}`}
+          accessibilityState={{
+            disabled: changing || disabled,
+            busy: changing,
+          }}
+        >
+          {changing ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Text style={styles.actionText}>{actionLabel}</Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

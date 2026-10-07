@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import FoundItemFormModal from "@/features/lostAndFound/components/FoundItemFormModal";
+import FoundItemPhotoModal from "@/features/lostAndFound/components/FoundItemPhotoModal";
 import FoundItemList from "@/features/lostAndFound/components/FoundItemList";
 import { useFoundItems } from "@/features/lostAndFound/hooks/useFoundItems";
 import AddButton from "@/shared/components/AddButton";
@@ -29,6 +30,9 @@ export default function LostAndFoundScreen() {
     canManage,
     reload,
     photoUriOf,
+    viewingItem,
+    openPhoto,
+    closePhoto,
     formOpen,
     formPhoto,
     formErrors,
@@ -57,9 +61,17 @@ export default function LostAndFoundScreen() {
         state={state}
         onRetry={reload}
         photoUriOf={photoUriOf}
+        onOpenPhoto={openPhoto}
         onToggleStatus={canManage ? toggleStatus : undefined}
         changingId={changingId}
         notice={notice}
+      />
+
+      {/* Para todos, morador inclusive: ver a foto maior é leitura, não gestão. */}
+      <FoundItemPhotoModal
+        item={viewingItem}
+        photoUri={viewingItem ? photoUriOf(viewingItem) : null}
+        onClose={closePhoto}
       />
 
       {canManage ? (

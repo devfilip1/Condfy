@@ -25,6 +25,8 @@ export interface FoundItemListProps {
   onRetry: () => void;
   /** O endereço completo da foto de um item. Vem do hook, que é quem conhece o endereço da API. */
   photoUriOf: (item: FoundItem) => string;
+  /** Tocar num card abre a foto dele sozinha. */
+  onOpenPhoto: (item: FoundItem) => void;
   /** Ausente para quem não pode trocar o status: os cards ficam sem botão. */
   onToggleStatus?: (item: FoundItem) => void;
   /** O id do item cuja troca está em voo, ou `null`. */
@@ -58,6 +60,7 @@ export default function FoundItemList({
   state,
   onRetry,
   photoUriOf,
+  onOpenPhoto,
   onToggleStatus,
   changingId,
   notice,
@@ -91,6 +94,7 @@ export default function FoundItemList({
             <FoundItemCard
               item={item}
               photoUri={photoUriOf(item)}
+              onOpenPhoto={onOpenPhoto}
               onToggleStatus={onToggleStatus}
               changing={item.id === changingId}
               disabled={changingId !== null}
