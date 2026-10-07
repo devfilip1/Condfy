@@ -20,6 +20,7 @@ export interface MembershipSummaryProps {
 const ROLE_LABELS: Record<ProfileMembership["role"], string> = {
   resident: "Resident",
   admin: "Administrator",
+  manager: "Manager",
 };
 
 const useStyles = makeStyles((colors) =>

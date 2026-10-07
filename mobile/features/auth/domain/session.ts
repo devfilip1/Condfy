@@ -141,10 +141,23 @@ export function isFormErrors(value: unknown): value is FormErrors {
 /**
  * Cargo de uma pessoa num condomínio. Os mesmos valores do enum do banco.
  *
- * `manager` (síndico) e `doorman` (portaria) foram substituídos por `admin` (administrador):
- * por enquanto é o único cargo de gestão.
+ * São três: morador, administrador e síndico. O síndico (`manager`) saiu na feature 007 e VOLTOU
+ * na 013, como um cargo próprio — é quem criou o condomínio —, e não como outro nome do
+ * administrador. Um condomínio pode ter os dois.
  */
-export type Role = "resident" | "admin";
+export type Role = "resident" | "admin" | "manager";
+
+/**
+ * Quem cuida de um condomínio: o administrador ou o síndico.
+ *
+ * É o ÚNICO lugar do app que responde a essa pergunta — nunca compare um cargo com `"admin"` para
+ * oferecer ou esconder uma ação. Os dois cargos são mantidos separados para poderem divergir, e no
+ * dia em que algo for só do síndico, é aqui que isso passa a aparecer. O servidor tem a mesma função
+ * em `server/src/lib/roles.ts`, e é ele quem recusa de verdade (ADR 0017).
+ */
+export function managesCondominium(role: Role): boolean {
+  return role === "admin" || role === "manager";
+}
 
 /** Unidade onde a pessoa mora. `block` é `null` em condomínio sem blocos. */
 export interface ProfileUnit {
@@ -161,11 +174,23 @@ export interface ProfileUnit {
  * É o motivo de o token não carregar condomínio nem unidade (RN-AUT-05).
  */
 export interface ProfileMembership {
-  /** `imageUrl` é a foto do condomínio, ou `null` — quem exibe mostra o placeholder. */
-  condominium: { id: string; name: string; imageUrl: string | null };
+  condominium: ProfileCondominium;
   role: Role;
-  /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
+  /** Vazia para quem tem vínculo sem morar em unidade alguma: o administrador e o síndico. */
   units: ProfileUnit[];
+}
+
+/**
+ * O condomínio de um vínculo. A foto tem duas origens possíveis, e no máximo uma vem preenchida:
+ * `imageUrl`, um endereço https, nos condomínios de exemplo; e `photoPath`, um caminho relativo ao
+ * endereço da API e assinado, quando o síndico enviou uma. Quem exibe NÃO escolhe entre os dois na
+ * mão: usa `condominiumPhotoUri`.
+ */
+export interface ProfileCondominium {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  photoPath: string | null;
 }
 
 export interface Profile {
@@ -185,7 +210,7 @@ export function unitLabel(unit: ProfileUnit): string {
   return unit.block === null ? unit.number : `${unit.block}-${unit.number}`;
 }
 
-const ROLES: readonly string[] = ["resident", "admin"];
+const ROLES: readonly string[] = ["resident", "admin", "manager"];
 
 function isProfileUnit(value: unknown): value is ProfileUnit {
   if (!isObject(value)) {
@@ -198,7 +223,8 @@ function isProfileUnit(value: unknown): value is ProfileUnit {
   );
 }
 
-function isProfileMembership(value: unknown): value is ProfileMembership {
+/** Exportado porque a criação de um condomínio responde com um vínculo neste mesmo formato. */
+export function isProfileMembership(value: unknown): value is ProfileMembership {
   if (!isObject(value)) {
     return false;
   }
@@ -208,6 +234,7 @@ function isProfileMembership(value: unknown): value is ProfileMembership {
     typeof condominium.id === "string" &&
     typeof condominium.name === "string" &&
     (condominium.imageUrl === null || typeof condominium.imageUrl === "string") &&
+    (condominium.photoPath === null || typeof condominium.photoPath === "string") &&
     typeof value.role === "string" &&
     ROLES.includes(value.role) &&
     Array.isArray(value.units) &&

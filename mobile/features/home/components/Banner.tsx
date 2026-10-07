@@ -1,6 +1,7 @@
 import { Octicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import { ProfileCondominium, condominiumPhotoUri } from "@/features/auth";
 import Photo from "@/shared/components/Photo";
 import { makeStyles, useTheme } from "@/shared/theme";
 
@@ -19,7 +20,7 @@ const BANNER_RADIUS = 35;
 
 export interface BannerProps {
   /** `null` enquanto o perfil não chegou, ou para quem não tem condomínio nenhum. */
-  condominium: { name: string; imageUrl: string | null } | null;
+  condominium: ProfileCondominium | null;
   /** Abre a escolha de condomínio. Ausente para quem tem um só: não há para o que trocar. */
   onSwitch?: () => void;
 }
@@ -82,7 +83,10 @@ export default function Banner({ condominium, onSwitch }: BannerProps) {
   return (
     <View style={styles.banner}>
       <Photo
-        uri={condominium?.imageUrl ?? null}
+        // `condominiumPhotoUri` resolve as duas origens da foto. O `id` é a chave de cache: o
+        // caminho de uma foto enviada é assinado e muda a cada carga do perfil, a foto não.
+        uri={condominium ? condominiumPhotoUri(condominium) : null}
+        cacheKey={condominium?.id}
         style={styles.photo}
         iconSize={48}
         accessibilityLabel={

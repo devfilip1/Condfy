@@ -14,9 +14,15 @@ export type {
   SessionState,
   UseAuthResult,
 } from "@/features/auth/hooks/useAuth";
-export { unitLabel } from "@/features/auth/domain/session";
+export {
+  isProfileMembership,
+  managesCondominium,
+  unitLabel,
+} from "@/features/auth/domain/session";
+export { condominiumPhotoUri } from "@/features/auth/services/condominiumPhoto";
 export type {
   Profile,
+  ProfileCondominium,
   ProfileMembership,
   ProfileUnit,
   Role,

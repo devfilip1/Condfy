@@ -41,8 +41,11 @@ export class HttpError extends Error {
 }
 
 export interface RequestOptions {
-  /** `PATCH` entrou com a troca de status de um item de achados e perdidos (feature 008). */
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  /**
+   * `PATCH` entrou com a troca de status de um item de achados e perdidos (feature 008), e `PUT`
+   * com a reserva do dia inteiro (feature 011). O servidor lista os mesmos métodos no CORS.
+   */
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /**
    * Quanto esperar antes de desistir. O padrão de 10 segundos serve para JSON de poucos kilobytes;

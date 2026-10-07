@@ -28,7 +28,7 @@ export interface Module {
   visibleTo: readonly Role[];
 }
 
-const ALL_ROLES: readonly Role[] = ["resident", "admin"];
+const ALL_ROLES: readonly Role[] = ["resident", "admin", "manager"];
 
 const modules: Module[] = [
   {
@@ -36,8 +36,10 @@ const modules: Module[] = [
     name: "Visitors",
     description: "Manage your visitors",
     route: "/visitors",
-    // Receber visita é coisa de quem mora. Quem administra não tem unidade e não recebe ninguém.
-    visibleTo: ["resident"],
+    // O administrador voltou a ver este módulo: ele acompanha as visitas do condomínio inteiro e
+    // também libera pessoas, para a unidade que escolher. O que cada cargo VÊ lá dentro é decidido
+    // pelo servidor, não por esta lista.
+    visibleTo: ALL_ROLES,
   },
   {
     icon: "calendar",
@@ -65,9 +67,9 @@ const modules: Module[] = [
 /**
  * Os módulos que esta pessoa enxerga, pela UNIÃO dos cargos dela.
  *
- * União, e não um cargo só, porque a home não tem contexto de condomínio: quem for moradora num
- * prédio e administradora em outro precisa do módulo de visitantes, que só o cargo de moradora
- * concede. Esconder seria pior que mostrar.
+ * União, e não um cargo só, para que um módulo concedido por um dos cargos não suma por causa do
+ * outro. Hoje todos os módulos são dos dois cargos, então a união não muda nada — ela fica para o
+ * primeiro módulo que voltar a ser de um cargo só. Esconder seria pior que mostrar.
  *
  * Sem vínculo nenhum (conta recém-criada), vale a lista de morador: as telas já sabem dizer que a
  * pessoa ainda não está ligada a condomínio algum.

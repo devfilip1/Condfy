@@ -1,7 +1,11 @@
 import { useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 
-import { AccountChangeResult, useAuth } from "@/features/auth";
+import {
+  AccountChangeResult,
+  managesCondominium,
+  useAuth,
+} from "@/features/auth";
 import {
   FieldErrors,
   hasNoErrors,
@@ -192,7 +196,8 @@ export function useDeleteAccount(): UseDeleteAccountResult {
   const isAdministrator =
     profile.status === "ready" &&
     profile.profile.memberships.some(
-      (membership) => membership.role === "admin"
+      // O síndico também: o condomínio ficaria sem ninguém cuidando dele (FR-029 da 013).
+      (membership) => managesCondominium(membership.role)
     );
 
   const askConfirmation = useCallback(() => {

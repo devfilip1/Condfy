@@ -18,6 +18,7 @@ import {
   User,
   isFormErrors,
   hasNoErrors,
+  managesCondominium,
   validateSignUp,
   validateSignIn,
 } from "@/features/auth/domain/session";
@@ -139,13 +140,22 @@ export interface UseAuthResult {
   /** Só aceita um condomínio que a pessoa realmente tenha. */
   selectCondominium: (condominiumId: string) => void;
   /**
-   * `true` só quando a pessoa é administradora DO CONDOMÍNIO EM TELA — não "é admin em algum
-   * lugar". Quem administra um prédio e mora em outro pode num e não no outro.
+   * Entra num condomínio que ACABOU de passar a ser da pessoa — o que ela criou. Recarrega o perfil,
+   * que é de onde vêm os vínculos, e já sai com aquele condomínio escolhido. `selectCondominium`
+   * não serve para isso: ele só aceita o que o perfil carregado já tem.
+   */
+  adoptCondominium: (condominiumId: string) => Promise<void>;
+  /**
+   * `true` quando a pessoa CUIDA do condomínio em tela — é a administradora ou a síndica dele —,
+   * não "cuida de algum". Quem administra um prédio e mora em outro pode num e não no outro.
+   *
+   * Até a feature 013 isto se chamava `isAdminOfSelectedCondominium`; o nome mudou junto com o
+   * significado, porque o síndico passou a contar.
    *
    * Isto é cortesia de interface: serve para oferecer ou esconder uma ação. Quem recusa de verdade
    * é a API (ADR 0010). Vive aqui desde o segundo uso — Newsletter e Achados e Perdidos.
    */
-  isAdminOfSelectedCondominium: boolean;
+  managesSelectedCondominium: boolean;
   /** Operação de input ou cadastro em andamento. */
   submitting: boolean;
   /** Falha que não é de um field (credentials, bloqueio, rede). */
@@ -425,6 +435,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
 
+  /**
+   * A ordem importa: a escolha é posta ANTES de o perfil chegar. Quando ele chega, o efeito acima
+   * confere que o condomínio escolhido está entre os vínculos — e agora está — e o mantém. Posta
+   * depois, a pessoa com dois condomínios passaria pela tela de escolha no meio do caminho.
+   */
+  const adoptCondominium = useCallback(
+    async (condominiumId: string) => {
+      selectedRef.current = condominiumId;
+      await writeSelectedCondominium(condominiumId);
+      await loadProfile();
+    },
+    [loadProfile]
+  );
+
   const applySession = useCallback(async (session: Session) => {
     credentials.current = session.credentials;
     await writeCredentials(session.credentials);
@@ -673,7 +697,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [memberships, selectedCondominiumId]
   );
 
-  const isAdminOfSelectedCondominium = currentMembership?.role === "admin";
+  const managesSelectedCondominium =
+    currentMembership !== null && managesCondominium(currentMembership.role);
 
   const canSwitchCondominium = (memberships?.length ?? 0) >= 2;
 
@@ -698,7 +723,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       condominiumGate,
       canSwitchCondominium,
       selectCondominium,
-      isAdminOfSelectedCondominium,
+      adoptCondominium,
+      managesSelectedCondominium,
       submitting,
       submitError,
       formErrors,
@@ -719,7 +745,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       condominiumGate,
       canSwitchCondominium,
       selectCondominium,
-      isAdminOfSelectedCondominium,
+      adoptCondominium,
+      managesSelectedCondominium,
       submitting,
       submitError,
       formErrors,

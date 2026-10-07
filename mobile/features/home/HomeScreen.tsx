@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { useAuth } from "@/features/auth";
 import Banner from "@/features/home/components/Banner";
 import HeaderHome from "@/features/home/components/HeaderHome";
+import NoCondominiumCard from "@/features/home/components/NoCondominiumCard";
 import ModuleList from "@/features/home/components/ModuleList";
 import { modulesForRoles } from "@/features/home/data/modules";
 
@@ -16,7 +17,15 @@ export const styles = StyleSheet.create({
 });
 
 export default function HomeScreen() {
-  const { currentMembership, canSwitchCondominium } = useAuth();
+  const { profile, currentMembership, canSwitchCondominium } = useAuth();
+
+  /**
+   * A conta não pertence a condomínio nenhum: é o caso de quem acabou de se cadastrar. Só é
+   * verdade com o perfil CARREGADO — enquanto ele não chega, "sem vínculo" ainda não se sabe, e
+   * oferecer criar um condomínio a quem já tem um seria errado.
+   */
+  const hasNoCondominium =
+    profile.status === "ready" && profile.profile.memberships.length === 0;
 
   /**
    * O cargo da pessoa NO CONDOMÍNIO EM QUE ELA ESTÁ. Até a feature 009 isto era a união dos cargos
@@ -44,6 +53,16 @@ export default function HomeScreen() {
               : undefined
           }
         />
+        {/*
+          Um botão, e não um redirecionamento: quem só quer morar num condomínio não é empurrado
+          para um formulário, e a oferta continua aqui pelo tempo que a conta ficar sem vínculo
+          (FR-001, FR-004 da 013).
+        */}
+        {hasNoCondominium ? (
+          <NoCondominiumCard
+            onCreate={() => router.push("/create-condominium")}
+          />
+        ) : null}
         <ModuleList modules={modulesForRoles(roles)} />
       </View>
     </>
