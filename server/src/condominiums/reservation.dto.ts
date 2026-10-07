@@ -87,6 +87,39 @@ const MESSAGE_PAST_DATE = "Pick a date from today on.";
 const MESSAGE_BEYOND_WINDOW = `Pick a date within the next ${BOOKING_WINDOW_DAYS} days.`;
 const MESSAGE_BAD_SLOT = "Select one of the available times.";
 
+export type DateValidation =
+  | { ok: true; data: { date: string } }
+  | { ok: false; errors: { date: string } };
+
+/**
+ * Valida o dia das rotas de "dia inteiro", que vem no CAMINHO e não no body.
+ *
+ * `window: "bookable"` aplica as três regras de uma reserva — dia real, de hoje em diante, dentro da
+ * janela — com as mesmas mensagens: reservar o dia todo é reservar, e obedece ao que uma reserva
+ * obedece (FR-031). `window: "any"` só confere que o dia existe: liberar não tem janela.
+ */
+export function validateDayParam(
+  value: unknown,
+  window: "bookable" | "any",
+  today: string = todayLocalISODate()
+): DateValidation {
+  const date = typeof value === "string" ? value.trim() : "";
+
+  if (!isValidISODate(date)) {
+    return { ok: false, errors: { date: MESSAGE_BAD_DATE } };
+  }
+  if (window === "bookable") {
+    if (date < today) {
+      return { ok: false, errors: { date: MESSAGE_PAST_DATE } };
+    }
+    if (date > addDaysISO(today, BOOKING_WINDOW_DAYS)) {
+      return { ok: false, errors: { date: MESSAGE_BEYOND_WINDOW } };
+    }
+  }
+
+  return { ok: true, data: { date: date } };
+}
+
 function asObject(body: unknown): Record<string, unknown> {
   return typeof body === "object" && body !== null && !Array.isArray(body)
     ? (body as Record<string, unknown>)

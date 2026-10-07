@@ -10,6 +10,8 @@ import {
   todayLocalISODate,
 } from "../lib/calendarDate.ts";
 import { prisma } from "../lib/prisma.ts";
+import { managesCondominium } from "../lib/roles.ts";
+import { signedCommonAreaPhotoPath } from "./commonArea.service.ts";
 import { BOOKING_WINDOW_DAYS, SLOT_START_MINUTES, endMinuteOf } from "./slot.ts";
 
 /**
@@ -20,10 +22,11 @@ import { BOOKING_WINDOW_DAYS, SLOT_START_MINUTES, endMinuteOf } from "./slot.ts"
  *
  * Duas garantias NÃO são deste módulo e não precisam ser conferidas aqui:
  *
- * - **Reserva dupla é impossível** pelo índice único `(common_area_id, date, start_minute)`. Não há
- *   "confere se está livre e depois grava" em lugar nenhum deste arquivo, de propósito: dois pedidos
- *   simultâneos passariam pela conferência e os dois gravariam (research R-001). Quem perde a corrida
- *   recebe a violação do índice, que `bookSlot` traduz.
+ * - **Reserva dupla é impossível** pelo índice único `(common_area_id, date, start_minute)`. Nenhuma
+ *   gravação deste arquivo CONFIA numa leitura de "está livre?" feita antes, de propósito: dois
+ *   pedidos simultâneos passariam pela conferência e os dois gravariam (research R-001). Quem perde
+ *   a corrida recebe a violação do índice, que `bookSlot` e `takeWholeDay` traduzem. A leitura que
+ *   `takeWholeDay` faz antes de gravar serve só para escolher a mensagem.
  * - **Local e vínculo são do mesmo condomínio da reserva**, pelas duas FKs compostas de
  *   `reservations` (feature 005, research R-002).
  *
@@ -35,7 +38,13 @@ import { BOOKING_WINDOW_DAYS, SLOT_START_MINUTES, endMinuteOf } from "./slot.ts"
 /* O contrato                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** `open` — livre. `held` — ocupado E quem pediu pode cancelar (FR-012a). */
+/**
+ * `open` — livre. `held` — reservado POR QUEM PEDIU, que por isso pode cancelar (FR-012a).
+ *
+ * Até a feature 011 o administrador recebia aqui também as reservas dos outros. Elas passaram para
+ * `booked`, com o `reservationId` junto, para cada reserva ter um lugar só de onde ser cancelada
+ * (research R-003 da 011).
+ */
 export type SlotStatus = "open" | "held";
 
 export interface AvailableSlot {
@@ -46,11 +55,30 @@ export interface AvailableSlot {
   reservationId?: string;
 }
 
+/** Um horário já reservado. De quem é não entra, em caso nenhum. */
+export interface BookedSlot {
+  startMinute: number;
+  endMinute: number;
+  /**
+   * Presente exatamente quando quem pediu pode cancelar esta reserva POR ESTA LISTA: é o
+   * administrador, a reserva é de outra pessoa e o horário ainda não começou. É o que o DELETE
+   * endereça. Para um morador nunca vem — a lista dele só informa.
+   */
+  reservationId?: string;
+}
+
 export interface DayAvailability {
   /** Dia de calendário `YYYY-MM-DD`. */
   date: string;
   /** Só o que quem pediu pode reservar ou liberar. Vazia é dia cheio. */
   slots: AvailableSlot[];
+  /** Todas as reservas do local neste dia, de qualquer pessoa, da mais cedo para a mais tarde. */
+  booked: BookedSlot[];
+  /**
+   * Presente exatamente quando quem pediu é o administrador. `true` quando o dia tem ao menos um
+   * horário que ainda não começou e TODOS eles são dele — é a posição do interruptor de dia inteiro.
+   */
+  wholeDayHeld?: boolean;
 }
 
 /** O local sendo reservado, como vai junto da disponibilidade. */
@@ -58,12 +86,21 @@ export interface BookedCommonArea {
   id: string;
   name: string;
   usageFee: string;
-  /** A foto que abre a tela de reserva, ou `null`. */
+  /** A foto que abre a tela de reserva, nos locais de exemplo: um endereço https, ou `null`. */
   imageUrl: string | null;
+  /** O caminho assinado da foto ENVIADA ao criar o local, ou `null`. No máximo um dos dois vem. */
+  photoPath: string | null;
+  /** `false` só chega ao administrador: para os outros um local desligado responde 404. */
+  isAvailable: boolean;
 }
 
 export interface Availability {
   commonArea: BookedCommonArea;
+  /**
+   * Quem pediu é o administrador deste condomínio. A tela mostra os dois interruptores quando isto
+   * vem `true`, e só então: quem decide é este módulo, não uma comparação de cargo na tela.
+   */
+  canManage: boolean;
   /** `YYYY-MM` do mês pedido. */
   month: string;
   /** Só os dias RESERVÁVEIS do mês: hoje até hoje + 60, dentro do mês pedido. */
@@ -107,6 +144,10 @@ export interface NewReservation {
  * - `forbidden` → 403. Tem vínculo, mas não é quem reservou nem administrador (ADR 0010).
  * - `taken` → 409. Perdeu a corrida: o horário foi reservado no meio do caminho.
  * - `started` → 409. O horário já começou; não há o que liberar.
+ * - `unavailable` → 409. O local está desligado e quem pediu é o administrador. Para os outros o
+ *   mesmo caso é `commonArea`, como sempre foi.
+ * - `dayTaken` → 409. Dia inteiro: outra pessoa tem horário naquele dia. Nada é reservado.
+ * - `nothingLeft` → 409. Dia inteiro: todos os horários de hoje já começaram.
  */
 export type ReservationFailure =
   | "condominium"
@@ -114,7 +155,10 @@ export type ReservationFailure =
   | "reservation"
   | "forbidden"
   | "taken"
-  | "started";
+  | "started"
+  | "unavailable"
+  | "dayTaken"
+  | "nothingLeft";
 
 export class ReservationError extends Error {
   reason: ReservationFailure;
@@ -147,16 +191,26 @@ async function membershipOf(
 }
 
 /**
- * O local, se ele existe, está disponível e é deste condomínio. `null` nos outros casos — e os
- * outros casos recebem todos a mesma recusa de quem não tem vínculo.
+ * O local, se ele existe e é deste condomínio — DISPONÍVEL OU NÃO. `null` nos outros casos.
+ *
+ * O que fazer com um local desligado é de quem chama, porque depende de quem pediu: para o
+ * administrador ele abre, para os outros ele responde como se não existisse.
  */
-async function availableCommonArea(
+async function commonAreaOf(
   condominiumId: string,
   commonAreaId: string
 ): Promise<BookedCommonArea | null> {
   const row = await prisma.commonArea.findFirst({
-    where: { id: commonAreaId, condominiumId: condominiumId, isAvailable: true },
-    select: { id: true, name: true, usageFee: true, imageUrl: true },
+    where: { id: commonAreaId, condominiumId: condominiumId },
+    // `photoContentType` diz se há foto enviada sem tocar nos bytes: `photo` NUNCA entra aqui.
+    select: {
+      id: true,
+      name: true,
+      usageFee: true,
+      imageUrl: true,
+      photoContentType: true,
+      isAvailable: true,
+    },
   });
 
   if (!row) {
@@ -169,7 +223,22 @@ async function availableCommonArea(
     name: row.name,
     usageFee: row.usageFee.toFixed(2),
     imageUrl: row.imageUrl,
+    photoPath: signedCommonAreaPhotoPath(condominiumId, row),
+    isAvailable: row.isAvailable,
   };
+}
+
+/** `true` quando o horário daquele dia já começou, no relógio do servidor. */
+function slotHasStarted(
+  date: string,
+  startMinute: number,
+  today: string,
+  nowMinutes: number
+): boolean {
+  if (date < today) {
+    return true;
+  }
+  return date === today && startMinute <= nowMinutes;
 }
 
 /** Os dias do mês que dá para reservar: a interseção do mês com a janela de hoje até hoje + 60. */
@@ -197,9 +266,14 @@ function bookableDaysOf(year: number, month: number, today: string): string[] {
  * errado ofereceria um horário que o servidor depois recusa, e a pessoa leria isso como app quebrado
  * (research R-004).
  *
- * A resposta traz o que está LIVRE, não o que está ocupado: assim o app não subtrai nada e nunca
- * guarda uma segunda cópia da grade para isso. E traz o local junto, para um pedido pintar a tela
- * inteira (research R-009).
+ * `slots` traz o que está LIVRE, não o que está ocupado: assim o app não subtrai nada e nunca
+ * guarda uma segunda cópia da grade para isso. E a resposta traz o local junto, para um pedido
+ * pintar a tela inteira (research R-009).
+ *
+ * `booked` é a outra metade, para a pessoa ver o dia inteiro do local: os horários reservados, por
+ * quem quer que seja. Vai SÓ o horário — sem nome, sem id de reserva e sem dizer quais são de quem
+ * pediu —, então a lista não serve para descobrir quem reservou nem para cancelar nada. Inclui o
+ * horário de hoje que já começou: a reserva existe, e o dia que a seção mostra é o dia todo.
  *
  * Dia passado e dia além da janela simplesmente NÃO VÊM. É a mesma forma para os dois casos, então a
  * regra do app é uma só: sem item, sem bolinha.
@@ -215,8 +289,12 @@ export async function listAvailability(
     throw new ReservationError("commonArea");
   }
 
-  const commonArea = await availableCommonArea(condominiumId, commonAreaId);
-  if (!commonArea) {
+  const canManage = managesCondominium(membership.role);
+
+  // Local desligado: para o administrador a tela abre — é nela que ele religa. Para os outros é a
+  // mesma recusa de um local que não existe, como era antes de o catálogo passar a mostrá-lo.
+  const commonArea = await commonAreaOf(condominiumId, commonAreaId);
+  if (!commonArea || (!commonArea.isAvailable && !canManage)) {
     throw new ReservationError("commonArea");
   }
 
@@ -226,7 +304,7 @@ export async function listAvailability(
 
   if (days.length === 0) {
     // Mês inteiro no passado, ou inteiro depois da janela. Nenhum dia leva bolinha.
-    return { commonArea: commonArea, month: monthLabel, days: [] };
+    return { commonArea: commonArea, canManage: canManage, month: monthLabel, days: [] };
   }
 
   const taken = await prisma.reservation.findMany({
@@ -252,45 +330,84 @@ export async function listAvailability(
 
   return {
     commonArea: commonArea,
+    canManage: canManage,
     month: monthLabel,
-    days: days.map((date) => ({
-      date: date,
-      slots: SLOT_START_MINUTES.flatMap((startMinute): AvailableSlot[] => {
+    days: days.map((date): DayAvailability => {
+      // Os horários do dia que ainda não começaram: é sobre eles que tudo abaixo decide.
+      const ahead = SLOT_START_MINUTES.filter(
+        (startMinute) => !slotHasStarted(date, startMinute, today, nowMinutes)
+      );
+
+      const day: DayAvailability = {
+        date: date,
+        // Pela ordem da grade, que já é a do relógio.
+        booked: SLOT_START_MINUTES.flatMap((startMinute): BookedSlot[] => {
+          const reservation = bySlot.get(slotKey(date, startMinute));
+          if (!reservation) {
+            return [];
+          }
+
+          const slot: BookedSlot = {
+            startMinute: startMinute,
+            endMinute: endMinuteOf(startMinute),
+          };
+
+          // O id só vai junto quando esta lista é o caminho do cancelamento: o administrador, a
+          // reserva de OUTRA pessoa, e um horário que ainda não começou. A dele mesmo continua
+          // sendo cancelada pelo horário `held` — uma reserva, um lugar só (research R-003).
+          if (
+            canManage &&
+            reservation.reservedById !== requesterId &&
+            !slotHasStarted(date, startMinute, today, nowMinutes)
+          ) {
+            slot.reservationId = reservation.id;
+          }
+
+          return [slot];
+        }),
         // Horário de hoje que já começou não é oferecido nem como livre nem como liberável: não dá
         // para reservar o passado, e o FR-027 também não deixa cancelar o que já começou.
-        if (date === today && startMinute <= nowMinutes) {
-          return [];
-        }
+        slots: ahead.flatMap((startMinute): AvailableSlot[] => {
+          const reservation = bySlot.get(slotKey(date, startMinute));
+          if (!reservation) {
+            // Local desligado não oferece horário a ninguém, nem ao administrador.
+            return commonArea.isAvailable
+              ? [
+                  {
+                    startMinute: startMinute,
+                    endMinute: endMinuteOf(startMinute),
+                    status: "open",
+                  },
+                ]
+              : [];
+          }
 
-        const reservation = bySlot.get(slotKey(date, startMinute));
-        if (!reservation) {
-          return [
-            {
-              startMinute: startMinute,
-              endMinute: endMinuteOf(startMinute),
-              status: "open",
-            },
-          ];
-        }
+          // Ocupado. Só aparece aqui se é de quem pediu. Ocupado por outra pessoa fica AUSENTE
+          // desta lista (FR-012) e aparece só em `booked`; em nenhum caso a resposta diz de quem é.
+          return reservation.reservedById === requesterId
+            ? [
+                {
+                  startMinute: startMinute,
+                  endMinute: endMinuteOf(startMinute),
+                  status: "held",
+                  reservationId: reservation.id,
+                },
+              ]
+            : [];
+        }),
+      };
 
-        // Ocupado. Só aparece se esta pessoa pode liberar — quem reservou, ou o administrador do
-        // condomínio. Ocupado por outra pessoa fica AUSENTE da lista (FR-012), e em nenhum caso a
-        // resposta diz de quem é.
-        const canRelease =
-          reservation.reservedById === requesterId || membership.role === "admin";
+      if (canManage) {
+        day.wholeDayHeld =
+          ahead.length > 0 &&
+          ahead.every(
+            (startMinute) =>
+              bySlot.get(slotKey(date, startMinute))?.reservedById === requesterId
+          );
+      }
 
-        return canRelease
-          ? [
-              {
-                startMinute: startMinute,
-                endMinute: endMinuteOf(startMinute),
-                status: "held",
-                reservationId: reservation.id,
-              },
-            ]
-          : [];
-      }),
-    })),
+      return day;
+    }),
   };
 }
 
@@ -303,7 +420,7 @@ export async function listAvailability(
  * distante.
  *
  * Só as de quem pediu, inclusive para o administrador: ele pode LIBERAR a reserva de qualquer
- * pessoa, mas isso continua acontecendo pelo horário `held` da disponibilidade. Esta lista responde
+ * pessoa, mas isso acontece pelas reservas do dia (`booked`) da disponibilidade. Esta lista responde
  * "o que eu reservei", e por isso não diz nome de ninguém.
  *
  * A reserva de hoje fica até o horário TERMINAR, e não até começar: quem está usando o salão agora
@@ -375,11 +492,18 @@ export async function bookSlot(
     throw new ReservationError("commonArea");
   }
 
-  // Local indisponível recebe a MESMA recusa de local inexistente (FR-017): ele saiu do catálogo,
-  // então para quem pede ele não está lá.
-  const commonArea = await availableCommonArea(condominiumId, commonAreaId);
+  const commonArea = await commonAreaOf(condominiumId, commonAreaId);
   if (!commonArea) {
     throw new ReservationError("commonArea");
+  }
+
+  // Local desligado não aceita reserva de ninguém. A diferença é só o que cada um ouve: o
+  // administrador, que pode religá-lo, ouve o motivo; para os outros é a MESMA recusa de local
+  // inexistente (FR-017), porque a tela de reserva dele nunca abriu para eles.
+  if (!commonArea.isAvailable) {
+    throw new ReservationError(
+      managesCondominium(membership.role) ? "unavailable" : "commonArea"
+    );
   }
 
   let row;
@@ -427,14 +551,6 @@ export async function bookSlot(
 /* Cancelar                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** `true` quando o horário da reserva já começou — não há mais o que liberar. */
-function hasStarted(date: string, startMinute: number, today: string): boolean {
-  if (date < today) {
-    return true;
-  }
-  return date === today && startMinute <= minutesSinceMidnightLocal();
-}
-
 /**
  * Libera uma reserva. O registro é REMOVIDO: ele não tem estado, então a existência da linha é a
  * reserva e cancelar é apagá-la (FR-024). Não fica histórico, e isso está registrado nas premissas
@@ -475,20 +591,171 @@ export async function cancelReservation(
   }
 
   const canRelease =
-    reservation.reservedById === requesterId || membership.role === "admin";
+    reservation.reservedById === requesterId || managesCondominium(membership.role);
   if (!canRelease) {
     throw new ReservationError("forbidden");
   }
 
   if (
-    hasStarted(
+    slotHasStarted(
       fromDateColumn(reservation.date),
       reservation.startMinute,
-      todayLocalISODate()
+      todayLocalISODate(),
+      minutesSinceMidnightLocal()
     )
   ) {
     throw new ReservationError("started");
   }
 
   await prisma.reservation.delete({ where: { id: reservation.id } });
+}
+
+/* -------------------------------------------------------------------------- */
+/* O dia inteiro                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** As recusas comuns às duas operações de dia inteiro, na ordem do ADR 0010. */
+async function requireAdministrator(
+  condominiumId: string,
+  requesterId: string
+): Promise<void> {
+  const membership = await membershipOf(condominiumId, requesterId);
+  if (!membership) {
+    throw new ReservationError("commonArea");
+  }
+  // Antes de o local ser procurado: quem não pode fazer isto não descobre se o id existe.
+  if (!managesCondominium(membership.role)) {
+    throw new ReservationError("forbidden");
+  }
+}
+
+/**
+ * Reserva, para o administrador, todos os horários do dia que ainda não começaram e que ele ainda
+ * não tem. **O dia todo ou nada** (FR-026a).
+ *
+ * São reservas comuns: não existe "dia bloqueado" em lugar nenhum do banco, e por isso nenhuma
+ * consulta de disponibilidade precisou aprender uma segunda forma de um horário estar ocupado.
+ *
+ * **A leitura antes de gravar é para a mensagem, não para a garantia.** Ela diz ao administrador
+ * que há reservas de outra pessoa no dia. Quem garante que nunca sobra meio dia é o índice único do
+ * ADR 0011 somado a um fato do banco: o `createMany` abaixo é UM comando. Se alguém reservar um
+ * daqueles horários entre a leitura e a gravação, o comando viola o índice e o Postgres descarta
+ * TODAS as linhas dele, não só a que colidiu. Não há sequência de oito gravações para parar na
+ * quinta, e não há transação para esquecer de abrir (research R-004).
+ *
+ * É idempotente: quem já tem o dia inteiro pede de novo e nada muda.
+ */
+export async function takeWholeDay(
+  condominiumId: string,
+  commonAreaId: string,
+  requesterId: string,
+  date: string
+): Promise<void> {
+  await requireAdministrator(condominiumId, requesterId);
+
+  const commonArea = await commonAreaOf(condominiumId, commonAreaId);
+  if (!commonArea) {
+    throw new ReservationError("commonArea");
+  }
+  if (!commonArea.isAvailable) {
+    throw new ReservationError("unavailable");
+  }
+
+  const today = todayLocalISODate();
+  const nowMinutes = minutesSinceMidnightLocal();
+  const ahead = SLOT_START_MINUTES.filter(
+    (startMinute) => !slotHasStarted(date, startMinute, today, nowMinutes)
+  );
+
+  if (ahead.length === 0) {
+    throw new ReservationError("nothingLeft");
+  }
+
+  const existing = await prisma.reservation.findMany({
+    where: { commonAreaId: commonAreaId, date: toDateColumn(date) },
+    select: { startMinute: true, reservedById: true },
+  });
+  const holderOf = new Map(
+    existing.map((row) => [row.startMinute, row.reservedById])
+  );
+
+  // Horário de outra pessoa que JÁ COMEÇOU não entra na conta: ninguém pode cancelá-lo, e a ação
+  // só fala dos horários que ainda estão à frente.
+  if (
+    ahead.some((startMinute) => {
+      const holder = holderOf.get(startMinute);
+      return holder !== undefined && holder !== requesterId;
+    })
+  ) {
+    throw new ReservationError("dayTaken");
+  }
+
+  const missing = ahead.filter((startMinute) => !holderOf.has(startMinute));
+  if (missing.length === 0) {
+    return;
+  }
+
+  try {
+    await prisma.reservation.createMany({
+      data: missing.map((startMinute) => ({
+        commonAreaId: commonAreaId,
+        reservedById: requesterId,
+        condominiumId: condominiumId,
+        date: toDateColumn(date),
+        startMinute: startMinute,
+        endMinute: endMinuteOf(startMinute),
+      })),
+    });
+  } catch (error) {
+    // Alguém reservou um dos horários no meio do caminho. O comando inteiro foi desfeito pelo
+    // banco, então a resposta é a mesma da leitura: há reservas neste dia.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new ReservationError("dayTaken");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Libera as reservas do próprio administrador naquele dia e local cujo horário ainda não começou.
+ *
+ * Nunca toca na reserva de outra pessoa, e nunca no que já começou — pelo mesmo motivo que
+ * `cancelReservation` recusa: não libera nada e apagaria o único registro de que o local foi
+ * usado. Funciona com o local desligado: cancelar nunca depende de disponibilidade (FR-007).
+ *
+ * É idempotente, e pode ser: diferente de `cancelReservation`, aqui não há um id cuja existência
+ * a resposta pudesse vazar.
+ */
+export async function releaseWholeDay(
+  condominiumId: string,
+  commonAreaId: string,
+  requesterId: string,
+  date: string
+): Promise<void> {
+  await requireAdministrator(condominiumId, requesterId);
+
+  const commonArea = await commonAreaOf(condominiumId, commonAreaId);
+  if (!commonArea) {
+    throw new ReservationError("commonArea");
+  }
+
+  const today = todayLocalISODate();
+  if (date < today) {
+    return;
+  }
+
+  await prisma.reservation.deleteMany({
+    where: {
+      commonAreaId: commonAreaId,
+      reservedById: requesterId,
+      date: toDateColumn(date),
+      // Num dia futuro todo horário está à frente; hoje, só os que ainda não começaram.
+      ...(date === today
+        ? { startMinute: { gt: minutesSinceMidnightLocal() } }
+        : {}),
+    },
+  });
 }

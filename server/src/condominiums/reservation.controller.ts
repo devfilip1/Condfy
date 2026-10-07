@@ -1,12 +1,18 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { validateMonth, validateNewReservation } from "./reservation.dto.ts";
+import {
+  validateDayParam,
+  validateMonth,
+  validateNewReservation,
+} from "./reservation.dto.ts";
 import {
   ReservationError,
   bookSlot,
   cancelReservation,
   listAvailability,
   listOwnReservations,
+  releaseWholeDay,
+  takeWholeDay,
 } from "./reservation.service.ts";
 
 /**
@@ -26,6 +32,13 @@ const MESSAGE_CANNOT_CANCEL =
   "Only the person who booked it or the condominium administrator can cancel a reservation.";
 const MESSAGE_ALREADY_STARTED =
   "That time has already started and cannot be cancelled.";
+const MESSAGE_AREA_UNAVAILABLE =
+  "This place is unavailable. Switch it on to book it.";
+const MESSAGE_ONLY_ADMIN_WHOLE_DAY =
+  "Only the condominium administrator can reserve a whole day.";
+const MESSAGE_DAY_HAS_BOOKINGS =
+  "This day already has bookings. Cancel them first to reserve the whole day.";
+const MESSAGE_NOTHING_LEFT = "No time of this day can still be booked.";
 
 /** `YYYY-MM` do mês corrente, para quando a query não informa nada. */
 function currentMonth(): string {
@@ -103,8 +116,94 @@ const reservationController: FastifyPluginAsync = async (app) => {
         if (error instanceof ReservationError) {
           // 409, e não 400 nem 404: o pedido estava bem formado e o horário existe. O que mudou foi
           // o estado do mundo entre ler a lista e confirmar (research R-005).
-          return error.reason === "taken"
-            ? reply.code(409).send({ message: MESSAGE_SLOT_TAKEN })
+          if (error.reason === "taken") {
+            return reply.code(409).send({ message: MESSAGE_SLOT_TAKEN });
+          }
+          // Só o administrador chega aqui: para os outros, local desligado é o 404 de sempre.
+          if (error.reason === "unavailable") {
+            return reply.code(409).send({ message: MESSAGE_AREA_UNAVAILABLE });
+          }
+          return reply.code(404).send({ message: MESSAGE_UNKNOWN_COMMON_AREA });
+        }
+        throw error;
+      }
+    }
+  );
+
+  // O dia inteiro é um recurso endereçado pelo dia: `PUT` faz o administrador tê-lo, `DELETE` faz
+  // ele não ter. As duas respondem 204 e as duas são idempotentes (research R-005 da 011).
+  app.put<{
+    Params: { condominiumId: string; commonAreaId: string; date: string };
+  }>(
+    "/:condominiumId/common-areas/:commonAreaId/whole-day/:date",
+    async (request, reply) => {
+      const result = validateDayParam(request.params.date, "bookable");
+      if (!result.ok) {
+        return reply.code(400).send({ errors: result.errors });
+      }
+
+      const requesterId = request.authUser?.id;
+      if (!requesterId) {
+        return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+      }
+
+      try {
+        await takeWholeDay(
+          request.params.condominiumId,
+          request.params.commonAreaId,
+          requesterId,
+          result.data.date
+        );
+        return reply.code(204).send();
+      } catch (error) {
+        if (error instanceof ReservationError) {
+          switch (error.reason) {
+            case "forbidden":
+              return reply.code(403).send({ message: MESSAGE_ONLY_ADMIN_WHOLE_DAY });
+            // Os três 409 são o mesmo tipo de recusa — o pedido estava certo e o estado do mundo
+            // não deixa — e em nenhum deles alguma coisa foi gravada.
+            case "dayTaken":
+              return reply.code(409).send({ message: MESSAGE_DAY_HAS_BOOKINGS });
+            case "nothingLeft":
+              return reply.code(409).send({ message: MESSAGE_NOTHING_LEFT });
+            case "unavailable":
+              return reply.code(409).send({ message: MESSAGE_AREA_UNAVAILABLE });
+            default:
+              return reply.code(404).send({ message: MESSAGE_UNKNOWN_COMMON_AREA });
+          }
+        }
+        throw error;
+      }
+    }
+  );
+
+  app.delete<{
+    Params: { condominiumId: string; commonAreaId: string; date: string };
+  }>(
+    "/:condominiumId/common-areas/:commonAreaId/whole-day/:date",
+    async (request, reply) => {
+      const result = validateDayParam(request.params.date, "any");
+      if (!result.ok) {
+        return reply.code(400).send({ errors: result.errors });
+      }
+
+      const requesterId = request.authUser?.id;
+      if (!requesterId) {
+        return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+      }
+
+      try {
+        await releaseWholeDay(
+          request.params.condominiumId,
+          request.params.commonAreaId,
+          requesterId,
+          result.data.date
+        );
+        return reply.code(204).send();
+      } catch (error) {
+        if (error instanceof ReservationError) {
+          return error.reason === "forbidden"
+            ? reply.code(403).send({ message: MESSAGE_ONLY_ADMIN_WHOLE_DAY })
             : reply.code(404).send({ message: MESSAGE_UNKNOWN_COMMON_AREA });
         }
         throw error;
