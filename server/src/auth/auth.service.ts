@@ -7,8 +7,13 @@ import {
   MAX_SIGNIN_ATTEMPTS,
   REFRESH_TOKEN_TTL_DAYS,
 } from "../lib/config.ts";
+import {
+  signedPhotoPathOf,
+  type MembershipCondominium,
+} from "../condominiums/condominium.service.ts";
 import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { prisma } from "../lib/prisma.ts";
+import { MANAGING_ROLES } from "../lib/roles.ts";
 import { generateRefreshToken, hashRefreshToken } from "../lib/tokens.ts";
 
 /**
@@ -354,10 +359,14 @@ export interface ProfileMembership {
    * `imageUrl` é a foto do condomínio, ou `null`. Vai AQUI, e não numa rota própria, de propósito:
    * o perfil parte dos vínculos de quem pediu, então não tem como trazer nome ou foto de um
    * condomínio alheio (feature 009, research R-001).
+   *
+   * Desde a feature 013 a foto tem duas origens possíveis: `imageUrl`, um endereço https, nos
+   * condomínios de exemplo; e `photoPath`, um caminho relativo e assinado, quando o síndico enviou
+   * uma. No máximo um dos dois vem preenchido, e o caminho é assinado de novo a cada leitura.
    */
-  condominium: { id: string; name: string; imageUrl: string | null };
+  condominium: MembershipCondominium;
   role: Role;
-  /** Vazia para quem tem vínculo sem morar em unidade alguma: síndico e portaria. */
+  /** Vazia para quem tem vínculo sem morar em unidade alguma: o administrador e o síndico. */
   units: ProfileUnit[];
 }
 
@@ -388,7 +397,11 @@ export async function getProfile(userId: string): Promise<Profile> {
       memberships: {
         select: {
           role: true,
-          condominium: { select: { id: true, name: true, imageUrl: true } },
+          // `photoContentType` diz se há foto enviada sem tocar nos bytes dela: `photo` NUNCA
+          // entra neste select (ADR 0012).
+          condominium: {
+            select: { id: true, name: true, imageUrl: true, photoContentType: true },
+          },
           residences: {
             select: {
               unit: { select: { id: true, block: true, number: true } },
@@ -410,7 +423,12 @@ export async function getProfile(userId: string): Promise<Profile> {
     name: row.name,
     email: row.email,
     memberships: row.memberships.map((membership) => ({
-      condominium: membership.condominium,
+      condominium: {
+        id: membership.condominium.id,
+        name: membership.condominium.name,
+        imageUrl: membership.condominium.imageUrl,
+        photoPath: signedPhotoPathOf(membership.condominium),
+      },
       role: membership.role,
       units: membership.residences.map((residence) => residence.unit),
     })),
@@ -591,7 +609,7 @@ export async function deleteAccount(
   const user = await verifyCurrentPassword(userId, data.currentPassword, origin);
 
   const administered = await prisma.condominiumMember.findFirst({
-    where: { userId: user.id, role: "admin" },
+    where: { userId: user.id, role: { in: MANAGING_ROLES } },
     select: { userId: true },
   });
   if (administered) {
