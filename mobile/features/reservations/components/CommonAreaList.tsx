@@ -16,14 +16,15 @@ import LoadingState from "@/shared/components/LoadingState";
  * garante que nenhuma situação renderize tela em branco (FR-010).
  */
 
-export const MESSAGE_NO_PLACES =
-  "This condominium has no places available for booking yet.";
+export const MESSAGE_NO_PLACES = "This condominium has no places to book yet.";
 export const MESSAGE_NO_CONDOMINIUM =
   "You are not linked to a condominium yet. Ask the manager to add you.";
 
 export interface CommonAreaListProps {
   state: CatalogueState;
   onSelect: (area: CommonArea) => void;
+  /** O endereço completo da foto de um local. Vem do hook, que é quem conhece o endereço da API. */
+  photoUriOf: (area: CommonArea) => string | null;
   onRetry: () => void;
   /**
    * O que vem embaixo dos locais, rolando junto com eles. Só aparece com o catálogo carregado: nos
@@ -44,6 +45,7 @@ export const styles = StyleSheet.create({
 export default function CommonAreaList({
   state,
   onSelect,
+  photoUriOf,
   onRetry,
   footer,
 }: CommonAreaListProps) {
@@ -58,15 +60,19 @@ export default function CommonAreaList({
       return <EmptyState message={MESSAGE_NO_CONDOMINIUM} />;
 
     case "ready":
-      // Lista vazia é "o condomínio não tem local disponível", nunca um erro — e é o mesmo que a
-      // pessoa vê quando todos estão desligados (FR-007a).
+      // Lista vazia é "o condomínio não tem local cadastrado", nunca um erro. Deixou de ser o que a
+      // pessoa vê quando todos estão desligados: local desligado continua na lista, apagado.
       return (
         <FlatList
           data={state.areas}
           keyExtractor={(area) => area.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <CommonAreaCard area={item} onPress={onSelect} />
+            <CommonAreaCard
+              area={item}
+              photoUri={photoUriOf(item)}
+              onPress={onSelect}
+            />
           )}
           ListEmptyComponent={<EmptyState message={MESSAGE_NO_PLACES} />}
           ListFooterComponent={footer}

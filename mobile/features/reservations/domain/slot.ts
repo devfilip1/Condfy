@@ -26,9 +26,11 @@ export const BOOKING_WINDOW_DAYS = 60;
 
 /**
  * `open` — livre, confirmar reserva.
- * `held` — ocupado E quem pediu pode cancelar. É o que torna o cancelamento alcançável (FR-012a).
+ * `held` — reservado por ESTA pessoa, que por isso pode cancelar (FR-012a). Vale para todo mundo,
+ * o administrador inclusive: a reserva de outra pessoa nunca chega aqui.
  *
- * Horário ocupado por OUTRA pessoa não chega em lista nenhuma: não vem no JSON (FR-012).
+ * Horário ocupado por OUTRA pessoa não chega nesta lista (FR-012): ele vem só em `booked`, como
+ * um horário sem dono.
  */
 export type SlotStatus = "open" | "held";
 
@@ -40,11 +42,30 @@ export interface Slot {
   reservationId?: string;
 }
 
+/** Um horário já reservado do local. O servidor não diz de quem é, em caso nenhum. */
+export interface BookedSlot {
+  startMinute: number;
+  endMinute: number;
+  /**
+   * Só vem quando esta pessoa pode cancelar a reserva POR ESTA LISTA: ela é o administrador, a
+   * reserva é de outra pessoa e o horário ainda não começou. Quem decide é o servidor; a tela só
+   * desenha um botão onde veio um id. Para um morador nunca vem.
+   */
+  reservationId?: string;
+}
+
 export interface DayAvailability {
   /** Dia de calendário `YYYY-MM-DD`. */
   date: string;
   /** Só o que dá para agir. Lista vazia é dia reservável sem nada livre — a bolinha vermelha. */
   slots: Slot[];
+  /** Todas as reservas do local neste dia, de qualquer pessoa, da mais cedo para a mais tarde. */
+  booked: BookedSlot[];
+  /**
+   * Só vem para o administrador. `true` quando todos os horários do dia que ainda não começaram são
+   * dele: é a posição do interruptor de dia inteiro, calculada no relógio do servidor.
+   */
+  wholeDayHeld?: boolean;
 }
 
 /** O local sendo reservado, como vem junto da disponibilidade (research R-009). */
@@ -55,10 +76,19 @@ export interface BookedCommonArea {
   usageFee: string;
   /** Endereço https da foto que abre a tela, ou `null` — a tela mostra o placeholder. */
   imageUrl: string | null;
+  /** Caminho relativo e assinado da foto enviada ao criar o local, ou `null`. */
+  photoPath: string | null;
+  /** `false` só chega ao administrador: para os outros, um local desligado nem abre esta tela. */
+  isAvailable: boolean;
 }
 
 export interface Availability {
   commonArea: BookedCommonArea;
+  /**
+   * Esta pessoa é o administrador do condomínio. É o que faz os dois interruptores existirem na
+   * tela — vem do servidor, não de uma comparação de cargo feita aqui.
+   */
+  canManage: boolean;
   /** `YYYY-MM` do mês pedido. */
   month: string;
   /**
@@ -125,12 +155,27 @@ function isSlot(value: unknown): value is Slot {
   );
 }
 
+function isBookedSlot(value: unknown): value is BookedSlot {
+  return (
+    isObject(value) &&
+    typeof value.startMinute === "number" &&
+    typeof value.endMinute === "number" &&
+    // Ausente é válido — é o caso de todo morador. Presente, tem de ser um id.
+    (value.reservationId === undefined ||
+      typeof value.reservationId === "string")
+  );
+}
+
 function isDayAvailability(value: unknown): value is DayAvailability {
   return (
     isObject(value) &&
     typeof value.date === "string" &&
     Array.isArray(value.slots) &&
-    value.slots.every(isSlot)
+    value.slots.every(isSlot) &&
+    Array.isArray(value.booked) &&
+    value.booked.every(isBookedSlot) &&
+    (value.wholeDayHeld === undefined ||
+      typeof value.wholeDayHeld === "boolean")
   );
 }
 
@@ -140,7 +185,9 @@ function isBookedCommonArea(value: unknown): value is BookedCommonArea {
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     typeof value.usageFee === "string" &&
-    (value.imageUrl === null || typeof value.imageUrl === "string")
+    (value.imageUrl === null || typeof value.imageUrl === "string") &&
+    (value.photoPath === null || typeof value.photoPath === "string") &&
+    typeof value.isAvailable === "boolean"
   );
 }
 
@@ -151,6 +198,7 @@ export function isAvailability(value: unknown): value is Availability {
   }
   return (
     isBookedCommonArea(value.commonArea) &&
+    typeof value.canManage === "boolean" &&
     typeof value.month === "string" &&
     Array.isArray(value.days) &&
     value.days.every(isDayAvailability)

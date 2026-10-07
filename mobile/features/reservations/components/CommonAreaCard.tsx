@@ -16,6 +16,11 @@ const IMAGE_SIZE = 72;
 
 export interface CommonAreaCardProps {
   area: CommonArea;
+  /**
+   * Endereço completo da foto, já montado por quem conhece o endereço da API, ou `null`. O card é
+   * puro: não sabe que a foto tem duas origens possíveis.
+   */
+  photoUri: string | null;
   onPress: (area: CommonArea) => void;
 }
 
@@ -53,28 +58,65 @@ const useStyles = makeStyles((colors) =>
       fontSize: 14,
       color: colors.textSecondary,
     },
+    // Apagado, mas não invisível: o local continua na lista de propósito (FR-011). Só a foto e os
+    // textos esmaecem — o rótulo abaixo fica com a cor cheia, porque é ele que explica.
+    muted: {
+      opacity: 0.45,
+    },
+    // A diferença não pode ser só de cor (FR-012): a palavra diz o que o esmaecido sugere.
+    unavailable: {
+      alignSelf: "flex-start",
+      marginTop: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: colors.chipBackground,
+    },
+    unavailableText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
   })
 );
 
-export default function CommonAreaCard({ area, onPress }: CommonAreaCardProps) {
+export default function CommonAreaCard({
+  area,
+  photoUri,
+  onPress,
+}: CommonAreaCardProps) {
   const styles = useStyles();
+  const unavailable = !area.isAvailable;
+
+  // O card de um local indisponível CONTINUA tocável: para o morador o toque explica por que não
+  // abre, para o administrador ele abre a tela onde o local é religado. Quem decide é a tela.
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(area)}
       accessibilityRole="button"
-      accessibilityLabel={`${area.name}, tax usage ${formatCurrency(area.usageFee)}`}
+      accessibilityLabel={`${area.name}, tax usage ${formatCurrency(area.usageFee)}${unavailable ? ", unavailable" : ""}`}
     >
-      <Photo uri={area.imageUrl} style={styles.image} />
+      {/* O `id` como chave de cache: o caminho de uma foto enviada é assinado e muda a cada carga. */}
+      <Photo
+        uri={photoUri}
+        cacheKey={area.id}
+        style={[styles.image, unavailable && styles.muted]}
+      />
 
       <View style={styles.texts}>
         {/* Duas linhas no máximo: nome comprido quebra sem empurrar a taxa para fora. */}
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={[styles.name, unavailable && styles.muted]} numberOfLines={2}>
           {area.name}
         </Text>
-        <Text style={styles.fee}>
+        <Text style={[styles.fee, unavailable && styles.muted]}>
           Tax usage: {formatCurrency(area.usageFee)}
         </Text>
+        {unavailable ? (
+          <View style={styles.unavailable}>
+            <Text style={styles.unavailableText}>Unavailable</Text>
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );

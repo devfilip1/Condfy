@@ -13,7 +13,13 @@ import {
   bookSlot as bookSlotOnServer,
   cancelReservation as cancelReservationOnServer,
   fetchAvailability,
+  releaseWholeDay,
+  takeWholeDay,
 } from "@/features/reservations/services/bookingService";
+import {
+  commonAreaPhotoUri,
+  setCommonAreaAvailability,
+} from "@/features/reservations/services/commonAreaService";
 import {
   CalendarMonth,
   monthOfISODate,
@@ -31,8 +37,10 @@ import {
  *
  * - *O que está livre.* Vem do servidor, que precisa da hora para saber quais horários de hoje já
  *   passaram — e o relógio dele é o que vai aceitar ou recusar a reserva (research R-004).
- * - *Quem pode liberar qual horário.* Chega como `status: "held"` com `reservationId`. Permissão não
- *   é coisa que a tela decide comparando ids (FR-012b).
+ * - *Quem pode fazer o quê.* Chega pronto: `status: "held"` com `reservationId` na reserva da
+ *   própria pessoa, `reservationId` nas reservas do dia que o administrador pode cancelar,
+ *   `canManage` e `wholeDayHeld` para os interruptores. Permissão não é coisa que a tela decide
+ *   comparando ids nem cargos (FR-012b).
  *
  * O que sobra para cá é o que a tela está fazendo agora: qual mês, qual dia, o que está em voo e
  * qual recusa mostrar.
@@ -51,7 +59,11 @@ export const MESSAGE_CONFLICT_FALLBACK =
 /** O que já está em voo. Impede um segundo toque no mesmo botão. */
 export type BookingBusy =
   | { kind: "booking"; startMinute: number }
-  | { kind: "cancelling"; reservationId: string };
+  | { kind: "cancelling"; reservationId: string }
+  /** As três ações do administrador. Nenhuma vira nada na tela antes de o servidor responder. */
+  | { kind: "switchingAvailability" }
+  | { kind: "takingDay" }
+  | { kind: "releasingDay" };
 
 /**
  * Os três estados são exaustivos e mutuamente exclusivos. É isso que torna a FR-010 verificável:
@@ -63,6 +75,13 @@ export type BookingState =
   | {
     status: "ready";
     commonArea: BookedCommonArea;
+    /** O endereço completo da foto do local, já resolvido entre as duas origens, ou `null`. */
+    photoUri: string | null;
+    /**
+     * Esta pessoa é o administrador do condomínio. COPIADO da resposta, nunca derivado: quem decide
+     * é o servidor, e a tela só mostra os interruptores quando isto veio `true`.
+     */
+    canManage: boolean;
     month: CalendarMonth;
     /** Indexado por dia. Dia ausente não é reservável — passado ou além da janela. */
     days: Map<string, DayAvailability>;
@@ -88,8 +107,15 @@ export interface UseBookingResult {
   selectSlot: (slot: Slot) => void;
   /** Reserva o horário escolhido. Sem escolha, não faz nada. */
   book: () => void;
-  /** Só faz sentido num horário `held`; num `open` não faz nada. */
-  cancel: (slot: Slot) => void;
+  /**
+   * Cancela a reserva que veio com `reservationId` — um horário `held` da própria pessoa, ou um das
+   * reservas do dia que o administrador pode cancelar. Sem id, não faz nada.
+   */
+  cancel: (target: { reservationId?: string }) => void;
+  /** Liga ou desliga o local. Só tem efeito para o administrador; o servidor é quem recusa. */
+  setAvailability: (isAvailable: boolean) => void;
+  /** Reserva (`true`) ou libera (`false`) o dia escolhido inteiro. Sem dia escolhido, não faz nada. */
+  setWholeDay: (held: boolean) => void;
   reload: () => void;
 }
 
@@ -97,8 +123,9 @@ function messageFor(error: unknown): string {
   if (error instanceof HttpError && error.type === "network") {
     return MESSAGE_OFFLINE;
   }
-  // Um 404 aqui é local inexistente, indisponível ou de outro condomínio — a API responde igual aos
-  // três de propósito, então a tela também diz uma coisa só.
+  // Um 404 aqui é local inexistente, de outro condomínio, ou indisponível para quem não é o
+  // administrador — a API responde igual aos três de propósito, então a tela também diz uma coisa
+  // só. É o que um morador vê se chegar por um link a um local que foi desligado.
   if (error instanceof HttpError && error.type === "server") {
     return MESSAGE_UNAVAILABLE;
   }
@@ -189,6 +216,8 @@ export function useBooking(): UseBookingResult {
         setState({
           status: "ready",
           commonArea: availability.commonArea,
+          photoUri: commonAreaPhotoUri(availability.commonArea),
+          canManage: availability.canManage,
           month: target,
           days: daysByDate(availability),
           selectedDate: keepDate,
@@ -350,23 +379,24 @@ export function useBooking(): UseBookingResult {
   /**
    * Libera o horário e recarrega o mês, pelo mesmo motivo de `book`: a bolinha do day muda junto.
    *
-   * Quem pode cancelar já foi decidido pelo servidor — o horário só chega como `held` para quem
-   * pode (FR-012b). Aqui não se compara identidade nenhuma.
+   * Quem pode cancelar já foi decidido pelo servidor — o `reservationId` só chega em quem pode: no
+   * horário `held` da própria pessoa e, para o administrador, nas reservas do dia que são de outra
+   * (FR-012b). Aqui não se compara identidade nenhuma, e um alvo sem id não faz nada.
    */
   const cancel = useCallback(
-    (slot: Slot) => {
+    (target: { reservationId?: string }) => {
       if (state.status !== "ready" || state.selectedDate === null || state.busy) {
         return;
       }
       if (selectedCondominiumId === null || !commonAreaId) {
         return;
       }
-      if (slot.status !== "held" || !slot.reservationId) {
+      if (!target.reservationId) {
         return;
       }
 
       const date = state.selectedDate;
-      const reservationId = slot.reservationId;
+      const reservationId = target.reservationId;
       setState({
         ...state,
         busy: { kind: "cancelling", reservationId: reservationId },
@@ -410,6 +440,100 @@ export function useBooking(): UseBookingResult {
     [state, selectedCondominiumId, commonAreaId, month, load]
   );
 
+  /**
+   * O caminho comum das três ações do administrador: marca o que está em voo, pede ao servidor e
+   * recarrega o mês mantendo o dia aberto.
+   *
+   * **Nada muda na tela antes da resposta.** Os interruptores leem o valor do state recarregado,
+   * então uma falha os deixa onde estavam sem código nenhum para voltá-los (research R-007).
+   *
+   * Num conflito a tela estava desatualizada — outra pessoa reservou naquele dia, ou o local foi
+   * desligado —, então recarrega junto com a message do servidor, como `book` faz.
+   */
+  const runAdminAction = useCallback(
+    (
+      busy: BookingBusy,
+      action: (condominiumId: string, areaId: string) => Promise<void>
+    ) => {
+      if (state.status !== "ready" || state.busy) {
+        return;
+      }
+      if (selectedCondominiumId === null || !commonAreaId) {
+        return;
+      }
+
+      const condominiumId = selectedCondominiumId;
+      const date = state.selectedDate;
+      setState({ ...state, busy: busy, notice: null });
+
+      void (async () => {
+        try {
+          await action(condominiumId, commonAreaId);
+          if (mounted.current) {
+            await load(condominiumId, commonAreaId, month, date);
+          }
+        } catch (error: unknown) {
+          if (!mounted.current) {
+            return;
+          }
+          const message = actionMessageFor(error);
+
+          if (error instanceof HttpError && error.type === "conflict") {
+            await load(condominiumId, commonAreaId, month, date);
+            if (mounted.current) {
+              setState((current) =>
+                current.status === "ready"
+                  ? { ...current, notice: message }
+                  : current
+              );
+            }
+            return;
+          }
+
+          setState((current) =>
+            current.status === "ready"
+              ? { ...current, busy: null, notice: message }
+              : current
+          );
+        }
+      })();
+    },
+    [state, selectedCondominiumId, commonAreaId, month, load]
+  );
+
+  const setAvailability = useCallback(
+    (isAvailable: boolean) => {
+      // Já está assim: nada a pedir. Evita um pedido quando o toque chega repetido.
+      if (
+        state.status !== "ready" ||
+        state.commonArea.isAvailable === isAvailable
+      ) {
+        return;
+      }
+      runAdminAction({ kind: "switchingAvailability" }, (condominiumId, areaId) =>
+        setCommonAreaAvailability(condominiumId, areaId, isAvailable)
+      );
+    },
+    [state, runAdminAction]
+  );
+
+  const setWholeDay = useCallback(
+    (held: boolean) => {
+      if (state.status !== "ready" || state.selectedDate === null) {
+        return;
+      }
+      const date = state.selectedDate;
+      runAdminAction(
+        { kind: held ? "takingDay" : "releasingDay" },
+        (condominiumId, areaId) =>
+          held
+            ? takeWholeDay(condominiumId, areaId, date)
+            : releaseWholeDay(condominiumId, areaId, date)
+      );
+    },
+    [state, runAdminAction]
+  );
+
   return {
     state,
     selectDay,
@@ -418,6 +542,8 @@ export function useBooking(): UseBookingResult {
     canGoToMonth,
     book,
     cancel,
+    setAvailability,
+    setWholeDay,
     reload,
   };
 }

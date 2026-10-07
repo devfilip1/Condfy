@@ -77,6 +77,45 @@ export async function bookSlot(
   );
 }
 
+function wholeDayPath(
+  condominiumId: string,
+  commonAreaId: string,
+  date: string
+): string {
+  return (
+    `/condominiums/${encodeURIComponent(condominiumId)}` +
+    `/common-areas/${encodeURIComponent(commonAreaId)}` +
+    `/whole-day/${encodeURIComponent(date)}`
+  );
+}
+
+/**
+ * Reserva o dia inteiro para o administrador: tudo o que ainda não começou, ou nada.
+ *
+ * Um `409` sobe como `HttpError("conflict")` com a message do servidor — há reservas de outra
+ * pessoa no dia, não sobrou horário, ou o local está desligado. Em nenhum deles algo foi gravado.
+ */
+export async function takeWholeDay(
+  condominiumId: string,
+  commonAreaId: string,
+  date: string
+): Promise<void> {
+  await request(wholeDayPath(condominiumId, commonAreaId, date), {
+    method: "PUT",
+  });
+}
+
+/** Libera as reservas do próprio administrador naquele dia. As dos outros não são tocadas. */
+export async function releaseWholeDay(
+  condominiumId: string,
+  commonAreaId: string,
+  date: string
+): Promise<void> {
+  await request(wholeDayPath(condominiumId, commonAreaId, date), {
+    method: "DELETE",
+  });
+}
+
 /**
  * Libera uma reserva. O registro é removido: não há cancelamento a consultar depois.
  *

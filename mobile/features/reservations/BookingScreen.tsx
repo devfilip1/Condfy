@@ -9,9 +9,11 @@ import {
   View,
 } from "react-native";
 
+import AdminSwitch from "@/features/reservations/components/AdminSwitch";
 import AvailabilityCalendar from "@/features/reservations/components/AvailabilityCalendar";
+import DayBookings from "@/features/reservations/components/DayBookings";
 import SlotGrid from "@/features/reservations/components/SlotGrid";
-import { Slot, slotLabel } from "@/features/reservations/domain/slot";
+import { slotLabel } from "@/features/reservations/domain/slot";
 import { useBooking } from "@/features/reservations/hooks/useBooking";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
@@ -26,8 +28,12 @@ import { formatCurrency } from "@/shared/lib/currency";
  * Tela de reserva de um local: apenas composição.
  * Todo o state vem do hook `useBooking` (constituição, Princípio I).
  *
- * De cima para baixo: a foto do local, o calendário, os horários do dia escolhido e, fixo no fim da
- * tela, o botão que conclui a reserva.
+ * De cima para baixo: a foto do local, o calendário, os horários livres do dia escolhido, os já
+ * reservados desse dia e, fixo no fim da tela, o botão que conclui a reserva.
+ *
+ * O administrador vê mais duas coisas, nos lugares que a spec da feature 011 pede: um interruptor
+ * ACIMA DE TUDO, que liga e desliga o local, e outro acima dos horários, que reserva o dia inteiro.
+ * Os dois existem quando `canManage` veio `true` do servidor — a tela não confere cargo.
  *
  * Sem `useAuth` aqui: leitura de state de sessão é do hook. O catálogo aprendeu isso quando o
  * `ModuleList` da home foi buscar o perfil por dentro.
@@ -57,6 +63,12 @@ const useStyles = makeStyles((colors) =>
       marginTop: 12,
       fontSize: 14,
       color: colors.textMuted,
+    },
+    availabilitySwitch: {
+      marginBottom: 16,
+    },
+    wholeDaySwitch: {
+      marginTop: 18,
     },
     footer: {
       paddingHorizontal: 20,
@@ -95,16 +107,29 @@ export default function BookingScreen() {
     canGoToMonth,
     book,
     cancel,
+    setAvailability,
+    setWholeDay,
     reload,
   } = useBooking();
-  /** Horário à espera da confirmação. O hook só é chamado depois do "sim". */
-  const [pendingCancel, setPendingCancel] = useState<Slot | null>(null);
+  /**
+   * Reserva à espera da confirmação. O hook só é chamado depois do "sim". Serve às duas origens —
+   * a pílula do próprio horário e, para o administrador, uma das reservas do dia — porque as duas
+   * são a mesma ação e pedem a mesma confirmação.
+   */
+  const [pendingCancel, setPendingCancel] = useState<{
+    startMinute: number;
+    endMinute: number;
+    reservationId?: string;
+  } | null>(null);
   const [confirmingBooking, setConfirmingBooking] = useState(false);
+  /** Para onde o interruptor de dia inteiro foi levado, à espera da confirmação. */
+  const [pendingWholeDay, setPendingWholeDay] = useState<boolean | null>(null);
 
-  const slots =
+  const selectedDay =
     state.status === "ready" && state.selectedDate !== null
-      ? (state.days.get(state.selectedDate)?.slots ?? [])
-      : [];
+      ? state.days.get(state.selectedDate)
+      : undefined;
+  const slots = selectedDay?.slots ?? [];
   const selectedSlot =
     state.status === "ready"
       ? (slots.find(
@@ -131,8 +156,26 @@ export default function BookingScreen() {
       {state.status === "ready" ? (
         <>
           <ScrollView contentContainerStyle={styles.content}>
+            {/*
+              Sem confirmação: desligar não apaga nada — as reservas ficam — e se desfaz com o mesmo
+              toque. O valor é o que o servidor confirmou por último; o interruptor só muda quando a
+              tela recarrega.
+            */}
+            {state.canManage ? (
+              <View style={styles.availabilitySwitch}>
+                <AdminSwitch
+                  title="Available for booking"
+                  description="While this is off, nobody can book this place. Existing bookings are kept."
+                  value={state.commonArea.isAvailable}
+                  onChange={setAvailability}
+                  disabled={state.busy !== null}
+                />
+              </View>
+            ) : null}
+
             <Photo
-              uri={state.commonArea.imageUrl}
+              uri={state.photoUri}
+              cacheKey={state.commonArea.id}
               style={styles.photo}
               iconSize={40}
               accessibilityLabel={`Photo of ${state.commonArea.name}`}
@@ -152,14 +195,43 @@ export default function BookingScreen() {
               canChangeMonth={canGoToMonth}
             />
 
+            {/*
+              Só com um dia escolhido: sem dia, não há o que o interruptor reservar. Com o local
+              desligado ele não liga — local desligado não aceita reserva de ninguém —, mas continua
+              podendo desligar, porque liberar nunca depende de disponibilidade.
+            */}
+            {state.canManage && selectedDay !== undefined ? (
+              <View style={styles.wholeDaySwitch}>
+                <AdminSwitch
+                  title="Reserve the whole day"
+                  description="Books every remaining time of this day in your name."
+                  value={selectedDay.wholeDayHeld ?? false}
+                  onChange={setPendingWholeDay}
+                  disabled={
+                    state.busy !== null ||
+                    (!state.commonArea.isAvailable && !selectedDay.wholeDayHeld)
+                  }
+                />
+              </View>
+            ) : null}
+
             <SlotGrid
               date={state.selectedDate}
               slots={slots}
               selectedStartMinute={state.selectedStartMinute}
               busy={state.busy}
               notice={state.notice}
+              unavailable={!state.commonArea.isAvailable}
               onSelect={selectSlot}
               onCancel={setPendingCancel}
+            />
+
+            {/* Sem `onCancel` para quem não é administrador: nenhuma pílula vira botão. */}
+            <DayBookings
+              date={state.selectedDate}
+              booked={selectedDay?.booked ?? []}
+              onCancel={state.canManage ? setPendingCancel : undefined}
+              busy={state.busy !== null}
             />
           </ScrollView>
 
@@ -233,6 +305,32 @@ export default function BookingScreen() {
           }
         }}
         onCancel={() => setPendingCancel(null)}
+      />
+
+      {/*
+        Ligar o dia inteiro cria reservas, desligar apaga — por isso os dois tons. Recuar aqui não
+        precisa "voltar" o interruptor: ele mostra o valor salvo e nunca saiu do lugar.
+      */}
+      <ConfirmDialog
+        visible={pendingWholeDay !== null}
+        message={
+          state.status !== "ready" ||
+          state.selectedDate === null ||
+          pendingWholeDay === null
+            ? ""
+            : pendingWholeDay
+              ? `Reserve every remaining time of ${state.commonArea.name} on ${toDisplayDate(state.selectedDate)}?`
+              : `Cancel all your bookings of ${state.commonArea.name} on ${toDisplayDate(state.selectedDate)}?\n\nThe times go back to being available for everyone.`
+        }
+        confirmLabel={pendingWholeDay ? "Reserve the day" : "Cancel bookings"}
+        tone={pendingWholeDay ? "neutral" : "destructive"}
+        onConfirm={() => {
+          if (pendingWholeDay !== null) {
+            setWholeDay(pendingWholeDay);
+            setPendingWholeDay(null);
+          }
+        }}
+        onCancel={() => setPendingWholeDay(null)}
       />
     </View>
   );

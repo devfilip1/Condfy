@@ -10,15 +10,16 @@ import { toDisplayDate } from "@/shared/lib/calendar";
  *
  * Puro: recebe dados e callbacks, não acessa serviço nem navegação (Princípio II).
  *
- * São quatro situações, e cada uma precisa ser distinguível — é o que torna a FR-010 e a SC-007
+ * São cinco situações, e cada uma precisa ser distinguível — é o que torna a FR-010 e a SC-007
  * verificáveis em vez de "olhar e ver": nenhum day escolhido ainda, day com horários, day sem nada
- * livre, e uma recusa acima da grade.
+ * livre, local indisponível, e uma recusa acima da grade.
  *
  * **Tocar numa pílula livre ESCOLHE, não reserva.** Quem reserva é o botão no fim da tela, depois de
- * uma confirmação. Já a pílula de um horário que esta pessoa segura continua sendo o caminho do
+ * uma confirmação. Já a pílula de um horário que esta pessoa reservou continua sendo o caminho do
  * cancelamento (FR-012a), e por isso tem aparência própria: ela não é uma opção a escolher.
  *
- * Horário ocupado por outra pessoa não chega aqui: o servidor não o manda (FR-012).
+ * Horário ocupado por outra pessoa não chega aqui, nem para o administrador: ele aparece só na
+ * seção de reservas do dia (`DayBookings`), que é de onde o administrador o cancela.
  */
 
 export interface SlotGridProps {
@@ -29,12 +30,18 @@ export interface SlotGridProps {
   selectedStartMinute: number | null;
   busy: BookingBusy | null;
   notice: string | null;
+  /**
+   * O local está desligado: nenhum horário é oferecido, e a mensagem diz por quê em vez de dizer
+   * que o dia está cheio. Só o administrador chega a ver isto — para os outros a tela nem abre.
+   */
+  unavailable?: boolean;
   onSelect: (slot: Slot) => void;
   onCancel: (slot: Slot) => void;
 }
 
 const MESSAGE_PICK_A_DAY = "Pick a day on the calendar to see its times.";
 const MESSAGE_DAY_FULL = "Every time of this day is taken.";
+const MESSAGE_UNAVAILABLE = "This place is unavailable. No time can be booked.";
 
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
@@ -120,6 +127,7 @@ export default function SlotGrid({
   selectedStartMinute,
   busy,
   notice,
+  unavailable = false,
   onSelect,
   onCancel,
 }: SlotGridProps) {
@@ -127,6 +135,12 @@ export default function SlotGrid({
   if (date === null) {
     return (
       <View style={styles.container}>
+        {/* Ligar ou desligar o local não precisa de dia escolhido, então a recusa cabe aqui também. */}
+        {notice !== null ? (
+          <View style={styles.notice} accessibilityRole="alert">
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        ) : null}
         <Text style={styles.hint}>{MESSAGE_PICK_A_DAY}</Text>
       </View>
     );
@@ -147,7 +161,9 @@ export default function SlotGrid({
       ) : null}
 
       {!hasOpenSlot ? (
-        <Text style={styles.hint}>{MESSAGE_DAY_FULL}</Text>
+        <Text style={styles.hint}>
+          {unavailable ? MESSAGE_UNAVAILABLE : MESSAGE_DAY_FULL}
+        </Text>
       ) : null}
 
       <View style={styles.grid}>

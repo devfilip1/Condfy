@@ -3,8 +3,8 @@
  *
  * Esta camada não importa React nem React Native (constituição, Princípio I).
  *
- * O nome do local vem junto de propósito: a lista mistura locais, e cruzar com o catálogo falharia
- * para um local que ficou indisponível depois da reserva — ele some do catálogo, a reserva não.
+ * O nome do local vem junto de propósito: a lista mistura locais, e assim ela não depende de o
+ * catálogo já ter sido carregado para dizer onde é cada reserva.
  */
 
 export interface OwnReservation {
