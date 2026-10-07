@@ -19,6 +19,11 @@ export interface Notice {
   body: string;
   /** Dia a que o aviso se refere, no formato ISO `YYYY-MM-DD`, sem horário. */
   date: string;
+  /**
+   * Quem publicou, pelo nome com que aparece no condomínio. O servidor já manda "Administrator" no
+   * lugar do nome pessoal de quem administra — a tela só mostra o que veio.
+   */
+  publishedBy: { name: string };
 }
 
 /** O que o formulário envia. `publishedById` não existe aqui: vem do token no servidor. */
@@ -88,7 +93,9 @@ export function isNotice(value: unknown): value is Notice {
     typeof value.id === "string" &&
     typeof value.title === "string" &&
     typeof value.body === "string" &&
-    typeof value.date === "string"
+    typeof value.date === "string" &&
+    isObject(value.publishedBy) &&
+    typeof value.publishedBy.name === "string"
   );
 }
 

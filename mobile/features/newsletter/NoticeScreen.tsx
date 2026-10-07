@@ -66,7 +66,9 @@ export default function NoticeScreen() {
       {notice ? (
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.title}>{notice.title}</Text>
-          <Text style={styles.date}>{toDisplayDate(notice.date)}</Text>
+          <Text style={styles.date}>
+            {toDisplayDate(notice.date)} · Published by {notice.publishedBy.name}
+          </Text>
           {/*
             Sem `numberOfLines`: aqui o texto vai inteiro. As quebras de linha do corpo são
             renderizadas como quebras, que é o que preserva os parágrafos (FR-002).

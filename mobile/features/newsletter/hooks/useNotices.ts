@@ -72,7 +72,7 @@ function sortNewestFirst(list: Notice[]): Notice[] {
 }
 
 export function useNotices(): UseNoticesResult {
-  const { profile, selectedCondominiumId, isAdminOfSelectedCondominium } =
+  const { profile, selectedCondominiumId, managesSelectedCondominium } =
     useAuth();
   const [state, setState] = useState<BoardState>({ status: "loading" });
   const [formOpen, setFormOpen] = useState(false);
@@ -91,7 +91,7 @@ export function useNotices(): UseNoticesResult {
 
   // A conta de "é administrador deste condomínio" mora no contexto de autenticação desde o segundo
   // uso (feature 008); aqui ela só ganha o nome que esta tela usa.
-  const canPublish = isAdminOfSelectedCondominium;
+  const canPublish = managesSelectedCondominium;
 
   // O condomínio em exibição vem do contexto de autenticação; aqui só sobra reagir ao perfil.
   useEffect(() => {

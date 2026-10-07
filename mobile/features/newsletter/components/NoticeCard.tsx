@@ -5,7 +5,7 @@ import { makeStyles } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
- * Card de um aviso: título, as primeiras duas linhas do conteúdo e a data.
+ * Card de um aviso: título, as primeiras duas linhas do conteúdo, a data e quem publicou.
  *
  * Componente puro: recebe dados e callback por props (constituição, Princípio II).
  *
@@ -51,6 +51,11 @@ const useStyles = makeStyles((colors) =>
       lineHeight: 20,
       color: colors.textMuted,
     },
+    publishedBy: {
+      marginTop: 2,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
   })
 );
 
@@ -61,7 +66,7 @@ export default function NoticeCard({ notice, onPress }: NoticeCardProps) {
       style={styles.card}
       onPress={() => onPress(notice)}
       accessibilityRole="button"
-      accessibilityLabel={`${notice.title}, ${toDisplayDate(notice.date)}`}
+      accessibilityLabel={`${notice.title}, ${toDisplayDate(notice.date)}, published by ${notice.publishedBy.name}`}
     >
       <View style={styles.header}>
         {/* Título em até duas linhas: um título longo quebra em vez de empurrar a data para fora. */}
@@ -77,6 +82,10 @@ export default function NoticeCard({ notice, onPress }: NoticeCardProps) {
       */}
       <Text style={styles.preview} numberOfLines={2} ellipsizeMode="tail">
         {previewOf(notice.body)}
+      </Text>
+
+      <Text style={styles.publishedBy} numberOfLines={1} ellipsizeMode="tail">
+        Published by {notice.publishedBy.name}
       </Text>
     </TouchableOpacity>
   );
