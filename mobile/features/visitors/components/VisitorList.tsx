@@ -8,6 +8,8 @@ export interface VisitorListProps {
   /** Já ordenados pelo hook `useVisitors` — este componente não reordena. */
   visitors: Visitor[];
   onRemove: (visitor: Visitor) => void;
+  /** Tocar num card abre o comprovante daquela visita, quando ela tem um. */
+  onOpenPass: (visitor: Visitor) => void;
 }
 
 export const styles = StyleSheet.create({
@@ -24,6 +26,7 @@ export const styles = StyleSheet.create({
 export default function VisitorList({
   visitors,
   onRemove,
+  onOpenPass,
 }: VisitorListProps) {
   return (
     <FlatList
@@ -32,7 +35,11 @@ export default function VisitorList({
       data={visitors}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <VisitorCard visitor={item} onRemove={onRemove} />
+        <VisitorCard
+          visitor={item}
+          onRemove={onRemove}
+          onOpenPass={onOpenPass}
+        />
       )}
       ListEmptyComponent={
         <EmptyState message="No visitors yet. Add the first one to get started." />

@@ -27,8 +27,13 @@ import {
 export interface VisitorFormModalProps {
   visible: boolean;
   errors: FormErrors;
-  /** Unidades onde a pessoa mora. Vazia impede registrar visitante. */
+  /**
+   * As unidades entre as quais escolher: onde a pessoa mora ou, para o administrador, todas as do
+   * condomínio. Vazia impede registrar visitante.
+   */
   units: VisitorUnit[];
+  /** O que dizer com `units` vazia. Vem de quem sabe o motivo — o formulário não conhece cargo. */
+  unitsHint: string;
   /** Envio em andamento: o botão de submit fica desativado (FR-010). */
   submitting: boolean;
   /** Falha que não é de um field específico (rede ou servidor). */
@@ -173,6 +178,7 @@ export default function VisitorFormModal({
   visible,
   errors,
   units,
+  unitsHint,
   submitting,
   submitError,
   onSubmit,
@@ -300,9 +306,7 @@ export default function VisitorFormModal({
                   })}
                 </View>
                 {units.length === 0 ? (
-                  <Text style={styles.error}>
-                    You do not live in any unit, so you cannot register a visitor.
-                  </Text>
+                  <Text style={styles.error}>{unitsHint}</Text>
                 ) : null}
                 {errors.unitId ? (
                   <Text style={styles.error}>{errors.unitId}</Text>

@@ -8,6 +8,7 @@ import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
 import VisitorFormModal from "@/features/visitors/components/VisitorFormModal";
 import VisitorList from "@/features/visitors/components/VisitorList";
+import VisitorPassModal from "@/features/visitors/components/VisitorPassModal";
 import { makeStyles } from "@/shared/theme";
 import {
   MESSAGE_LOAD_FAILED,
@@ -43,9 +44,16 @@ export default function VisitorsScreen() {
     closeForm,
     addVisitor,
     units,
+    unitsHint,
     requestRemoval,
     cancelRemoval,
     confirmRemoval,
+    openPass,
+    showPass,
+    closePass,
+    sharePass,
+    sharing,
+    shareNotice,
   } = useVisitors();
 
   return (
@@ -60,7 +68,11 @@ export default function VisitorsScreen() {
       )}
       {list.status === "ready" && (
         <>
-          <VisitorList visitors={list.visitors} onRemove={requestRemoval} />
+          <VisitorList
+            visitors={list.visitors}
+            onRemove={requestRemoval}
+            onOpenPass={showPass}
+          />
           <AddButton onPress={openForm} />
         </>
       )}
@@ -68,10 +80,22 @@ export default function VisitorsScreen() {
         visible={formOpen}
         errors={formErrors}
         units={units}
+        unitsHint={unitsHint}
         submitting={submitting}
         submitError={submitError}
         onSubmit={addVisitor}
         onCancel={closeForm}
+      />
+      {/*
+        O comprovante de liberação. Abre sozinho quando um visitante é cadastrado e de novo ao tocar
+        no card — só para quem autorizou a visita, que é quem recebe o código dela.
+      */}
+      <VisitorPassModal
+        pass={openPass}
+        sharing={sharing}
+        notice={shareNotice}
+        onShare={sharePass}
+        onClose={closePass}
       />
       <ConfirmDialog
         visible={pendingRemoval !== null}

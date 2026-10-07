@@ -1,23 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { makeStyles, useTheme } from "@/shared/theme";
 import {
   VisitType,
   Visitor,
-  VisitorUnit,
+  unitDescription,
 } from "@/features/visitors/domain/visitor";
 import { toDisplayDate } from "@/shared/lib/calendar";
-
-/** `A101`, ou só `101` em condomínio sem blocos. */
-function unitLabel(unit: VisitorUnit): string {
-  return unit.block === null ? unit.number : `${unit.block}${unit.number}`;
-}
 
 export interface VisitorCardProps {
   visitor: Visitor;
   /** Apenas notifica a intenção de remover — a exclusão e a confirmação são de quem consome. */
   onRemove: (visitor: Visitor) => void;
+  /**
+   * Tocar no card abre o comprovante da visita. Só vale numa visita que veio com `passCode` — isto
+   * é, que esta pessoa autorizou. Nas outras o card não é tocável.
+   */
+  onOpenPass?: (visitor: Visitor) => void;
 }
 
 /** Rótulos de interface em inglês para os valores de domínio em português (D-005). */
@@ -62,7 +68,17 @@ const useStyles = makeStyles((colors) =>
       fontSize: 12,
       color: colors.textSecondary,
     },
+    content: {
+      gap: 10,
+    },
+    // Espaço reservado para a lixeira, que fica POR CIMA do conteúdo e não dentro dele.
+    containerUpSideWithRemove: {
+      paddingRight: 44,
+    },
     removeButton: {
+      position: "absolute",
+      top: 28,
+      right: 14,
       padding: 6,
     },
     footer: {
@@ -72,11 +88,20 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 10,
     },
-    authorizedBy: {
+    // Quem liberou e para onde, em duas linhas: numa lista com as visitas do condomínio inteiro —
+    // a do administrador — é isto que diz de quem é cada uma, e uma linha só cortava o nome.
+    authorization: {
       flex: 1,
       minWidth: 0,
+      gap: 2,
+    },
+    authorizedBy: {
       fontSize: 12,
       color: colors.textPrimary,
+    },
+    unit: {
+      fontSize: 12,
+      color: colors.textMuted,
     },
     date: {
       fontSize: 12,
@@ -86,13 +111,26 @@ const useStyles = makeStyles((colors) =>
   })
 );
 
-/** Card de um visitor, com controle de remoção sempre visível (FR-002, FR-010). */
-export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
+/** Card de um visitor, com o controle de remoção visível para quem o autorizou (FR-002, FR-010). */
+export default function VisitorCard({
+  visitor,
+  onRemove,
+  onOpenPass,
+}: VisitorCardProps) {
   const styles = useStyles();
   const { colors } = useTheme();
-  return (
-    <View style={styles.container}>
-      <View style={styles.containerUpSide}>
+  // O card abre o comprovante quando a visita veio com o código — o servidor só o manda a quem a
+  // autorizou. Este componente não confere quem é quem.
+  const opensPass = onOpenPass !== undefined && visitor.passCode !== undefined;
+
+  const content = (
+    <View style={styles.content}>
+      <View
+        style={[
+          styles.containerUpSide,
+          visitor.canRemove && styles.containerUpSideWithRemove,
+        ]}
+      >
         <Ionicons
           name="person-circle-outline"
           size={50}
@@ -104,6 +142,46 @@ export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
           </Text>
           <Text style={styles.role}>{TYPE_LABELS[visitor.type]}</Text>
         </View>
+      </View>
+      <View style={styles.footer}>
+        <View style={styles.authorization}>
+          <Text style={styles.authorizedBy} numberOfLines={1} ellipsizeMode="tail">
+            Authorized by {visitor.authorizedBy.name}
+          </Text>
+          <Text style={styles.unit} numberOfLines={1} ellipsizeMode="tail">
+            {unitDescription(visitor.unit)}
+          </Text>
+        </View>
+        <Text style={styles.date}>
+          {toDisplayDate(visitor.expectedDate)}
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {opensPass ? (
+        <Pressable
+          onPress={() => onOpenPass(visitor)}
+          accessibilityRole="button"
+          accessibilityLabel={`${visitor.name}, ${TYPE_LABELS[visitor.type]}, ${toDisplayDate(visitor.expectedDate)}`}
+          accessibilityHint="Opens the pass"
+        >
+          {content}
+        </Pressable>
+      ) : (
+        content
+      )}
+
+      {/*
+        Só quem autorizou a visita a remove. O administrador vê as de todo mundo, mas nas dos
+        outros não há lixeira nenhuma, nem desabilitada — e o servidor recusa de qualquer jeito.
+
+        A lixeira é IRMÃ da área tocável, por cima dela, e não filha: um botão dentro de outro é
+        HTML inválido na web, e no aparelho o toque na lixeira abriria o comprovante junto.
+      */}
+      {visitor.canRemove ? (
         <TouchableOpacity
           style={styles.removeButton}
           onPress={() => onRemove(visitor)}
@@ -112,15 +190,7 @@ export default function VisitorCard({ visitor, onRemove }: VisitorCardProps) {
         >
           <Ionicons name="trash-outline" size={22} color={colors.danger} />
         </TouchableOpacity>
-      </View>
-      <View style={styles.footer}>
-        <Text style={styles.authorizedBy} numberOfLines={1} ellipsizeMode="tail">
-          {unitLabel(visitor.unit)} · authorized by {visitor.authorizedBy.name}
-        </Text>
-        <Text style={styles.date}>
-          {toDisplayDate(visitor.expectedDate)}
-        </Text>
-      </View>
+      ) : null}
     </View>
   );
 }

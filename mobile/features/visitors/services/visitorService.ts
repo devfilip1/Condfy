@@ -1,8 +1,10 @@
 import {
   NewVisitor,
   Visitor,
+  VisitorUnit,
   isVisitorList,
   isVisitor,
+  isVisitorUnitList,
 } from "@/features/visitors/domain/visitor";
 import { HttpError, request } from "@/features/auth";
 
@@ -14,7 +16,28 @@ import { HttpError, request } from "@/features/auth";
  * input, não ordena e não gera text de interface.
  */
 
-/** Lista de visitors, na ordem do servidor (data prevista, depois ordem de criação). */
+/**
+ * Todas as unidades de um condomínio, para o seletor do formulário DO ADMINISTRADOR. Ele não mora
+ * em unidade nenhuma, então o perfil dele não traz de onde escolher. Para qualquer outra pessoa o
+ * servidor responde `403`.
+ */
+export async function listCondominiumUnits(
+  condominiumId: string
+): Promise<VisitorUnit[]> {
+  const response = await request(
+    `/condominiums/${encodeURIComponent(condominiumId)}/units`
+  );
+  if (!isVisitorUnitList(response)) {
+    throw new HttpError("server", response);
+  }
+  return response;
+}
+
+/**
+ * Lista de visitors, na ordem do servidor (data prevista, depois ordem de criação). Só vêm os que
+ * esta pessoa pode ver: todos os do condomínio para o administrador, e só os que ela mesma
+ * autorizou para a moradora.
+ */
 export async function listVisitors(): Promise<Visitor[]> {
   const response = await request("/visitors");
   if (!isVisitorList(response)) {
