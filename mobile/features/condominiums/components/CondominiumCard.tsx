@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { ProfileMembership } from "@/features/auth";
+import { ProfileMembership, condominiumPhotoUri } from "@/features/auth";
 import {
   roleLabel,
   unitsLine,
@@ -114,7 +114,17 @@ export default function CondominiumCard({
       accessibilityLabel={label}
       accessibilityState={{ selected: current }}
     >
-      <Photo uri={condominium.imageUrl} style={styles.photo} iconSize={40} />
+      {/*
+        A foto vem de `condominiumPhotoUri`, que resolve as duas origens possíveis. O caminho de
+        uma foto enviada é assinado e muda a cada carga do perfil; o `id` como chave de cache é o
+        que impede baixar a mesma imagem de novo.
+      */}
+      <Photo
+        uri={condominiumPhotoUri(condominium)}
+        cacheKey={condominium.id}
+        style={styles.photo}
+        iconSize={40}
+      />
 
       <View style={styles.body}>
         <View style={styles.heading}>

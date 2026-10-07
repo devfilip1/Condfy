@@ -28,7 +28,15 @@ function Navegacao() {
 
   const status = state.status;
   const emTelaPublica = segmentos[0] === "(auth)";
-  const naEscolha = segmentos[0] === "choose-condominium";
+  /**
+   * A tela de escolha E a de criar um condomínio: quem ainda não escolheu pode ir de uma para a
+   * outra. Sem a segunda aqui, o botão "Create a condominium" da própria tela de escolha seria
+   * devolvido para ela pelo redirecionamento abaixo (feature 013). Continua exigindo sessão: quem
+   * não entrou é mandado para a tela de entrada antes de chegar neste teste.
+   */
+  const naEscolha =
+    segmentos[0] === "choose-condominium" ||
+    segmentos[0] === "create-condominium";
 
   /** Falta escolher, ou o perfil nem carregou para saber se falta: só a tela de escolha serve. */
   const deveEscolher =

@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import CondominiumCardList from "@/features/condominiums/components/CondominiumCardList";
@@ -40,6 +41,7 @@ export default function ChooseCondominiumScreen() {
         onChoose={choose}
         onRetry={retry}
         onSignOut={signOut}
+        onCreate={() => router.push("/create-condominium")}
       />
     </View>
   );

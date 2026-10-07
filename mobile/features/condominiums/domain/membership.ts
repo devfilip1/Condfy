@@ -21,6 +21,9 @@ export function roleLabel(role: Role): string | null {
   switch (role) {
     case "admin":
       return "Administrator";
+    // O síndico tem a palavra DELE: são dois cargos, e o card diz qual (FR-027 da 013).
+    case "manager":
+      return "Manager";
     case "resident":
       return null;
   }
@@ -28,7 +31,7 @@ export function roleLabel(role: Role): string | null {
 
 /**
  * Onde a pessoa mora naquele condomínio: `Unit A-101`, `Units A-101, A-102`, ou `null` para quem
- * tem vínculo sem morar em unidade nenhuma — o administrador.
+ * tem vínculo sem morar em unidade nenhuma — o administrador e o síndico.
  */
 export function unitsLine(units: readonly ProfileUnit[]): string | null {
   if (units.length === 0) {

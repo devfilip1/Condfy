@@ -29,6 +29,8 @@ export interface CondominiumCardListProps {
   onChoose: (condominiumId: string) => void;
   onRetry: () => void;
   onSignOut: () => void;
+  /** Abre a criação de um condomínio: quem já pertence a algum cria outro por aqui. */
+  onCreate: () => void;
 }
 
 const useStyles = makeStyles((colors) =>
@@ -63,6 +65,23 @@ const useStyles = makeStyles((colors) =>
       fontWeight: "bold",
       color: colors.textOnAccent,
     },
+    footer: {
+      gap: 4,
+    },
+    create: {
+      height: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.cardBackground,
+    },
+    createText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
     signOut: {
       alignSelf: "center",
       paddingVertical: 12,
@@ -80,6 +99,7 @@ export default function CondominiumCardList({
   onChoose,
   onRetry,
   onSignOut,
+  onCreate,
 }: CondominiumCardListProps) {
   const styles = useStyles();
   switch (state.status) {
@@ -117,13 +137,23 @@ export default function CondominiumCardList({
             />
           )}
           ListFooterComponent={
-            <TouchableOpacity
-              onPress={onSignOut}
-              accessibilityRole="button"
-              style={styles.signOut}
-            >
-              <Text style={styles.signOutText}>Sign out</Text>
-            </TouchableOpacity>
+            <View style={styles.footer}>
+              {/* Discreto, abaixo dos cards: escolher um condomínio é a ação principal desta tela. */}
+              <TouchableOpacity
+                onPress={onCreate}
+                accessibilityRole="button"
+                style={styles.create}
+              >
+                <Text style={styles.createText}>Create a condominium</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onSignOut}
+                accessibilityRole="button"
+                style={styles.signOut}
+              >
+                <Text style={styles.signOutText}>Sign out</Text>
+              </TouchableOpacity>
+            </View>
           }
         />
       );
