@@ -1,4 +1,7 @@
+import type { Role } from "../../generated/prisma/enums.ts";
+import { displayNameOf } from "../lib/displayName.ts";
 import { prisma } from "../lib/prisma.ts";
+import { managesCondominium } from "../lib/roles.ts";
 
 /**
  * Regras e acesso a dados dos avisos de um condomínio.
@@ -20,6 +23,12 @@ export interface Notice {
   body: string;
   /** Dia de calendário `YYYY-MM-DD`, sem horário e sem fuso. */
   date: string;
+  /**
+   * Quem publicou, pelo nome com que aparece no condomínio: "Administrator" enquanto for o
+   * administrador, o nome da pessoa se deixou de ser. Só o nome — o id de quem publicou continua
+   * sem sair daqui.
+   */
+  publishedBy: { name: string };
 }
 
 /**
@@ -48,12 +57,27 @@ export interface NewNotice {
   date: string;
 }
 
-/** Converte a row para o contrato. `publishedById` nunca sai daqui (FR-004). */
+/** As colunas e a relação que `toNotice` precisa, num lugar só para as duas consultas. */
+const NOTICE_COLUMNS = {
+  id: true,
+  title: true,
+  body: true,
+  date: true,
+  publishedBy: { select: { role: true, user: { select: { name: true } } } },
+} as const;
+
+/**
+ * Converte a row para o contrato.
+ *
+ * Até a feature de nomes por cargo, quem publicou era gravado e nunca mostrado (FR-004). Agora o
+ * NOME aparece; `publishedById` continua sem sair daqui.
+ */
 function toNotice(row: {
   id: string;
   title: string;
   body: string;
   date: Date;
+  publishedBy: { role: Role; user: { name: string } };
 }): Notice {
   return {
     id: row.id,
@@ -61,6 +85,12 @@ function toNotice(row: {
     body: row.body,
     // A coluna é `DATE`; ler em UTC devolve sempre o dia gravado (research R-007 da 002).
     date: row.date.toISOString().slice(0, 10),
+    publishedBy: {
+      name: displayNameOf({
+        role: row.publishedBy.role,
+        name: row.publishedBy.user.name,
+      }),
+    },
   };
 }
 
@@ -68,7 +98,7 @@ function toNotice(row: {
 async function membershipOf(
   condominiumId: string,
   userId: string
-): Promise<{ role: string } | null> {
+): Promise<{ role: Role } | null> {
   return prisma.condominiumMember.findUnique({
     where: { userId_condominiumId: { userId: userId, condominiumId: condominiumId } },
     select: { role: true },
@@ -93,7 +123,7 @@ export async function listNotices(
 
   const rows = await prisma.notice.findMany({
     where: { condominiumId: condominiumId },
-    select: { id: true, title: true, body: true, date: true },
+    select: NOTICE_COLUMNS,
     orderBy: [{ date: "desc" }, { id: "desc" }],
   });
 
@@ -117,7 +147,7 @@ export async function publishNotice(
   if (!membership) {
     throw new NoticeError("condominium");
   }
-  if (membership.role !== "admin") {
+  if (!managesCondominium(membership.role)) {
     throw new NoticeError("forbidden");
   }
 
@@ -130,7 +160,7 @@ export async function publishNotice(
       // Meia-noite UTC para a coluna DATE guardar exatamente o dia informado.
       date: new Date(`${data.date}T00:00:00.000Z`),
     },
-    select: { id: true, title: true, body: true, date: true },
+    select: NOTICE_COLUMNS,
   });
 
   return toNotice(row);

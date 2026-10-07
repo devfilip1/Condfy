@@ -19,8 +19,17 @@ import {
 /** Mesma recusa para unidade inexistente e para unidade de condomínio alheio. */
 const MESSAGE_UNKNOWN_UNIT = "Select a unit.";
 
+const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
+
 const visitorController: FastifyPluginAsync = async (app) => {
-  app.get("/", async () => listVisitors());
+  // De quem são as visitas vem do token: o que cada cargo alcança é decidido no service.
+  app.get("/", async (request, reply) => {
+    const requesterId = request.authUser?.id;
+    if (!requesterId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+    return listVisitors(requesterId);
+  });
 
   app.post("/", async (request, reply) => {
     const result = validateNewVisitor(request.body);
@@ -32,7 +41,7 @@ const visitorController: FastifyPluginAsync = async (app) => {
     // que `authUser` existe; a checagem é só para o compilador.
     const authorizedById = request.authUser?.id;
     if (!authorizedById) {
-      return reply.code(401).send({ message: "Your session has expired. Sign in again." });
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
     }
 
     try {
@@ -48,7 +57,14 @@ const visitorController: FastifyPluginAsync = async (app) => {
   });
 
   app.delete<{ Params: { id: string } }>("/:id", async (request, reply) => {
-    await removeVisitor(request.params.id);
+    const requesterId = request.authUser?.id;
+    if (!requesterId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    // 204 também para a visita que esta pessoa não alcança: nada é apagado, e a resposta não
+    // revela que ela existe.
+    await removeVisitor(request.params.id, requesterId);
     return reply.code(204).send();
   });
 };

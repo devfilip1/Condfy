@@ -1,6 +1,7 @@
-import type { FoundItemStatus } from "../../generated/prisma/enums.ts";
+import type { FoundItemStatus, Role } from "../../generated/prisma/enums.ts";
 import type { ImageContentType } from "../lib/imageType.ts";
 import { prisma } from "../lib/prisma.ts";
+import { managesCondominium } from "../lib/roles.ts";
 import { signPath } from "../lib/signedPath.ts";
 
 /**
@@ -109,7 +110,7 @@ function toFoundItem(row: {
 async function membershipOf(
   condominiumId: string,
   userId: string
-): Promise<{ role: string } | null> {
+): Promise<{ role: Role } | null> {
   return prisma.condominiumMember.findUnique({
     where: { userId_condominiumId: { userId: userId, condominiumId: condominiumId } },
     select: { role: true },
@@ -190,7 +191,7 @@ export async function postFoundItem(
   if (!membership) {
     throw new FoundItemError("condominium");
   }
-  if (membership.role !== "admin") {
+  if (!managesCondominium(membership.role)) {
     throw new FoundItemError("forbidden");
   }
 
@@ -241,7 +242,7 @@ export async function changeFoundItemStatus(
   if (!membership) {
     throw new FoundItemError("item");
   }
-  if (membership.role !== "admin") {
+  if (!managesCondominium(membership.role)) {
     throw new FoundItemError("forbidden");
   }
 

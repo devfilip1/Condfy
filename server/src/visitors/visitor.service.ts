@@ -1,5 +1,7 @@
-import type { VisitType } from "../../generated/prisma/enums.ts";
+import type { Role, VisitType } from "../../generated/prisma/enums.ts";
+import { displayNameOf } from "../lib/displayName.ts";
 import { prisma } from "../lib/prisma.ts";
+import { MANAGING_ROLES } from "../lib/roles.ts";
 import type { NewVisitor } from "./visitor.dto.ts";
 
 /**
@@ -28,6 +30,12 @@ export interface VisitorUnit {
 export interface VisitorAuthorizer {
   id: string;
   name: string;
+  /**
+   * O cargo de quem autorizou, no condomínio da visita, AGORA — o mesmo instante para o qual `name`
+   * é calculado. É o que deixa o comprovante dizer "Resident …" ou "Administrator" sem o app
+   * adivinhar o cargo pelo nome.
+   */
+  role: Role;
 }
 
 /** Visitor no formato do contrato JSON: os mesmos campos e nomes do app. */
@@ -40,6 +48,19 @@ export interface Visitor {
   condominiumId: string;
   unit: VisitorUnit;
   authorizedBy: VisitorAuthorizer;
+  /**
+   * Quem pediu pode remover esta visita: foi ele quem a autorizou. Para o administrador é `false`
+   * em toda visita de outra pessoa — ele a vê, mas não a apaga. A tela só desenha a lixeira onde
+   * isto vem `true`; permissão não é coisa que ela decide comparando ids.
+   */
+  canRemove: boolean;
+  /**
+   * O código do comprovante desta visita. Presente EXATAMENTE quando quem pediu a autorizou — a
+   * mesma condição de `canRemove` —, e ausente nos outros casos, em vez de `null`. O administrador
+   * vê as visitas de todo mundo, mas o código das que não liberou não chega a ele: quem não poderia
+   * ter gerado o comprovante não o recebe (research R-007 da 012).
+   */
+  passCode?: string;
 }
 
 /** Motivo da recusa que o controller traduz em status code. */
@@ -55,10 +76,15 @@ export class VisitorError extends Error {
   }
 }
 
-/** Tudo que `toVisitor` precisa das relações, num lugar só. */
+/** Tudo que `toVisitor` precisa além das colunas básicas, num lugar só para as duas consultas. */
 const WITH_RELATIONS = {
+  // Sempre lido; se SAI na resposta é `toVisitor` que decide, olhando quem pediu.
+  passCode: true,
   unit: { select: { id: true, block: true, number: true } },
-  authorizedBy: { select: { userId: true, user: { select: { name: true } } } },
+  // O cargo vem junto porque decide o NOME exibido: o administrador aparece como "Administrator".
+  authorizedBy: {
+    select: { userId: true, role: true, user: { select: { name: true } } },
+  },
 } as const;
 
 type VisitorRowWithRelations = {
@@ -67,8 +93,9 @@ type VisitorRowWithRelations = {
   type: VisitType;
   expectedDate: Date;
   condominiumId: string;
+  passCode: string;
   unit: { id: string; block: string | null; number: string };
-  authorizedBy: { userId: string; user: { name: string } };
+  authorizedBy: { userId: string; role: Role; user: { name: string } };
 };
 
 /**
@@ -78,8 +105,17 @@ type VisitorRowWithRelations = {
  * em UTC devolve sempre o dia gravado, sem deslocamento de fuso (research R-007).
  * `createdAt` e `updatedAt` ficam fora do contrato.
  */
-export function toVisitor(row: VisitorRowWithRelations): Visitor {
+export function toVisitor(
+  row: VisitorRowWithRelations,
+  requesterId: string
+): Visitor {
+  // Uma pergunta só decide as duas coisas: remover a visita e ter o comprovante dela.
+  const authorizedByRequester = row.authorizedBy.userId === requesterId;
+
   return {
+    canRemove: authorizedByRequester,
+    // A chave fica FORA do objeto para quem não autorizou: nem o nome do campo viaja.
+    ...(authorizedByRequester ? { passCode: row.passCode } : {}),
     id: row.id,
     name: row.name,
     type: row.type,
@@ -92,20 +128,53 @@ export function toVisitor(row: VisitorRowWithRelations): Visitor {
     },
     authorizedBy: {
       id: row.authorizedBy.userId,
-      name: row.authorizedBy.user.name,
+      // "Administrator" quando quem autorizou administra este condomínio; o nome dela, se não.
+      name: displayNameOf({
+        role: row.authorizedBy.role,
+        name: row.authorizedBy.user.name,
+      }),
+      role: row.authorizedBy.role,
     },
   };
 }
 
 /**
- * Todos os visitors, da data prevista mais próxima para a mais distante (FR-016).
+ * Quais visitas uma pessoa VÊ.
+ *
+ * - **Administrador**: todas as visitas dos condomínios que ele administra, de qualquer unidade e
+ *   autorizadas por qualquer pessoa. É o único que vê visita de outra pessoa.
+ * - **Morador**: só as que ele mesmo autorizou. Nem a de quem mora na mesma unidade.
+ *
+ * O cargo é POR CONDOMÍNIO: quem administra um prédio e mora em outro vê tudo do primeiro e só as
+ * suas do segundo, e é por isso que o filtro é um `OR` e não um `if` de cargo.
+ *
+ * **Ver não é poder remover.** Remover é só de quem autorizou, administrador inclusive — ver
+ * `removeVisitor`.
+ */
+async function visibleTo(requesterId: string) {
+  const administered = await prisma.condominiumMember.findMany({
+    where: { userId: requesterId, role: { in: MANAGING_ROLES } },
+    select: { condominiumId: true },
+  });
+
+  return {
+    OR: [
+      { condominiumId: { in: administered.map((row) => row.condominiumId) } },
+      { authorizedById: requesterId },
+    ],
+  };
+}
+
+/**
+ * As visitas que quem pediu vê, da data prevista mais próxima para a mais distante (FR-016).
  * No empate, vale a ordem de criação, e por fim o `id`, para a ordem ser sempre estável.
  *
- * TODO: ainda devolve os visitantes de TODOS os condomínios. Restringir ao condomínio de quem
- * pediu depende de decidir o que cada cargo pode ver, que é a feature de moradores.
+ * Até aqui esta rota devolvia as visitas de TODOS os condomínios para qualquer conta, e a tela é
+ * que filtrava. A decisão que faltava — o que cada cargo pode ver — está em `visibleTo`.
  */
-export async function listVisitors(): Promise<Visitor[]> {
+export async function listVisitors(requesterId: string): Promise<Visitor[]> {
   const rows = await prisma.visitor.findMany({
+    where: await visibleTo(requesterId),
     select: {
       id: true,
       name: true,
@@ -116,7 +185,7 @@ export async function listVisitors(): Promise<Visitor[]> {
     },
     orderBy: [{ expectedDate: "asc" }, { createdAt: "asc" }, { id: "asc" }],
   });
-  return rows.map(toVisitor);
+  return rows.map((row) => toVisitor(row, requesterId));
 }
 
 /**
@@ -176,16 +245,24 @@ export async function createVisitor(
       ...WITH_RELATIONS,
     },
   });
-  return toVisitor(row);
+  // Quem acabou de autorizar é, por definição, quem pode remover.
+  return toVisitor(row, authorizedById);
 }
 
 /**
  * Remove o visitor de forma permanente. Remover um `id` que já não existe também é sucesso:
  * a operação é idempotente (FR-012, research R-011).
  *
- * TODO: não confere de quem é o visitante. Qualquer conta autenticada apaga o de qualquer outra,
- * até a feature de moradores definir o que cada cargo pode apagar.
+ * **Só quem autorizou a visita a remove — e isso vale para o administrador também.** Ele vê as
+ * visitas do condomínio inteiro, mas apagar a de outra pessoa não é dele: só as que ele mesmo
+ * liberou. É a mesma condição que `toVisitor` manda como `canRemove`, para a tela não desenhar uma
+ * lixeira que o servidor recusaria.
+ *
+ * Um `id` de outra pessoa NÃO é apagado e recebe o mesmo sucesso de um `id` que não existe — a
+ * resposta não diz a ninguém se aquela visita existe.
  */
-export async function removeVisitor(id: string): Promise<void> {
-  await prisma.visitor.deleteMany({ where: { id } });
+export async function removeVisitor(id: string, requesterId: string): Promise<void> {
+  await prisma.visitor.deleteMany({
+    where: { id: id, authorizedById: requesterId },
+  });
 }
