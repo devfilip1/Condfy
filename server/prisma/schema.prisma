@@ -35,6 +35,10 @@ model Visitor {
   unitId         String    @map("unit_id")
   /// Repetido de propósito: amarra as duas FKs compostas ao mesmo condomínio (research R-002).
   condominiumId  String    @map("condominium_id")
+  /// O código do comprovante desta visita, que vai no QR. Gerado pelo BANCO, para valer para
+  /// qualquer escritor — a API, a carga, um script. Não é o `id` de propósito: o administrador
+  /// recebe o `id` de toda visita do condomínio, e o código só pode chegar a quem a autorizou.
+  passCode       String    @unique @default(dbgenerated("gen_random_uuid()")) @map("pass_code") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -52,12 +56,18 @@ model Visitor {
 
 /// Cargo de um usuário em um condomínio.
 ///
-/// `manager` (síndico) e `doorman` (portaria) saíram na feature 007: o papel de gestão virou
-/// `admin` (administrador), e por enquanto é o único além de morador. Nenhuma linha usava os dois
-/// removidos quando a troca aconteceu.
+/// `manager` (síndico) e `doorman` (portaria) saíram na feature 007, quando o papel de gestão
+/// virou `admin` (administrador). Na feature 013 o SÍNDICO VOLTOU, como um cargo próprio e não
+/// como outro nome do administrador: é quem cria o condomínio. São três cargos, e um condomínio
+/// pode ter um administrador E um síndico (ADR 0017).
+///
+/// Quem "cuida" de um condomínio é o administrador ou o síndico — a pergunta é feita num lugar só,
+/// `managesCondominium` em `src/lib/roles.ts`, nunca comparando com `admin`.
 enum Role {
   resident
   admin
+  /// Síndico: quem criou o condomínio. No máximo um por condomínio.
+  manager
 }
 
 // As CHECKs (nome, e-mail, bloco, número) e as triggers de "morador tem unidade" não cabem no
@@ -70,6 +80,15 @@ model Condominium {
   /// home. `null` é "sem foto", e o app mostra o placeholder. A CHECK de `https://` está na
   /// migration add_condominium_image (ADR 0004).
   imageUrl    String?             @map("image_url")
+  /// Endereço, em texto livre. `null` só nos condomínios que já existiam antes de dar para criar
+  /// um pelo app (feature 013); todo condomínio criado pelo formulário tem um.
+  address     String?             @db.VarChar(200)
+  /// A foto ENVIADA pelo síndico, em bytes. NENHUMA lista seleciona esta coluna: toda consulta em
+  /// `condominiums` nomeia as colunas que lê, e só `readCondominiumPhoto` lê esta (ADR 0012).
+  /// Um condomínio tem foto por aqui, por `imageUrl`, ou não tem.
+  photo            Bytes?
+  /// O tipo que o SERVIDOR detectou nos bytes, nunca o que quem enviou disse.
+  photoContentType String?        @map("photo_content_type") @db.VarChar(20)
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   units       Unit[]
@@ -138,7 +157,7 @@ model FoundItem {
 model Notice {
   id            String   @id @default(uuid())
   condominiumId String   @map("condominium_id")
-  /// Quem publicou. Gravado para responsabilização, nunca exibido (FR-004).
+  /// Quem publicou. O id nunca é exposto; o nome exibido de quem publicou é (RN-MEM-04).
   publishedById String   @map("published_by_id")
   title         String   @db.VarChar(120)
   /// Texto completo, quebras de linha incluídas. Limitado a 5000 caracteres pela CHECK.
@@ -172,7 +191,14 @@ model CommonArea {
   usageFee      Decimal  @default(0) @map("usage_fee") @db.Decimal(10, 2)
   /// Endereço https da foto. `null` cai no placeholder da tela (research R-007).
   imageUrl      String?  @map("image_url")
-  /// `false` esconde do catálogo SEM apagar o registro nem o histórico (FR-002a).
+  /// A foto ENVIADA pelo síndico ao criar o local, em bytes. NENHUMA lista seleciona esta coluna:
+  /// toda consulta em `common_areas` nomeia as colunas que lê, e só `readCommonAreaPhoto` lê
+  /// esta (ADR 0012). Um local tem foto por aqui, por `imageUrl` (dados de exemplo), ou não tem.
+  photo            Bytes?
+  /// O tipo que o SERVIDOR detectou nos bytes, nunca o que quem enviou disse.
+  photoContentType String?  @map("photo_content_type") @db.VarChar(20)
+  /// `false` fecha o local para novas reservas SEM apagar o registro nem o histórico (FR-002a). Ele
+  /// continua no catálogo, marcado; quem liga e desliga é o administrador (feature 011).
   isAvailable   Boolean  @default(true) @map("is_available")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -282,6 +308,9 @@ model CondominiumMember {
   // No máximo um administrador por condomínio. Herdado da regra do síndico (research R-003), que
   // era um cargo eletivo único; vale reavaliar se uma administradora puder ter várias pessoas.
   @@unique([condominiumId], map: "condominium_members_one_admin_key", where: raw("role = 'admin'"))
+  // No máximo um síndico por condomínio, do mesmo jeito. Os dois índices são independentes: um
+  // condomínio pode ter um administrador e um síndico, que são pessoas diferentes (ADR 0017).
+  @@unique([condominiumId], map: "condominium_members_one_manager_key", where: raw("role = 'manager'"))
   @@index([condominiumId])
   @@map("condominium_members")
 }
