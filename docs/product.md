@@ -23,13 +23,16 @@ condominium and a resident in another ([data model](data-model.md#condominiummem
 | Role (code) | In Portuguese | What they do in the system |
 |---|---|---|
 | `resident` | morador | Registers and removes the visitors they expect. Must live in at least one unit. |
-| `admin` | administrador | Manages the condominium. At most one per condominium, and has no unit. |
+| `manager` | síndico | Creates the condominium and is in charge of it. Can do everything the administrator can, for now. At most one per condominium, and has no unit. |
+| `admin` | administrador | Manages the condominium: sees every visitor and authorizes visitors for any unit, switches common areas off and on, publishes notices and found items. At most one per condominium, and has no unit. |
 
-The home screen is the first place that branches on role: an `admin` does not see the Visitors
-module, because receiving a visitor is something a resident does. That is presentation only — the
-API does not yet refuse a route based on role.
+Both roles see the same modules on the home screen. What differs is inside each one, and it is the
+API that decides it — the visitor list, for instance, is the whole condominium's for the
+administrator and only the visits they authorized for a resident.
 
-`manager` (síndico) and `doorman` (portaria) were replaced by the single `admin` role; nobody held
+The síndico **returned in feature 013** as a role of its own
+([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)). Before that,
+`manager` (síndico) and `doorman` (portaria) had been replaced by the single `admin` role; nobody held
 either when the change was made.
 
 ## Features
@@ -38,6 +41,8 @@ either when the change was made.
   - See the visitors registered for the condominium, sorted by expected date, nearest first.
   - Register a visitor with name, visit type, expected date and the resident who authorized it.
   - Remove a visitor, with an explicit confirmation step.
+  - Get a **pass** for each visitor: a square with who authorizes the entry, where, when and a QR
+    code of that visit, opened on registering and again from the card, and shared as a picture.
   - Loading, empty and failure states, the last one with a retry action.
   - Rules: [Visitors](business-rules.md#visitors) · Screen:
     [VisitorsScreen.tsx](../mobile/features/visitors/VisitorsScreen.tsx) · API: [api.md](api.md)
@@ -89,6 +94,16 @@ disappears. A failure at any point keeps the list untouched and explains what ha
   registering it again ([RN-VIS-08](business-rules.md#rn-vis-08--visitors-cannot-be-edited)).
 - **Editing or deleting a found item, and claiming one.** The administrator posts an item and
   changes its status; nothing else about it changes, and the app does not record who collected it.
+- **Renaming, repricing or deleting a common area, and replacing its photo.** The síndico creates
+  a place; after that the only thing that changes is whether it is available.
+- **Joining a condominium.** A person creates a condominium and is its síndico, but nothing lets a
+  resident enter one from the app yet: a new condominium has one member.
+- **Editing or deleting a condominium, and appointing an administrator.** Its name, address, blocks
+  and photo stay as they were created.
+- **Reading a visitor pass at the gate.** The app produces the pass and its code; nothing in it
+  scans a code or says whether one is valid yet, and there is no gate role to give a reader to.
+- **Notifying anyone.** A resident whose booking the administrator cancels finds out by not seeing
+  it in "My bookings" any more.
 - **Offline use.** The app needs the server to show anything.
 - **Changing a condominium's photo in the app.** A person in several condominiums chooses one at
   sign-in and can switch from the home screen; the photo on each card is example data.
@@ -112,6 +127,11 @@ an administrator calls each thing in conversation.
 | Reserva | A held slot of a common area, for a day and a time range | `Reservation` |
 | Horário | One of the eight fixed two-hour slots a common area can be booked for, 07:00 to 23:00 | `Slot`, `startMinute` / `endMinute` |
 | Janela de reserva | How far ahead a booking may go: today plus 60 days, counted in whole days | `BOOKING_WINDOW_DAYS` |
+| Comprovante de liberação | The pass of one visit: a square for the visitor with who authorizes, where, when and a QR code | `VisitorPass`, `passCode` |
+| Síndico | The person in charge of a condominium, who created it. Shown as "Manager" | `manager` |
+| Bloco | A part of a condominium — a tower, a wing — with a code of one or two letters; what groups its units | `block` |
+| Local indisponível | A common area the administrator switched off: still listed, but it takes no booking from anyone | `isAvailable: false` |
+| Dia inteiro | Every remaining time of one day reserved by the administrator at once — ordinary reservations, all or none | `wholeDayHeld`, `takeWholeDay` |
 | Taxa de uso | What the condominium charges to use a common area; zero means free | `usageFee` |
 | Configurações | The screen that gathers what belongs to the person rather than to a condominium | `settings` (app feature) |
 | Aparência | Light or dark; chosen per device, kept across sign-outs | `appearance`, `scheme` |

@@ -94,8 +94,9 @@ in. The root layout redirects between the `(auth)` group and the rest based on t
 
 The same layout also holds the **condominium gate**. The context derives `condominiumGate` —
 `resolving`, `choose`, `failed` or `open` — from the profile and the selected condominium. While it
-is `resolving` no route is rendered at all; while it is `choose` or `failed` the only route allowed
-is `/choose-condominium`. It lives in the root layout because that is the one place every route
+is `resolving` no route is rendered at all; while it is `choose` or `failed` the only routes allowed
+are `/choose-condominium` and `/create-condominium` — the second because the chooser offers to
+create a condominium, and its own button would otherwise bounce back to it. It lives in the root layout because that is the one place every route
 passes through, so a direct link to a module is held as well as a tap
 ([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
 Features read which condominium is current — `selectedCondominiumId`, `currentMembership` — from

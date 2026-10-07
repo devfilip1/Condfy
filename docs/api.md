@@ -68,8 +68,12 @@ interface Profile {
   name: string;
   email: string;        // never the password hash
   memberships: {
-    condominium: { id: string; name: string; imageUrl: string | null };
-    role: "resident" | "admin";
+    condominium: {
+      id: string; name: string;
+      imageUrl: string | null;    // an https address, or null
+      photoPath: string | null;   // relative and signed, when a photo was uploaded
+    };
+    role: "resident" | "admin" | "manager";
     units: { id: string; block: string | null; number: string }[];
   }[];
 }
@@ -188,17 +192,23 @@ interface CommonArea {
   name: string;
   /** Money as a STRING, never a number: "0.00", "150.00". Two decimals always. */
   usageFee: string;
-  imageUrl: string | null;   // https:// or null
+  imageUrl: string | null;   // https:// or null — sample places
+  photoPath: string | null;  // relative and signed — a place created from the app
+  isAvailable: boolean;      // false: listed, but takes no booking from anyone
 }
 ```
 
 `condominiumId` is not repeated inside each item — every item belongs to the condominium already in
-the path. `isAvailable` is not exposed either: an unavailable place is simply absent, so the field
-would always be `true` and would invite a client to filter on something the server already did.
+the path.
+
+**Every** place of the condominium is returned, available or not. Until the administrator's
+controls existed, an unavailable place was simply absent; now it stays in the list, the app draws it
+muted with the word "Unavailable", and a touch explains why it does not open. An empty array means
+one thing only: the condominium has no place registered.
 
 | Status | Body | When |
 |---|---|---|
-| `200` | `CommonArea[]` — `[]` when the condominium has none available | The caller has a membership in `:condominiumId` |
+| `200` | `CommonArea[]` — `[]` when the condominium has no place registered | The caller has a membership in `:condominiumId` |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | Token missing, malformed, tampered or expired |
 | `404` | `{ "message": "Condominium not found." }` | No such condominium, **or** the caller has no membership in it, **or** the id is not a uuid — deliberately the same answer |
 | `500` | `{ "message": "Internal server error." }` | Unexpected failure |
@@ -213,13 +223,91 @@ Authorization: Bearer <accessToken>
 
 200 OK
 [{ "id": "00000000-…-0403", "name": "Churrasqueira",
-   "usageFee": "80.00", "imageUrl": null },
+   "usageFee": "80.00", "imageUrl": null, "isAvailable": true },
  { "id": "00000000-…-0401", "name": "Quiosque Quadra",
-   "usageFee": "0.00", "imageUrl": "https://images.unsplash.com/…" }]
+   "usageFee": "0.00", "imageUrl": "https://images.unsplash.com/…", "isAvailable": false }]
 ```
 
-**Not in the contract**: there is no `POST`, `PATCH` or `DELETE` for common areas — the catalogue is
-read-only and the examples come from the seed. Reserving one of them is the next four routes.
+At most one of `imageUrl` and `photoPath` is set. `photoPath` is the uploaded photo of a place
+created from the app: relative to the address of the API and signed for 24 hours. The `commonArea`
+inside the availability response carries the same two fields.
+
+**Not in the contract**: there is no `DELETE` for common areas, and no way to rename one, change
+its fee or replace its photo. A place is created by the next route, and the one thing that can be
+changed afterwards is whether it is available.
+
+## `POST /condominiums/:condominiumId/common-areas`
+
+Creates a place to book. **Síndico of that condominium only** — the administrator switches places
+off and on but does not create them. Requires a session.
+
+```json
+{ "name": "Salão de Festas", "usageFee": "150.00", "photo": "<base64>" }
+```
+
+All three fields are required.
+
+- `name` — trimmed, 1 to 60 characters, unique inside the condominium.
+- `usageFee` — a **string** with a dot, up to two decimals: `"0"`, `"150"`, `"150.50"`. Zero means
+  free, but the field must be sent; a JSON number is refused, because this is money.
+- `photo` — the bytes of the picture in base64, without a `data:` prefix. JPEG, PNG or WebP, at
+  most 5 MB; the server decides the type from the bytes.
+
+The place is created **available**. `isAvailable`, `imageUrl` and anything else in the body are
+ignored.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | the `CommonArea`, with `photoPath` set | Created |
+| `400` | `{ "errors": { name?, usageFee?, photo? } }` | A field is missing or invalid — or `name` is already used by another place of that condominium (`"This condominium already has a place with this name."`) |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium manager can create a place." }` | A member who is not the síndico — the administrator included |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller has no membership in it |
+
+A repeated name is a `400` on the field and not a `409`: the person fixes it by typing another.
+It is decided by the unique index on `(condominium_id, name)`, not by a read before the write.
+
+## `GET /condominiums/:condominiumId/common-areas/:commonAreaId/photo?expires=…&signature=…`
+
+The uploaded photo of a place. **Outside the session group**, like the other two photo routes: the
+permission is the signature, which is only handed out inside the catalogue
+([ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)).
+
+| Status | Body | When |
+|---|---|---|
+| `200` | the image bytes | The signature is valid and a photo exists |
+| `404` | `{ "message": "Photo not found." }` | Wrong, expired or missing signature, **or** no such photo — the same answer |
+
+On `200`: `Content-Type` as detected at upload, `X-Content-Type-Options: nosniff`,
+`Cache-Control: private, max-age=86400`.
+
+## `PATCH /condominiums/:condominiumId/common-areas/:commonAreaId`
+
+Switches a place off or on. **Administrator of that condominium only.** Requires a session.
+
+```json
+{ "isAvailable": false }
+```
+
+Only `isAvailable` is read, and only a real boolean passes — `"false"` and `0` are refused rather
+than guessed.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | the `CommonArea`, as the catalogue lists it | Saved — also when the place was already in that state |
+| `400` | `{ "errors": { "isAvailable": "Say whether the place is available." } }` | `isAvailable` missing or not a boolean |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium administrator can change a place." }` | A member who is not the administrator |
+| `404` | `{ "message": "Common area not found." }` | The caller has no membership, **or** no such place, **or** it is in another condominium |
+
+- The `403` is decided **before** the place is looked up, so a member who may not change anything
+  learns nothing about whether an id exists
+  ([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
+- **No reservation is touched**, in either direction. Switching off keeps every booking; switching
+  on brings the place back exactly as it was.
+- While a place is off, nobody can book it — the administrator included — and reservations of it
+  can still be cancelled by whoever may cancel them.
+- It is idempotent: a repeated touch or a retried request does no harm.
 
 ## `GET /condominiums/:condominiumId/common-areas/:commonAreaId/availability`
 
@@ -239,9 +327,18 @@ interface Slot {
 }
 
 interface Availability {
-  commonArea: { id: string; name: string; usageFee: string; imageUrl: string | null };
+  commonArea: {
+    id: string; name: string; usageFee: string; imageUrl: string | null;
+    isAvailable: boolean;
+  };
+  canManage: boolean;       // the caller is the administrator of this condominium
   month: string;            // "YYYY-MM", echoing what was asked for
-  days: { date: string; slots: Slot[] }[];   // date is "YYYY-MM-DD"
+  days: {
+    date: string;           // "YYYY-MM-DD"
+    slots: Slot[];
+    booked: { startMinute: number; endMinute: number; reservationId?: string }[];
+    wholeDayHeld?: boolean; // present exactly when canManage
+  }[];
 }
 ```
 
@@ -253,11 +350,26 @@ Reading it is the whole screen, so each shape means one thing:
 - `days` carries **only bookable days** — today through today + 60, intersected with the month asked
   for. A day in the past, or past the window, is **absent**, so the app has one rule and not three:
   no entry, no dot, not selectable.
-- `slots` carries only what the caller can act on. A slot taken by **somebody else** is absent, and
-  nothing anywhere says who holds a slot.
-- `"open"` is free. `"held"` is taken **and releasable by the caller** — their own booking, or any
-  booking of that place when they are the administrator. It is there so the cancel action has
-  somewhere to live; a slot that simply vanished could never be cancelled.
+- `slots` carries only what the caller can act on. A slot taken by **somebody else** is absent from
+  it, and nothing anywhere says who holds a slot.
+- `booked` is every reservation of that place on that day, whoever made it, earliest first. It
+  never carries a name, nor a mark on the caller's own. Unlike `slots`, it keeps a slot of today
+  that has already started.
+- `booked[].reservationId` is present **exactly** when the caller may cancel that reservation from
+  this list: the caller is the administrator, the reservation is somebody else's, and its time has
+  not started. It is what `DELETE …/reservations/:reservationId` addresses. For a resident it is
+  never present, so their list can be read and not acted on.
+- `"open"` is free. `"held"` is **the caller's own** booking, for every caller. It is there so the
+  cancel action has somewhere to live; a slot that simply vanished could never be cancelled. The
+  administrator used to receive other people's bookings as `"held"` too; those moved to `booked`
+  so that one reservation is cancellable from one place.
+- `canManage` is whether the caller is the administrator of the condominium. The app shows its two
+  switches when, and only when, it is `true` — it never compares roles itself.
+- `wholeDayHeld` is the position of the "whole day" switch: `true` when the day has at least one
+  time that has not started and the caller holds all of them. Present only when `canManage`.
+- `commonArea.isAvailable` is `false` only for the administrator: for anyone else an unavailable
+  place answers the `404` below. On an unavailable place `slots` has no `"open"` entry; the
+  caller's own bookings still come as `"held"` and `booked` is complete.
 - `"slots": []` on a present day is a **full** day: the red dot. Different from an absent day, which
   gets no dot at all.
 - For **today**, slots whose start time has already passed are absent, computed on the server's
@@ -268,7 +380,7 @@ Reading it is the whole screen, so each shape means one thing:
 | `200` | `Availability` | The caller has a membership and the place is available |
 | `400` | `{ "errors": { "month": "Select a month." } }` | `month` is not `YYYY-MM` |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
-| `404` | `{ "message": "Common area not found." }` | No such place, **or** it is in another condominium, **or** it is unavailable, **or** the caller has no membership — deliberately the same answer |
+| `404` | `{ "message": "Common area not found." }` | No such place, **or** it is in another condominium, **or** it is unavailable and the caller is not the administrator, **or** the caller has no membership — deliberately the same answer |
 
 The server computes availability, rather than the app, because deciding what is free needs the
 current time — and the server's clock is the one that will accept or refuse the booking. If the
@@ -290,6 +402,7 @@ the grid. `reservedById` is not accepted either: identity comes from the token.
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
 | `404` | `{ "message": "Common area not found." }` | Unknown, unavailable or foreign place, or the caller is not a member |
 | **`409`** | `{ "message": "That time was just taken. Pick another one." }` | Somebody else booked that slot between the caller reading the list and confirming |
+| `409` | `{ "message": "This place is unavailable. Switch it on to book it." }` | The place is switched off **and** the caller is the administrator. Anyone else gets the `404` above |
 
 `condominiumId` and `reservedById` are absent from the response: the first is already in the path,
 and the second can only be the caller.
@@ -308,6 +421,51 @@ the slot; the server only translates its refusal
 The window check is a `400` on `date` rather than a `409` for the same reason in reverse: that
 request was already wrong when it was written, not overtaken by events.
 
+## `PUT /condominiums/:condominiumId/common-areas/:commonAreaId/whole-day/:date`
+
+Reserves, for the administrator, every time of `:date` that has not started and that they do not
+already hold. No body. **All of the day or none of it.** Administrator only.
+
+| Status | Body | When |
+|---|---|---|
+| `204` | — | The administrator now holds every not-started time of the day — also when they already did |
+| `400` | `{ "errors": { "date": "…" } }` | Not a real date, in the past, or beyond the 60-day window — the messages of a single booking |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium administrator can reserve a whole day." }` | A member who is not the administrator |
+| `404` | `{ "message": "Common area not found." }` | The caller has no membership, or no such place in that condominium |
+| `409` | `{ "message": "This day already has bookings. Cancel them first to reserve the whole day." }` | Another person holds a time of that day that has not started — including one booked while this request was in progress |
+| `409` | `{ "message": "No time of this day can still be booked." }` | Today, with every time already started |
+| `409` | `{ "message": "This place is unavailable. Switch it on to book it." }` | The place is switched off |
+
+Nothing is written on any `409`. The result is ordinary reservations in the administrator's name —
+there is no "blocked day" anywhere, so nothing else had to learn a second way for a time to be taken.
+
+**Why it cannot end half done.** The times are written by **one** statement. If somebody books one
+of them between the server reading the day and writing it, the statement violates the unique index
+of [ADR 0011](decisions/0011-no-double-booking-is-a-unique-index.md) and the database discards
+every row of it, not only the one that collided. The read before the write exists for the message;
+the index is the guarantee.
+
+A time of another person that has **already started** does not block the action: nobody can cancel
+it, and the action only concerns the times still ahead.
+
+## `DELETE /condominiums/:condominiumId/common-areas/:commonAreaId/whole-day/:date`
+
+Cancels every reservation of `:date` in that place that is the administrator's **own** and has not
+started. No body. Administrator only.
+
+| Status | Body | When |
+|---|---|---|
+| `204` | — | Done — also when there was nothing to cancel |
+| `400` | `{ "errors": { "date": "Pick a real date." } }` | Not a real date |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium administrator can reserve a whole day." }` | A member who is not the administrator |
+| `404` | `{ "message": "Common area not found." }` | The caller has no membership, or no such place in that condominium |
+
+It works on an unavailable place — cancelling never depends on availability. Reservations of other
+people, and times already started, are never touched. Unlike the `DELETE` of one reservation, this
+one **is** idempotent: there is no id here whose existence the answer could leak.
+
 ## `GET /condominiums/:condominiumId/reservations`
 
 The caller's **own** reservations in that condominium that have not ended yet, soonest first. It is
@@ -324,12 +482,12 @@ interface OwnReservation {
 ```
 
 - Whose reservations comes from the token. There is no parameter to ask for somebody else's, and
-  the administrator gets only their own too — releasing another person's booking still happens
-  through the `"held"` slot of the availability.
+  the administrator gets only their own too — releasing another person's booking happens through
+  the `booked` list of the availability, where that booking carries its `reservationId`.
 - A reservation of **today** stays in the list until its slot **ends**, not until it starts:
   somebody using the room right now still holds that booking.
-- The place's name travels with each item because the list crosses places, and a place switched
-  off after the booking is gone from the catalogue while the reservation is not.
+- The place's name travels with each item because the list crosses places, and the app should not
+  have to join it against the catalogue to say where a booking is.
 
 | Status | Body | When |
 |---|---|---|
@@ -477,11 +635,14 @@ interface Notice {
   /** Complete text, newlines included. The two-line preview is the app's doing, not the API's. */
   body: string;
   date: string;   // "YYYY-MM-DD"
+  publishedBy: { name: string };
 }
 ```
 
-`publishedById` is **not** exposed: it is recorded for accountability, and showing it would change
-what the board is. Ordered by `date` descending, then `id` descending, so two notices from the same
+`publishedBy.name` is who published the notice, **by the name they go by in that condominium**:
+`"Administrator"` while they are its administrator, their own name if they no longer are
+([RN-MEM-04](business-rules.md#rn-mem-04--the-administrator-goes-by-administrator-in-the-condominium-they-administer)).
+Only the name travels — `publishedById` is still not exposed. Ordered by `date` descending, then `id` descending, so two notices from the same
 day keep a stable order between visits.
 
 | Status | Body | When |
@@ -519,10 +680,98 @@ boundary — hide existence from those outside it, explain the refusal to those 
 **Not in the contract**: no `PATCH`, no `DELETE` — a published notice stays, and correcting one means
 publishing another.
 
+## `POST /condominiums`
+
+Creates a condominium and makes the caller its **síndico** (`manager`). Requires a session; any
+signed-in account may call it — creating a condominium is what makes somebody its síndico.
+
+```json
+{
+  "name": "Edifício Solar",
+  "address": "Rua das Acácias, 120 — Salvador, BA",
+  "blocks": [
+    { "code": "A", "unitCount": 40 },
+    { "code": "B", "unitCount": 40 }
+  ],
+  "photo": "<base64, optional>"
+}
+```
+
+- Who the síndico is comes from the token. A `role`, a `managerId` or an `id` in the body is
+  ignored.
+- The units of each block are created numbered `1` to `unitCount`, belonging to that block.
+- Block codes are upper-cased and trimmed before being checked, so `"a"` is accepted as `"A"`.
+- `photo` is the bytes of the picture in base64, without a `data:` prefix; omitted or `null` is
+  no photo. The server decides what kind of image it is from the bytes.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | the new membership of the caller — one item of `memberships` in `GET /me`, with `role: "manager"` and `units: []` | Created, with every unit of every block |
+| `400` | `{ "errors": { … } }` | A rule of [RN-CON-03 to RN-CON-05](business-rules.md#rn-con-03--anybody-signed-in-creates-a-condominium-and-becomes-its-síndico) failed |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+
+Errors are keyed by field, and those of a block by its position:
+`name`, `address`, `blocks`, `blocks.0.code`, `blocks.1.unitCount`, `photo`.
+
+**All or nothing.** The condominium, its units and the membership are written in one transaction.
+Two condominiums may have the same name, so nothing is refused as a duplicate: a repeated request
+creates a second condominium, and stopping a double touch is the job of the app.
+
+## `GET /condominiums/:condominiumId/photo?expires=…&signature=…`
+
+The uploaded photo of a condominium. **Outside the session group**, like the found-item photo: an
+image tag cannot send a token, so the permission is the signature
+([ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)).
+
+| Status | Body | When |
+|---|---|---|
+| `200` | the image bytes | The signature is valid and a photo exists |
+| `404` | `{ "message": "Photo not found." }` | Wrong, expired or missing signature, **or** no such photo — the same answer |
+
+On `200`: `Content-Type` as detected at upload, `X-Content-Type-Options: nosniff`,
+`Cache-Control: private, max-age=86400`. The signature covers the path and lasts **24 hours** —
+longer than the hour of a found item, because the profile that carries it is read when the app
+opens and kept. A path is only ever produced inside a membership of the profile.
+
+## The administrator or the síndico
+
+Every route below that says "administrator only" accepts the **síndico** as well
+([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)). The status codes and messages
+are unchanged — a message may still say "administrator" — only who gets past them is wider:
+publishing notices; posting found items and changing their status; switching a common area off and
+on; the whole day; listing units; `canManage`, `wholeDayHeld` and `booked[].reservationId` in the
+availability; cancelling the reservation of somebody else; seeing every visitor of the condominium;
+and `DELETE /me`, refused while the person is in charge of a condominium.
+
+Wherever a response carries a display name (`authorizedBy.name`, `publishedBy.name`), a síndico
+reads `"Manager"`, as an administrator reads `"Administrator"`. `authorizedBy.role` may be
+`"manager"`.
+
+## `GET /condominiums/:condominiumId/units`
+
+Every unit of a condominium, by block and number. **Administrator of that condominium only.** It
+exists for one screen: the administrator authorizes visitors for any unit and lives in none, so
+their profile (`GET /me`) has no units to offer. A resident's units are already in their profile.
+
+```ts
+interface Unit {
+  id: string;
+  block: string | null;   // null when the condominium has no blocks
+  number: string;
+}
+```
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `Unit[]` | The caller is the administrator |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium administrator can list its units." }` | A member who is not the administrator |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller has no membership in it |
+
 ## `GET /visitors`
 
-Lists every visitor, ordered by `expectedDate` ascending, then by creation order
-([RN-VIS-06](business-rules.md#rn-vis-06--the-list-is-ordered-by-expected-date-nearest-first)).
+Lists the visitors **the caller may see**, ordered by `expectedDate` ascending, then by creation
+order ([RN-VIS-06](business-rules.md#rn-vis-06--the-list-is-ordered-by-expected-date-nearest-first)).
 
 | Status | Body |
 |---|---|
@@ -530,9 +779,39 @@ Lists every visitor, ordered by `expectedDate` ascending, then by creation order
 | `401` | `{ "message": "Your session has expired. Sign in again." }` — missing, malformed, tampered or expired token |
 | `500` | `{ "message": "Internal server error." }` |
 
-Still returns **every** condominium's visitors, not only those of the caller. The schema allows
-scoping since [ADR 0009](decisions/0009-visitors-belong-to-a-unit-and-a-membership.md); what each
-role may see is still undecided.
+What "may see" means depends on the caller's role **in each condominium**
+([RN-VIS-11](business-rules.md#rn-vis-11--the-administrator-sees-every-visit-a-resident-sees-their-own)):
+
+- where they are the **administrator**: every visit of that condominium, to any unit, authorized by
+  anyone;
+- where they are a **resident**: only the visits they authorized themselves — not even those of
+  somebody they live with.
+
+The response covers all the caller's condominiums at once; the app filters by the one on screen.
+Until 2026-10-06 this route returned every condominium's visitors to any signed-in account.
+
+`unit` and `authorizedBy` are what say whose each visit is: the app shows the name of who
+authorized it and the block and number of the unit. `authorizedBy.name` is `"Administrator"` when
+that person administers the condominium of the visit, and their own name otherwise
+([RN-MEM-04](business-rules.md#rn-mem-04--the-administrator-goes-by-administrator-in-the-condominium-they-administer)).
+
+Each item also carries `canRemove: boolean` — `true` exactly when the caller authorized that visit.
+For the administrator it is `false` on everybody else's: they see those visits and cannot delete
+them. The app draws the remove control only where it is `true`.
+
+Two more fields serve the visitor pass
+([RN-VIS-13](business-rules.md#rn-vis-13--every-visit-has-a-pass-with-a-code-of-its-own-and-only-who-authorized-it-gets-the-code)):
+
+- `passCode?: string` — the code of the visit's pass, a uuid. Present **exactly** when the caller
+  authorized that visit, and **absent** otherwise — the key is left out, not sent as `null`. The
+  administrator receives the code of their own visits only. It is read-only: generated by the
+  database when the visit is created, never changed, and ignored if sent in a body.
+- `authorizedBy.role` — `"resident"` or `"admin"`, the authorizer's role in the condominium of the
+  visit at the time of the request. It lets the pass say "Resident …" or "Administrator" without
+  guessing from the name.
+
+The QR on the pass carries `condfy:pass:<passCode>`, built by the app. **No route reads a code
+yet**: checking a pass is a later feature.
 
 ```http
 GET /visitors
@@ -542,7 +821,9 @@ GET /visitors
    "expectedDate": "2026-09-14",
    "condominiumId": "00000000-…-0001",
    "unit": { "id": "00000000-…-0101", "block": "A", "number": "101" },
-   "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza" } }]
+   "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza", "role": "resident" },
+   "canRemove": true,
+   "passCode": "8d1f0c2e-4b7a-4e0e-9a53-6f2b1c0d7e44" }]
 ```
 
 ## `POST /visitors`
@@ -576,7 +857,9 @@ POST /visitors
   "expectedDate": "2026-10-05",
   "condominiumId": "00000000-…-0001",
   "unit": { "id": "00000000-…-0101", "block": "A", "number": "101" },
-  "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza" } }
+  "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza", "role": "resident" },
+  "canRemove": true,
+  "passCode": "8d1f0c2e-4b7a-4e0e-9a53-6f2b1c0d7e44" }
 ```
 
 The app shows each message under its field without translating anything, which is why the message
@@ -587,8 +870,11 @@ text is part of the contract and must stay identical on both sides.
 Removes a visitor permanently. Idempotent: an id that no longer exists also returns `204`
 ([RN-VIS-07](business-rules.md#rn-vis-07--removing-a-visitor-twice-is-not-an-error)).
 
-Does **not** check who owns the visitor: any signed-in account can delete any visitor. Same open
-decision as `GET /visitors`.
+Removes only a visitor **the caller authorized** — the administrator included, who sees everybody's
+visits and can delete only their own. It is the condition `GET /visitors` reports as `canRemove`.
+Somebody else's id is **not** removed and still answers `204`, exactly like an id that does not
+exist: the answer tells nobody whether that visit is there. Until 2026-10-06 any signed-in account
+could delete any visitor.
 
 | Status | Body |
 |---|---|

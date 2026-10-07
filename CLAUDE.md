@@ -34,6 +34,22 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
   holds for notices (`newsletter/domain/notice.ts` ↔ `condominiums/notice.dto.ts`) and found items
   (`lostAndFound/domain/foundItem.ts` ↔ `condominiums/foundItem.dto.ts`).
   And for the account forms (`settings/domain/account.ts` ↔ `auth/account.dto.ts`).
+  And for creating a condominium (`condominiums/domain/newCondominium.ts` ↔
+  `condominiums/condominium.dto.ts`) and a place to book
+  (`reservations/domain/newCommonArea.ts` ↔ `condominiums/commonArea.dto.ts`).
+- **A role is never compared with `"admin"` to decide a permission.** Who is in charge of a
+  condominium is the administrator **or the síndico** (`manager`), and that question is asked by
+  `managesCondominium` — `server/src/lib/roles.ts` and `mobile/features/auth/domain/session.ts`
+  (ADR 0017). Only the display name and the role label tell the two apart.
+- **A new enum value and its first use go in separate migrations.** Postgres refuses to use a value
+  in the transaction that added it. Migrations are written by hand and applied with
+  `npx prisma migrate deploy`; `migrate dev` will not run without an interactive terminal.
+- **The uploaded photo of a condominium is a column too, and no query may select it** except
+  `readCondominiumPhoto`. Its route is outside the session group like the one of a found item. In
+  the app, the picture of a condominium always goes through `condominiumPhotoUri`. The same holds
+  for a place to book: `readCommonAreaPhoto`, and `commonAreaPhotoUri` in the app.
+- **Creating a place to book is the síndico's alone** — the one permission that asks for
+  `role === "manager"` instead of `managesCondominium`.
 - **Colours never come from a constant.** Every component gets its styles from `makeStyles` and any
   loose colour from `useTheme()` (`@/shared/theme`); every `<Text>` and every icon has a colour from
   the palette. There is no `Colors` export, on purpose — do not add one back to quiet the typecheck
@@ -49,6 +65,12 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
 - **The slot grid is duplicated on purpose** between `mobile/features/reservations/domain/slot.ts`
   and `server/src/condominiums/slot.ts` — the same eight start minutes. Change both together, and
   the `reservations_slot_grid_check` CHECK with them (ADR 0011).
+- **Three app libraries have one importer each** (ADR 0016): `qrcode-generator` only in
+  `mobile/shared/lib/qr.ts`; `react-native-view-shot` and `expo-sharing` only in
+  `mobile/features/visitors/services/passSharing.ts`. Add app dependencies with `npx expo install`.
+- **The visitor pass is always drawn with the light palette**, through a nested
+  `ThemeProvider scheme="light"` — never through a colour constant. Its code (`passCode`) is sent
+  only to whoever authorized the visit; never add it to a response for anybody else.
 - **Server imports end in `.ts`** and `enum`, `namespace` and parameter properties are rejected —
   Node strips types, it does not compile them.
 - **App imports use the `@/` alias**; a feature imports another only through its `index.ts`.
