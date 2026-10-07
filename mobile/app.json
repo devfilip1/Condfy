@@ -48,7 +48,8 @@
           "photosPermission": "Allow Condfy to choose a photo of the found item.",
           "cameraPermission": "Allow Condfy to take a photo of the found item."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
