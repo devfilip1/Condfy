@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { validateNewCondominium } from "./condominium.dto.ts";
-import { createCondominium } from "./condominium.service.ts";
+import { CondominiumError, createCondominium } from "./condominium.service.ts";
 
 /**
  * Controller de condomínios: as rotas do recurso são declaradas aqui dentro.
@@ -12,6 +12,9 @@ import { createCondominium } from "./condominium.service.ts";
  */
 
 const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
+const MESSAGE_PENDING = "Your request to join a condominium is still pending.";
+const MESSAGE_ALREADY_BELONGS =
+  "You already belong to a condominium, so you cannot create one.";
 
 /**
  * Teto do body da criação. O padrão do Fastify é 1 MB, e a foto viaja em base64 dentro do JSON.
@@ -23,8 +26,8 @@ const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
 const POST_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
 
 const condominiumController: FastifyPluginAsync = async (app) => {
-  // Qualquer conta autenticada cria um condomínio: criar é o que torna a pessoa síndica dele. Não
-  // há cargo a conferir antes, porque antes ela não tem vínculo nenhum com o que ainda não existe.
+  // Cria quem ainda não pertence a condomínio nenhum: criar é o que torna a pessoa síndica, e um
+  // síndico tem um só. Quem já tem vínculo — com qualquer cargo — ouve `409`.
   app.post("/", { bodyLimit: POST_BODY_LIMIT_BYTES }, async (request, reply) => {
     const result = validateNewCondominium(request.body);
     if (!result.ok) {
@@ -38,7 +41,19 @@ const condominiumController: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
     }
 
-    return reply.code(201).send(await createCondominium(result.data, creatorId));
+    try {
+      return reply.code(201).send(await createCondominium(result.data, creatorId));
+    } catch (error) {
+      // `409`, e não `400` nem `403`: os campos estão certos e não há cargo que falte. É o estado da
+      // conta que não permite, como ao apagar a conta de quem cuida de um condomínio.
+      if (error instanceof CondominiumError) {
+        return reply.code(409).send({
+          message:
+            error.reason === "pending" ? MESSAGE_PENDING : MESSAGE_ALREADY_BELONGS,
+        });
+      }
+      throw error;
+    }
   });
 };
 

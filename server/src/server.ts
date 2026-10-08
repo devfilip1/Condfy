@@ -8,10 +8,14 @@ import commonAreaController from "./condominiums/commonArea.controller.ts";
 import commonAreaPhotoController from "./condominiums/commonAreaPhoto.controller.ts";
 import condominiumController from "./condominiums/condominium.controller.ts";
 import condominiumPhotoController from "./condominiums/condominiumPhoto.controller.ts";
+import directoryController from "./condominiums/directory.controller.ts";
 import foundItemController from "./condominiums/foundItem.controller.ts";
 import foundItemPhotoController from "./condominiums/foundItemPhoto.controller.ts";
+import joinRequestController from "./condominiums/joinRequest.controller.ts";
 import noticeController from "./condominiums/notice.controller.ts";
+import passCheckController from "./condominiums/passCheck.controller.ts";
 import reservationController from "./condominiums/reservation.controller.ts";
+import staffController from "./condominiums/staff.controller.ts";
 import unitController from "./condominiums/unit.controller.ts";
 import { JWT_SECRET } from "./lib/config.ts";
 import { prisma } from "./lib/prisma.ts";
@@ -42,6 +46,12 @@ await app.register(condominiumPhotoController, { prefix: "/condominiums" });
 // E a foto enviada de um local de reserva, igual.
 await app.register(commonAreaPhotoController, { prefix: "/condominiums" });
 
+// O diretório é PÚBLICO: é o que alguém vê antes de ter conta, para dizer em que condomínio e em
+// que unidade mora (feature 016). Fica sob `/directory`, e NÃO sob `/condominiums`, de propósito:
+// tudo o que está sob `/condominiums` exige sessão e confere vínculo, e uma rota pública registrada
+// ali estaria a um descuido de expor outra coisa.
+await app.register(directoryController, { prefix: "/directory" });
+
 // Rotas que exigem sessão. Os módulos registrados aqui não sabem que isso existe: o `preHandler`
 // é do escopo, não deles (FR-023).
 await app.register(
@@ -54,6 +64,9 @@ await app.register(
     await instancia.register(foundItemController, { prefix: "/condominiums" });
     await instancia.register(unitController, { prefix: "/condominiums" });
     await instancia.register(condominiumController, { prefix: "/condominiums" });
+    await instancia.register(staffController, { prefix: "/condominiums" });
+    await instancia.register(passCheckController, { prefix: "/condominiums" });
+    await instancia.register(joinRequestController, { prefix: "/condominiums" });
   },
   { name: "rotas-protegidas" }
 );

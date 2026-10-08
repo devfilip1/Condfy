@@ -1,7 +1,7 @@
 import type { FoundItemStatus, Role } from "../../generated/prisma/enums.ts";
 import type { ImageContentType } from "../lib/imageType.ts";
 import { prisma } from "../lib/prisma.ts";
-import { managesCondominium } from "../lib/roles.ts";
+import { managesCondominium, readsLostAndFound } from "../lib/roles.ts";
 import { signPath } from "../lib/signedPath.ts";
 
 /**
@@ -122,7 +122,8 @@ async function membershipOf(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Tudo o que foi encontrado num condomínio, para quem tem vínculo nele — qualquer cargo.
+ * Tudo o que foi encontrado num condomínio, para quem tem vínculo nele — qualquer cargo, menos o
+ * porteiro (`readsLostAndFound`).
  *
  * Os devolvidos vêm junto: marcar como devolvido não tira da lista (FR-014). Mais recente primeiro,
  * com `id` desempatando para dois itens do mesmo instante não trocarem de lugar entre visitas
@@ -135,6 +136,15 @@ export async function listFoundItems(
   const membership = await membershipOf(condominiumId, requesterId);
   if (!membership) {
     throw new FoundItemError("condominium");
+  }
+  // O porteiro perdeu achados e perdidos na feature 015 — o acesso, e não só o card da home. Ele
+  // pertence ao condomínio, então ouve que não pode (403), em vez do 404 de quem é de fora.
+  //
+  // A rota da FOTO não muda e não precisa: a permissão dela é o caminho assinado, que só é
+  // entregue por esta lista (ADR 0012). Recusado aqui, o porteiro não recebe caminho nenhum; um
+  // caminho que ele já tinha morre sozinho em uma hora.
+  if (!readsLostAndFound(membership.role)) {
+    throw new FoundItemError("forbidden");
   }
 
   const rows = await prisma.foundItem.findMany({

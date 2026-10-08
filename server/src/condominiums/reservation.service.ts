@@ -10,7 +10,7 @@ import {
   todayLocalISODate,
 } from "../lib/calendarDate.ts";
 import { prisma } from "../lib/prisma.ts";
-import { managesCondominium } from "../lib/roles.ts";
+import { actsInCondominium, managesCondominium } from "../lib/roles.ts";
 import { signedCommonAreaPhotoPath } from "./commonArea.service.ts";
 import { BOOKING_WINDOW_DAYS, SLOT_START_MINUTES, endMinuteOf } from "./slot.ts";
 
@@ -148,6 +148,8 @@ export interface NewReservation {
  *   mesmo caso é `commonArea`, como sempre foi.
  * - `dayTaken` → 409. Dia inteiro: outra pessoa tem horário naquele dia. Nada é reservado.
  * - `nothingLeft` → 409. Dia inteiro: todos os horários de hoje já começaram.
+ * - `doorman` → 403. Tem vínculo, mas o cargo não reserva: o porteiro, que por enquanto só lê
+ *   (feature 014).
  */
 export type ReservationFailure =
   | "condominium"
@@ -158,7 +160,8 @@ export type ReservationFailure =
   | "started"
   | "unavailable"
   | "dayTaken"
-  | "nothingLeft";
+  | "nothingLeft"
+  | "doorman";
 
 export class ReservationError extends Error {
   reason: ReservationFailure;
@@ -490,6 +493,12 @@ export async function bookSlot(
   const membership = await membershipOf(condominiumId, reservedById);
   if (!membership) {
     throw new ReservationError("commonArea");
+  }
+
+  // Reservar é aberto a qualquer vínculo, e o porteiro tem um. Ele pertence ao condomínio, então
+  // ouve que não pode, em vez do 404 de quem é de fora (FR-009 da 014).
+  if (!actsInCondominium(membership.role)) {
+    throw new ReservationError("doorman");
   }
 
   const commonArea = await commonAreaOf(condominiumId, commonAreaId);

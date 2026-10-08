@@ -38,6 +38,7 @@ const MESSAGE_ONLY_ADMIN_WHOLE_DAY =
   "Only the condominium administrator can reserve a whole day.";
 const MESSAGE_DAY_HAS_BOOKINGS =
   "This day already has bookings. Cancel them first to reserve the whole day.";
+const MESSAGE_DOORMAN_CANNOT_BOOK = "A doorman cannot book a place.";
 const MESSAGE_NOTHING_LEFT = "No time of this day can still be booked.";
 
 /** `YYYY-MM` do mês corrente, para quando a query não informa nada. */
@@ -122,6 +123,9 @@ const reservationController: FastifyPluginAsync = async (app) => {
           // Só o administrador chega aqui: para os outros, local desligado é o 404 de sempre.
           if (error.reason === "unavailable") {
             return reply.code(409).send({ message: MESSAGE_AREA_UNAVAILABLE });
+          }
+          if (error.reason === "doorman") {
+            return reply.code(403).send({ message: MESSAGE_DOORMAN_CANNOT_BOOK });
           }
           return reply.code(404).send({ message: MESSAGE_UNKNOWN_COMMON_AREA });
         }

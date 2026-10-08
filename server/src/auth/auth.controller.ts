@@ -1,7 +1,10 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 
 import { ACCESS_TOKEN_TTL_SECONDS } from "../lib/config.ts";
-import { authenticate } from "./authenticate.ts";
+import {
+  authenticate,
+  authenticateAllowingProvisional,
+} from "./authenticate.ts";
 import { validateSignIn, validateSignUp } from "./auth.dto.ts";
 import {
   validateAccountDeletion,
@@ -20,6 +23,7 @@ import {
   signIn,
   signOut,
   signUp,
+  withdrawJoinRequest,
   type SignAccessToken,
 } from "./auth.service.ts";
 
@@ -57,6 +61,7 @@ function replyWithFailure(error: AuthError, reply: FastifyReply): FastifyReply {
 const MESSAGE_WRONG_CURRENT_PASSWORD = "Current password is incorrect.";
 const MESSAGE_IS_ADMINISTRATOR =
   "An administrator's account cannot be deleted while they administer a condominium.";
+const MESSAGE_NO_REQUEST = "This request no longer exists.";
 const MESSAGE_HAS_RECORDS =
   "This account cannot be deleted because a condominium still keeps notices or found items it published.";
 
@@ -104,6 +109,8 @@ function replyWithAccountFailure(error: unknown, reply: FastifyReply): FastifyRe
       return reply.code(409).send({ message: MESSAGE_IS_ADMINISTRATOR });
     case "hasRecords":
       return reply.code(409).send({ message: MESSAGE_HAS_RECORDS });
+    case "noRequest":
+      return reply.code(404).send({ message: MESSAGE_NO_REQUEST });
   }
 }
 
@@ -117,8 +124,14 @@ function refreshTokenFromBody(body: unknown): string | null {
 
 const authController: FastifyPluginAsync = async (app) => {
   /** O service não conhece o Fastify: recebe daqui a função que assina o accessToken. */
-  const signAccessToken: SignAccessToken = (userId) =>
-    app.jwt.sign({ sub: userId }, { expiresIn: ACCESS_TOKEN_TTL_SECONDS });
+  //
+  // `prov` só entra no token da conta de password provisória: o de todas as outras continua sendo
+  // exatamente o que era, identidade e mais nada (ADR 0018).
+  const signAccessToken: SignAccessToken = (userId, provisional) =>
+    app.jwt.sign(
+      provisional ? { sub: userId, prov: true } : { sub: userId },
+      { expiresIn: ACCESS_TOKEN_TTL_SECONDS }
+    );
 
   app.post("/accounts", async (request, reply) => {
     const result = validateSignUp(request.body);
@@ -175,7 +188,10 @@ const authController: FastifyPluginAsync = async (app) => {
    * O `preHandler` está na rota, e não num escopo em `server.ts` como acontece com `/visitors`,
    * porque as outras três rotas deste controller são públicas: um escopo cobriria todas.
    */
-  app.get("/me", { preHandler: authenticate }, async (request, reply) => {
+  //
+  // Aceita a conta de password provisória: é por aqui que o aplicativo descobre que precisa pedir
+  // a password. Esta e `PATCH /me/password` são as DUAS únicas rotas que aceitam.
+  app.get("/me", { preHandler: authenticateAllowingProvisional }, async (request, reply) => {
     const userId = request.authUser?.id;
     if (!userId) {
       return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
@@ -217,7 +233,9 @@ const authController: FastifyPluginAsync = async (app) => {
     }
   });
 
-  app.patch("/me/password", { preHandler: authenticate }, async (request, reply) => {
+  // Aceita a conta de password provisória: é assim que ela deixa de ser provisória (feature 014).
+  // Trocar e-mail e apagar a conta NÃO aceitam.
+  app.patch("/me/password", { preHandler: authenticateAllowingProvisional }, async (request, reply) => {
     const userId = request.authUser?.id;
     if (!userId) {
       return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
@@ -253,6 +271,22 @@ const authController: FastifyPluginAsync = async (app) => {
 
     try {
       await deleteAccount(userId, result.data, request.ip);
+      return reply.code(204).send();
+    } catch (error) {
+      return replyWithAccountFailure(error, reply);
+    }
+  });
+
+  // A pessoa desiste do próprio pedido de entrada: o pedido e a conta deixam de existir. Sem body
+  // e SEM password — exceção ao que as três rotas acima fazem, explicada no service (ADR 0021).
+  app.delete("/me/join-request", { preHandler: authenticate }, async (request, reply) => {
+    const userId = request.authUser?.id;
+    if (!userId) {
+      return reply.code(401).send({ message: MESSAGE_SESSION_EXPIRED });
+    }
+
+    try {
+      await withdrawJoinRequest(userId);
       return reply.code(204).send();
     } catch (error) {
       return replyWithAccountFailure(error, reply);

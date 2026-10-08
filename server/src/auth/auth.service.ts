@@ -11,6 +11,12 @@ import {
   signedPhotoPathOf,
   type MembershipCondominium,
 } from "../condominiums/condominium.service.ts";
+import {
+  MESSAGE_CHOOSE_CONDOMINIUM,
+  MESSAGE_CHOOSE_UNIT,
+  type FormErrors,
+  type SignUpInput,
+} from "./auth.dto.ts";
 import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { prisma } from "../lib/prisma.ts";
 import { MANAGING_ROLES } from "../lib/roles.ts";
@@ -37,8 +43,14 @@ import { generateRefreshToken, hashRefreshToken } from "../lib/tokens.ts";
  */
 const DUMMY_HASH = await hashPassword("conta-inexistente");
 
-/** Assina a credencial de accessToken. O controller fornece, usando o plugin do Fastify. */
-export type SignAccessToken = (userId: string) => string;
+/**
+ * Assina a credencial de accessToken. O controller fornece, usando o plugin do Fastify.
+ *
+ * `provisional` é `true` para a conta cuja password ainda é a que o síndico definiu: o token sai
+ * com uma marca que `authenticate` recusa em toda rota menos duas (feature 014, ADR 0018). É a
+ * única coisa que o token carrega além da identidade, e só serve para TIRAR acesso.
+ */
+export type SignAccessToken = (userId: string, provisional: boolean) => string;
 
 export interface AuthUser {
   id: string;
@@ -78,9 +90,9 @@ export class AuthError extends Error {
 
 /** Recusa de cadastro com error por campo, que o formulário exibe sob cada um (FR-028). */
 export class SignUpError extends Error {
-  errors: { name?: string; email?: string; password?: string };
+  errors: FormErrors;
 
-  constructor(errors: { name?: string; email?: string; password?: string }) {
+  constructor(errors: FormErrors) {
     super("Cadastro recusado");
     this.name = "SignUpError";
     this.errors = errors;
@@ -98,9 +110,12 @@ export function toAuthUser(row: User): AuthUser {
  * Grava só o hash da credencial de renovação e devolve o value em text uma única vez — o banco
  * não permite recuperá-lo depois. O prazo é sempre contado a partir de now, e é isso que
  * mantém conectado quem usa o aplicativo.
+ *
+ * `provisional` vem de quem chama, que já tem a linha do usuário na mão — esta função não a lê.
  */
 export async function issueCredentials(
   userId: string,
+  provisional: boolean,
   signAccessToken: SignAccessToken
 ): Promise<Credentials> {
   const refreshToken = generateRefreshToken();
@@ -117,7 +132,7 @@ export async function issueCredentials(
   });
 
   return {
-    accessToken: signAccessToken(userId),
+    accessToken: signAccessToken(userId, provisional),
     refreshToken,
     expiresAt: new Date(
       Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000
@@ -234,7 +249,11 @@ export async function signIn(
 
   return {
     user: toAuthUser(user),
-    credentials: await issueCredentials(user.id, signAccessToken),
+    credentials: await issueCredentials(
+      user.id,
+      user.passwordIsProvisional,
+      signAccessToken
+    ),
   };
 }
 
@@ -252,6 +271,9 @@ export async function refresh(
 ): Promise<Credentials> {
   const current = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashRefreshToken(refreshToken) },
+    // A marca de password provisória é relida a cada renovação, na consulta que já existia: o
+    // token renovado de uma conta provisória continua restrito.
+    include: { user: { select: { passwordIsProvisional: true } } },
   });
 
   if (!current || current.expiresAt <= new Date()) {
@@ -268,7 +290,11 @@ export async function refresh(
     throw new AuthError("session");
   }
 
-  return issueCredentials(current.userId, signAccessToken);
+  return issueCredentials(
+    current.userId,
+    current.user.passwordIsProvisional,
+    signAccessToken
+  );
 }
 
 /** Encerra todas as sessões do usuário, em todos os aparelhos. */
@@ -294,14 +320,22 @@ export async function signOut(refreshToken: string): Promise<void> {
 }
 
 /**
- * Cria a conta e já abre uma sessão (FR-026, FR-030).
+ * Cria a conta JUNTO com o pedido de entrada num condomínio, e já abre uma sessão.
  *
- * A conta nasce SEM vínculo com condomínio, sem cargo e sem unidade (FR-027): ligar a pessoa a um
- * condomínio é assunto de outra feature. Um `resident` sem unidade seria recusado pelo próprio
- * banco (trigger da feature 003), e é por isso que nenhum vínculo é criado aqui.
+ * **Cadastrar-se é pedir para entrar** (feature 016). A conta nasce sem vínculo — não é moradora
+ * de lugar nenhum — e com um `JoinRequest` para a unidade que a pessoa disse ser a dela. Quem
+ * cuida do condomínio aprova ou rejeita; até lá a sessão aberta aqui só alcança a tela de espera.
+ *
+ * As duas gravações são UMA transação: nunca uma conta sem pedido por este caminho, nunca um
+ * pedido sem conta. Uma conta sem condomínio e sem pedido — a que pode criar um condomínio — não
+ * nasce mais daqui: nasce de `scripts/createAccount.ts`.
+ *
+ * A unidade é procurada antes só para devolver erro de CAMPO em vez de deixar a FK composta
+ * estourar como 500; a garantia de que ela é daquele condomínio continua sendo do banco. Unidade
+ * inexistente e unidade de outro condomínio recebem a mesma mensagem.
  */
 export async function signUp(
-  data: { name: string; email: string; password: string },
+  data: SignUpInput,
   origin: string,
   signAccessToken: SignAccessToken
 ): Promise<Session> {
@@ -319,22 +353,62 @@ export async function signUp(
     throw new SignUpError({ email: "This e-mail is already in use." });
   }
 
-  const user = await prisma.user.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      passwordHash: await hashPassword(data.password),
-    },
+  const unit = await prisma.unit.findFirst({
+    where: { id: data.unitId, condominiumId: data.condominiumId },
+    select: { id: true },
   });
+  if (!unit) {
+    const condominium = await prisma.condominium.findUnique({
+      where: { id: data.condominiumId },
+      select: { id: true },
+    });
+    throw new SignUpError(
+      condominium
+        ? { unitId: MESSAGE_CHOOSE_UNIT }
+        : { condominiumId: MESSAGE_CHOOSE_CONDOMINIUM }
+    );
+  }
+
+  const passwordHash = await hashPassword(data.password);
+
+  let user: User;
+  try {
+    user = await prisma.$transaction(async (transaction) => {
+      const created = await transaction.user.create({
+        data: { name: data.name, email: data.email, passwordHash: passwordHash },
+      });
+      await transaction.joinRequest.create({
+        data: {
+          userId: created.id,
+          condominiumId: data.condominiumId,
+          unitId: data.unitId,
+        },
+        select: { id: true },
+      });
+      return created;
+    });
+  } catch (error) {
+    // Outro cadastro com o mesmo e-mail passou pela conferência lá em cima ao mesmo tempo: quem
+    // decide é o índice único, e quem perde recebe a mesma recusa.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      await recordFailure([key]);
+      throw new SignUpError({ email: "This e-mail is already in use." });
+    }
+    throw error;
+  }
 
   return {
     user: toAuthUser(user),
-    credentials: await issueCredentials(user.id, signAccessToken),
+    // Quem se cadastra escolheu a própria password: nunca é provisória.
+    credentials: await issueCredentials(user.id, false, signAccessToken),
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Perfil de quem está autenticado                                            */
+/* Perfil de quem está autenticado                                           */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -374,7 +448,26 @@ export interface Profile {
   id: string;
   name: string;
   email: string;
+  /**
+   * A password ainda é a que o síndico definiu. Enquanto for `true` o aplicativo só mostra a tela
+   * de escolher a password — e o servidor recusa todo o resto de qualquer jeito (ADR 0018).
+   */
+  passwordIsProvisional: boolean;
+  /**
+   * O pedido de entrada desta pessoa, ENQUANTO estiver pendente; `null` em todos os outros casos.
+   * Com ele preenchido `memberships` vem vazia, e o aplicativo mostra só a tela de espera. Some
+   * quando o pedido é aprovado — e a pessoa passa a ter um vínculo de moradora — ou quando a conta
+   * deixa de existir, por rejeição ou desistência (feature 016).
+   */
+  joinRequest: ProfileJoinRequest | null;
   memberships: ProfileMembership[];
+}
+
+export interface ProfileJoinRequest {
+  condominium: { id: string; name: string };
+  unit: { block: string | null; number: string };
+  /** ISO 8601: quando foi pedido. Um instante, lido na hora local. */
+  requestedAt: string;
 }
 
 /**
@@ -394,6 +487,15 @@ export async function getProfile(userId: string): Promise<Profile> {
       id: true,
       name: true,
       email: true,
+      passwordIsProvisional: true,
+      joinRequest: {
+        select: {
+          createdAt: true,
+          // Só o nome: nem a foto nem o endereço do condomínio saem para quem ainda não entrou.
+          condominium: { select: { id: true, name: true } },
+          unit: { select: { block: true, number: true } },
+        },
+      },
       memberships: {
         select: {
           role: true,
@@ -422,6 +524,14 @@ export async function getProfile(userId: string): Promise<Profile> {
     id: row.id,
     name: row.name,
     email: row.email,
+    passwordIsProvisional: row.passwordIsProvisional,
+    joinRequest: row.joinRequest
+      ? {
+          condominium: row.joinRequest.condominium,
+          unit: row.joinRequest.unit,
+          requestedAt: row.joinRequest.createdAt.toISOString(),
+        }
+      : null,
     memberships: row.memberships.map((membership) => ({
       condominium: {
         id: membership.condominium.id,
@@ -450,6 +560,8 @@ export async function getProfile(userId: string): Promise<Profile> {
  *   apagada (FR-038).
  * - `hasRecords` → 409. Não administra hoje, mas avisos ou achados que publicou continuam
  *   apontando para ela, e esses registros são do condomínio.
+ * - `noRequest` → 404. Desistir do pedido de entrada, quando não há pedido: ele acabou de ser
+ *   respondido.
  */
 export type AccountFailure =
   | "currentPassword"
@@ -457,7 +569,8 @@ export type AccountFailure =
   | "emailTaken"
   | "samePassword"
   | "administrator"
-  | "hasRecords";
+  | "hasRecords"
+  | "noRequest";
 
 export class AccountError extends Error {
   reason: AccountFailure;
@@ -568,9 +681,15 @@ export async function changePassword(
     throw new AccountError("samePassword");
   }
 
+  // A marca de provisória cai NO MESMO `UPDATE` que grava o hash, e não num segundo: é assim que
+  // a conta criada pelo síndico deixa de ser provisória, e não pode haver um instante com a
+  // password nova e a marca velha — nem o contrário (feature 014, research R-005).
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: await hashPassword(data.newPassword) },
+    data: {
+      passwordHash: await hashPassword(data.newPassword),
+      passwordIsProvisional: false,
+    },
     select: { id: true },
   });
 
@@ -582,7 +701,8 @@ export async function changePassword(
   // desconectada. Apagadas, elas viram credencial desconhecida: o aparelho antigo é recusado e
   // nada mais acontece (FR-019).
   await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
-  return issueCredentials(user.id, signAccessToken);
+  // O par novo sai SEM a restrição: a password agora é de quem a escolheu.
+  return issueCredentials(user.id, false, signAccessToken);
 }
 
 /**
@@ -594,9 +714,10 @@ export async function changePassword(
  * 1. A password. Só quem provou ser dono da conta ouve qualquer coisa sobre o estado dela.
  * 2. Administra algum condomínio → recusado. Os avisos e os achados do condomínio guardam o autor,
  *    e ainda não existe como passar a administração adiante (FR-038).
- * 3. O `DELETE`. Se o banco recusar é porque avisos ou achados ainda apontam para um vínculo dela
- *    com `Restrict` — o caso de quem JÁ FOI administradora. Isso tem de chegar como explicação,
- *    não como erro 500.
+ * 3. O `DELETE`. Se o banco recusar é porque avisos ou achados ainda apontam para ela com
+ *    `Restrict` — o caso de quem JÁ FOI administradora. Desde a feature 014 eles apontam para a
+ *    conta, e não para o vínculo (ADR 0019); a recusa é a mesma. Isso tem de chegar como
+ *    explicação, não como erro 500.
  *
  * Depois disso, entrar com os dados da conta falha exatamente como para um e-mail que nunca
  * existiu: não há nada a fazer para isso, a linha não está mais lá (FR-035).
@@ -631,4 +752,51 @@ export async function deleteAccount(
   }
 
   await clearFailures(user.email);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Desistir do pedido de entrada (feature 016)                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A pessoa desiste do próprio pedido de entrada: o pedido E a conta deixam de existir.
+ *
+ * **Não pede a password**, ao contrário de `deleteAccount` — e é uma exceção estreita ao ADR 0015.
+ * Aquela regra existe para um aparelho desbloqueado na mão errada não tomar a conta; esta rota só
+ * funciona enquanto o pedido está pendente, e uma conta pendente não guarda nada: nenhum
+ * condomínio, nenhum dado, nada a tomar (ADR 0021).
+ *
+ * Começa apagando o pedido, e só segue se apagou — como toda resposta a um pedido. Se quem cuida do
+ * condomínio o aprovou no mesmo instante, este `DELETE` não acha nada, a conta NÃO é apagada e a
+ * pessoa continua moradora.
+ *
+ * A conta só é apagada se não tem vínculo nenhum. Hoje um pedido só vem com conta nova, então
+ * sempre é o caso; a trava existe para o dia em que alguém que já mora num lugar puder pedir outro.
+ */
+export async function withdrawJoinRequest(userId: string): Promise<void> {
+  const removedEmail = await prisma.$transaction(async (transaction) => {
+    const { count } = await transaction.joinRequest.deleteMany({
+      where: { userId: userId },
+    });
+    if (count === 0) {
+      throw new AccountError("noRequest");
+    }
+
+    const memberships = await transaction.condominiumMember.count({
+      where: { userId: userId },
+    });
+    if (memberships > 0) {
+      return null;
+    }
+
+    const user = await transaction.user.delete({
+      where: { id: userId },
+      select: { email: true },
+    });
+    return user.email;
+  });
+
+  if (removedEmail !== null) {
+    await clearFailures(removedEmail);
+  }
 }

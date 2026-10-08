@@ -1,3 +1,4 @@
+import { Prisma } from "../../generated/prisma/client.ts";
 import type { Role } from "../../generated/prisma/enums.ts";
 import { prisma } from "../lib/prisma.ts";
 import { signPath } from "../lib/signedPath.ts";
@@ -63,6 +64,27 @@ export function signedPhotoPathOf(condominium: {
 }
 
 /**
+ * Motivo de recusa que o controller traduz em status code.
+ *
+ * - `alreadyBelongs` → 409. Quem pediu já pertence a um condomínio. O pedido estava bem formado; o
+ *   que não permite é o estado da conta.
+ * - `pending` → 409. Quem pediu tem um pedido de entrada num condomínio à espera de resposta
+ *   (feature 016). Uma conta pendente não tem vínculo — passaria pela contagem acima —, e criar um
+ *   condomínio é justamente a única coisa que uma conta sem vínculo consegue fazer.
+ */
+export type CondominiumFailure = "alreadyBelongs" | "pending";
+
+export class CondominiumError extends Error {
+  reason: CondominiumFailure;
+
+  constructor(reason: CondominiumFailure) {
+    super(`Condomínio recusado (${reason})`);
+    this.name = "CondominiumError";
+    this.reason = reason;
+  }
+}
+
+/**
  * Cria o condomínio, as unidades de cada bloco e o vínculo de quem criou, como SÍNDICO.
  *
  * **Tudo ou nada, numa transação.** São três tabelas, então — diferente de reservar o dia inteiro
@@ -77,15 +99,43 @@ export function signedPhotoPathOf(condominium: {
  * porque também guarda coisas como `101`. Um bloco não é uma tabela: é o valor de `block` que as
  * unidades dele compartilham.
  *
- * Quem cria vem do token, nunca do body. E um pedido repetido cria um SEGUNDO condomínio, de
- * propósito: dois condomínios podem ter o mesmo nome (RN-CON-01), então não há chave natural para
- * recusar duplicata — quem barra o toque duplo é o app.
+ * Quem cria vem do token, nunca do body.
+ *
+ * **Só cria quem ainda não pertence a condomínio nenhum, e por isso um síndico tem um só** (decisão
+ * do dono do produto, 2026-10-07). Criar é o que torna a pessoa síndica; quem já é moradora,
+ * administradora ou porteira de algum lugar não cria, e quem já criou o seu não cria outro.
+ *
+ * São duas travas, e as duas são necessárias:
+ *
+ * - a contagem de vínculos, dentro da transação, recusa quem já pertence a algum condomínio com
+ *   QUALQUER cargo — é a única que pega o morador, o administrador e o porteiro;
+ * - o índice único `condominium_members_one_condominium_per_manager_key` recusa o segundo vínculo de
+ *   síndico. É ele que segura dois pedidos simultâneos da mesma conta, que passariam os dois pela
+ *   contagem. Até esta regra um pedido repetido criava um segundo condomínio, e quem barrava o
+ *   toque duplo era só o app.
+ *
+ * Dois condomínios continuam podendo ter o mesmo nome (RN-CON-01).
  */
 export async function createCondominium(
   data: NewCondominium,
   creatorId: string
 ): Promise<CreatedMembership> {
   const created = await prisma.$transaction(async (transaction) => {
+    const memberships = await transaction.condominiumMember.count({
+      where: { userId: creatorId },
+    });
+    if (memberships > 0) {
+      throw new CondominiumError("alreadyBelongs");
+    }
+
+    const joinRequest = await transaction.joinRequest.findUnique({
+      where: { userId: creatorId },
+      select: { id: true },
+    });
+    if (joinRequest) {
+      throw new CondominiumError("pending");
+    }
+
     const condominium = await transaction.condominium.create({
       data: {
         name: data.name,
@@ -107,14 +157,26 @@ export async function createCondominium(
       ),
     });
 
-    await transaction.condominiumMember.create({
-      data: {
-        userId: creatorId,
-        condominiumId: condominium.id,
-        role: "manager",
-      },
-      select: { userId: true },
-    });
+    try {
+      await transaction.condominiumMember.create({
+        data: {
+          userId: creatorId,
+          condominiumId: condominium.id,
+          role: "manager",
+        },
+        select: { userId: true },
+      });
+    } catch (error) {
+      // `P2002` aqui só pode ser o índice de "um condomínio por síndico": outro pedido desta mesma
+      // conta gravou antes. A transação inteira é desfeita, então não sobra condomínio sem síndico.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new CondominiumError("alreadyBelongs");
+      }
+      throw error;
+    }
 
     return condominium;
   });

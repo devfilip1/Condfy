@@ -25,6 +25,7 @@ const MESSAGE_CANNOT_POST =
   "Only the condominium administrator can post found items.";
 const MESSAGE_CANNOT_CHANGE_STATUS =
   "Only the condominium administrator can change the status of a found item.";
+const MESSAGE_NO_ACCESS = "A doorman has no access to lost & found.";
 const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
 
 /**
@@ -53,9 +54,12 @@ const foundItemController: FastifyPluginAsync = async (app) => {
           await listFoundItems(request.params.condominiumId, requesterId)
         );
       } catch (error) {
-        // Condomínio inexistente e condomínio alheio recebem a MESMA resposta, de propósito.
+        // Condomínio inexistente e condomínio alheio recebem a MESMA resposta, de propósito. Quem
+        // pertence ao condomínio e não lê a prateleira — o porteiro — ouve que não pode.
         if (error instanceof FoundItemError) {
-          return reply.code(404).send({ message: MESSAGE_UNKNOWN_CONDOMINIUM });
+          return error.reason === "forbidden"
+            ? reply.code(403).send({ message: MESSAGE_NO_ACCESS })
+            : reply.code(404).send({ message: MESSAGE_UNKNOWN_CONDOMINIUM });
         }
         throw error;
       }

@@ -57,14 +57,30 @@ export interface NewNotice {
   date: string;
 }
 
-/** As colunas e a relação que `toNotice` precisa, num lugar só para as duas consultas. */
-const NOTICE_COLUMNS = {
-  id: true,
-  title: true,
-  body: true,
-  date: true,
-  publishedBy: { select: { role: true, user: { select: { name: true } } } },
-} as const;
+/**
+ * As colunas e a relação que `toNotice` precisa, num lugar só para as duas consultas.
+ *
+ * É uma função do condomínio desde a feature 014: quem publicou é um USUÁRIO (ADR 0019), e o cargo
+ * dele é lido do vínculo NESTE condomínio — que pode não existir mais, se o síndico o removeu. A
+ * lista de vínculos vem com zero ou um item, por causa do filtro.
+ */
+function noticeColumns(condominiumId: string) {
+  return {
+    id: true,
+    title: true,
+    body: true,
+    date: true,
+    publishedBy: {
+      select: {
+        name: true,
+        memberships: {
+          where: { condominiumId: condominiumId },
+          select: { role: true },
+        },
+      },
+    },
+  } as const;
+}
 
 /**
  * Converte a row para o contrato.
@@ -77,7 +93,7 @@ function toNotice(row: {
   title: string;
   body: string;
   date: Date;
-  publishedBy: { role: Role; user: { name: string } };
+  publishedBy: { name: string; memberships: { role: Role }[] };
 }): Notice {
   return {
     id: row.id,
@@ -87,8 +103,10 @@ function toNotice(row: {
     date: row.date.toISOString().slice(0, 10),
     publishedBy: {
       name: displayNameOf({
-        role: row.publishedBy.role,
-        name: row.publishedBy.user.name,
+        // Sem vínculo, quem publicou não pertence mais ao condomínio: aparece com o próprio nome.
+        // Supor que o vínculo existe aqui derrubaria o mural na primeira remoção.
+        role: row.publishedBy.memberships[0]?.role ?? null,
+        name: row.publishedBy.name,
       }),
     },
   };
@@ -123,7 +141,7 @@ export async function listNotices(
 
   const rows = await prisma.notice.findMany({
     where: { condominiumId: condominiumId },
-    select: NOTICE_COLUMNS,
+    select: noticeColumns(condominiumId),
     orderBy: [{ date: "desc" }, { id: "desc" }],
   });
 
@@ -160,7 +178,7 @@ export async function publishNotice(
       // Meia-noite UTC para a coluna DATE guardar exatamente o dia informado.
       date: new Date(`${data.date}T00:00:00.000Z`),
     },
-    select: NOTICE_COLUMNS,
+    select: noticeColumns(condominiumId),
   });
 
   return toNotice(row);

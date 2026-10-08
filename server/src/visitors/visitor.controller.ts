@@ -19,6 +19,8 @@ import {
 /** Mesma recusa para unidade inexistente e para unidade de condomínio alheio. */
 const MESSAGE_UNKNOWN_UNIT = "Select a unit.";
 
+const MESSAGE_DOORMAN_CANNOT_REGISTER = "A doorman cannot register visitors.";
+
 const MESSAGE_SESSION_EXPIRED = "Your session has expired. Sign in again.";
 
 const visitorController: FastifyPluginAsync = async (app) => {
@@ -50,6 +52,10 @@ const visitorController: FastifyPluginAsync = async (app) => {
         .send(await createVisitor(result.data, authorizedById));
     } catch (error) {
       if (error instanceof VisitorError) {
+        // O porteiro pertence ao condomínio: ouve que não pode, em vez de um erro de campo.
+        if (error.reason === "forbidden") {
+          return reply.code(403).send({ message: MESSAGE_DOORMAN_CANNOT_REGISTER });
+        }
         return reply.code(400).send({ errors: { unitId: MESSAGE_UNKNOWN_UNIT } });
       }
       throw error;

@@ -23,7 +23,12 @@ export const ADMINISTRATOR_DISPLAY_NAME = "Administrator";
  */
 export const MANAGER_DISPLAY_NAME = "Manager";
 
-export function displayNameOf(member: { role: Role; name: string }): string {
+/**
+ * `role` é `null` quando a pessoa NÃO pertence mais ao condomínio — o autor de um aviso que foi
+ * removido pelo síndico (feature 014). Ela aparece com o próprio nome, que é o que já acontecia com
+ * quem deixou de ser administrador e ficou.
+ */
+export function displayNameOf(member: { role: Role | null; name: string }): string {
   // Um `switch` e não a função de `roles.ts`, de propósito: aqui os dois cargos NÃO são a mesma
   // coisa — cada um tem a sua palavra.
   switch (member.role) {
@@ -31,7 +36,11 @@ export function displayNameOf(member: { role: Role; name: string }): string {
       return ADMINISTRATOR_DISPLAY_NAME;
     case "manager":
       return MANAGER_DISPLAY_NAME;
+    // O porteiro aparece com o próprio nome: não publica nada que o morador leia como "o cargo
+    // falando".
+    case "doorman":
     case "resident":
+    case null:
       return member.name;
   }
 }

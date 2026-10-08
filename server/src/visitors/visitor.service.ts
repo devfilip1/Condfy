@@ -1,7 +1,11 @@
 import type { Role, VisitType } from "../../generated/prisma/enums.ts";
 import { displayNameOf } from "../lib/displayName.ts";
 import { prisma } from "../lib/prisma.ts";
-import { MANAGING_ROLES } from "../lib/roles.ts";
+import {
+  ACTING_ROLES,
+  ROLES_SEEING_EVERY_VISIT,
+  actsInCondominium,
+} from "../lib/roles.ts";
 import type { NewVisitor } from "./visitor.dto.ts";
 
 /**
@@ -61,10 +65,25 @@ export interface Visitor {
    * ter gerado o comprovante não o recebe (research R-007 da 012).
    */
   passCode?: string;
+  /**
+   * Quando o visitante entrou: o instante da primeira conferência válida do comprovante, em ISO
+   * 8601, ou `null` se ninguém o conferiu ainda. Ao contrário de `passCode`, vai para TODO MUNDO
+   * que já vê a visita — o porteiro, quem cuida do condomínio e o morador que a liberou, que assim
+   * fica sabendo que a entrega chegou (feature 015).
+   *
+   * É um INSTANTE, e `expectedDate` logo acima é um dia de calendário: não são lidos pela mesma
+   * função.
+   */
+  enteredAt: string | null;
 }
 
-/** Motivo da recusa que o controller traduz em status code. */
-export type VisitorFailure = "unit";
+/**
+ * Motivo da recusa que o controller traduz em status code.
+ *
+ * - `unit` → 400 no campo. Unidade inexistente, ou de um condomínio onde quem pediu não tem vínculo.
+ * - `forbidden` → 403. Tem vínculo, mas o cargo não libera visita: o porteiro (feature 014).
+ */
+export type VisitorFailure = "unit" | "forbidden";
 
 export class VisitorError extends Error {
   reason: VisitorFailure;
@@ -80,6 +99,7 @@ export class VisitorError extends Error {
 const WITH_RELATIONS = {
   // Sempre lido; se SAI na resposta é `toVisitor` que decide, olhando quem pediu.
   passCode: true,
+  enteredAt: true,
   unit: { select: { id: true, block: true, number: true } },
   // O cargo vem junto porque decide o NOME exibido: o administrador aparece como "Administrator".
   authorizedBy: {
@@ -94,6 +114,7 @@ type VisitorRowWithRelations = {
   expectedDate: Date;
   condominiumId: string;
   passCode: string;
+  enteredAt: Date | null;
   unit: { id: string; block: string | null; number: string };
   authorizedBy: { userId: string; role: Role; user: { name: string } };
 };
@@ -110,7 +131,14 @@ export function toVisitor(
   requesterId: string
 ): Visitor {
   // Uma pergunta só decide as duas coisas: remover a visita e ter o comprovante dela.
-  const authorizedByRequester = row.authorizedBy.userId === requesterId;
+  //
+  // Além de ter liberado a visita, quem pede precisa de um cargo que AGE. Quando é ele quem
+  // liberou, `authorizedBy.role` é o cargo dele mesmo — não é preciso outra consulta. O caso que
+  // isto fecha: quem liberou uma visita como administrador e depois virou porteiro. O porteiro não
+  // remove visita nenhuma nem recebe código de comprovante nenhum, nem dessas (feature 015).
+  const authorizedByRequester =
+    row.authorizedBy.userId === requesterId &&
+    actsInCondominium(row.authorizedBy.role);
 
   return {
     canRemove: authorizedByRequester,
@@ -120,6 +148,8 @@ export function toVisitor(
     name: row.name,
     type: row.type,
     expectedDate: row.expectedDate.toISOString().slice(0, 10),
+    // O instante inteiro, com hora e fuso: quem lê converte para a hora local.
+    enteredAt: row.enteredAt?.toISOString() ?? null,
     condominiumId: row.condominiumId,
     unit: {
       id: row.unit.id,
@@ -141,8 +171,9 @@ export function toVisitor(
 /**
  * Quais visitas uma pessoa VÊ.
  *
- * - **Administrador**: todas as visitas dos condomínios que ele administra, de qualquer unidade e
- *   autorizadas por qualquer pessoa. É o único que vê visita de outra pessoa.
+ * - **Quem cuida do condomínio e o porteiro**: todas as visitas dos condomínios onde têm esse
+ *   cargo, de qualquer unidade e autorizadas por qualquer pessoa — passadas, de hoje e futuras. O
+ *   porteiro entrou nesta lista na feature 015: é o caderno da portaria.
  * - **Morador**: só as que ele mesmo autorizou. Nem a de quem mora na mesma unidade.
  *
  * O cargo é POR CONDOMÍNIO: quem administra um prédio e mora em outro vê tudo do primeiro e só as
@@ -152,14 +183,14 @@ export function toVisitor(
  * `removeVisitor`.
  */
 async function visibleTo(requesterId: string) {
-  const administered = await prisma.condominiumMember.findMany({
-    where: { userId: requesterId, role: { in: MANAGING_ROLES } },
+  const seenWhole = await prisma.condominiumMember.findMany({
+    where: { userId: requesterId, role: { in: ROLES_SEEING_EVERY_VISIT } },
     select: { condominiumId: true },
   });
 
   return {
     OR: [
-      { condominiumId: { in: administered.map((row) => row.condominiumId) } },
+      { condominiumId: { in: seenWhole.map((row) => row.condominiumId) } },
       { authorizedById: requesterId },
     ],
   };
@@ -220,11 +251,17 @@ export async function createVisitor(
         condominiumId: unit.condominiumId,
       },
     },
-    select: { userId: true },
+    select: { userId: true, role: true },
   });
 
   if (!member) {
     throw new VisitorError("unit");
+  }
+
+  // Esta rota é aberta a qualquer vínculo, e o porteiro tem um. Por enquanto ele só lê: sem esta
+  // pergunta, liberaria visita para qualquer unidade do prédio (feature 014, FR-009).
+  if (!actsInCondominium(member.role)) {
+    throw new VisitorError("forbidden");
   }
 
   const row = await prisma.visitor.create({
@@ -263,6 +300,12 @@ export async function createVisitor(
  */
 export async function removeVisitor(id: string, requesterId: string): Promise<void> {
   await prisma.visitor.deleteMany({
-    where: { id: id, authorizedById: requesterId },
+    where: {
+      id: id,
+      authorizedById: requesterId,
+      // O porteiro não remove visita nenhuma — nem a que liberou quando era administrador. É a
+      // mesma condição de `canRemove` em `toVisitor`, e recebe o mesmo sucesso calado.
+      authorizedBy: { role: { in: ACTING_ROLES } },
+    },
   });
 }

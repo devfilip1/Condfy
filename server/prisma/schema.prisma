@@ -39,6 +39,11 @@ model Visitor {
   /// qualquer escritor — a API, a carga, um script. Não é o `id` de propósito: o administrador
   /// recebe o `id` de toda visita do condomínio, e o código só pode chegar a quem a autorizou.
   passCode       String    @unique @default(dbgenerated("gen_random_uuid()")) @map("pass_code") @db.Uuid
+  /// Quando o visitante ENTROU: o momento da primeira conferência do comprovante que respondeu
+  /// "válido" (feature 015). `null` até lá; gravado UMA vez e nunca mais alterado nem apagado.
+  /// É um INSTANTE, como `postedAt` de um achado e ao contrário de `expectedDate`, que é um dia
+  /// de calendário: trafega em ISO 8601 completo e é lido na hora local. Só a conferência grava.
+  enteredAt      DateTime? @map("entered_at") @db.Timestamptz(3)
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -63,11 +68,18 @@ model Visitor {
 ///
 /// Quem "cuida" de um condomínio é o administrador ou o síndico — a pergunta é feita num lugar só,
 /// `managesCondominium` em `src/lib/roles.ts`, nunca comparando com `admin`.
+///
+/// Na feature 014 o PORTEIRO também voltou, e são quatro cargos. Ele não cuida do condomínio e,
+/// por enquanto, só lê: quem responde "este cargo age aqui?" é `actsInCondominium`, no mesmo
+/// arquivo.
 enum Role {
   resident
   admin
   /// Síndico: quem criou o condomínio. No máximo um por condomínio.
   manager
+  /// Porteiro: qualquer número por condomínio, sem unidade. Não cuida do condomínio e, por
+  /// enquanto, só lê.
+  doorman
 }
 
 // As CHECKs (nome, e-mail, bloco, número) e as triggers de "morador tem unidade" não cabem no
@@ -92,6 +104,7 @@ model Condominium {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   units       Unit[]
+  joinRequests JoinRequest[]
   members     CondominiumMember[]
   commonAreas CommonArea[]
   notices     Notice[]
@@ -139,11 +152,11 @@ model FoundItem {
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
   condominium Condominium       @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
-  /// A FK composta garante que quem postou pertence ao condomínio do item.
-  ///
-  /// `Restrict`, como nos avisos e ao contrário das visitas: a prateleira é do condomínio, e não
-  /// pode esvaziar porque o administrador foi trocado.
-  postedBy    CondominiumMember @relation(fields: [postedById, condominiumId], references: [userId, condominiumId], onDelete: Restrict)
+  /// Aponta para o USUÁRIO, e não mais para o vínculo (feature 014, ADR 0019), pelo mesmo motivo
+  /// dos avisos: a prateleira é do condomínio e fica quando quem postou é removido dele. O
+  /// `Restrict` continua valendo para a CONTA. Que quem posta pertence ao condomínio é o service
+  /// que confere, antes de gravar.
+  postedBy    User              @relation(fields: [postedById], references: [id], onDelete: Restrict)
 
   @@index([condominiumId, postedAt(sort: Desc), id])
   @@map("found_items")
@@ -168,12 +181,18 @@ model Notice {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   condominium Condominium       @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
-  /// A FK composta garante que quem publicou pertence ao condomínio do aviso.
+  /// Aponta para o USUÁRIO, e não mais para o vínculo (feature 014, ADR 0019).
   ///
-  /// `Restrict`, e não `Cascade` como em visitors, de propósito: uma visita é sobre uma pessoa
-  /// receber alguém e sai com ela, enquanto um aviso é o condomínio falando. Perder o mural porque
-  /// o administrador foi trocado seria defeito, não cascata (research R-008).
-  publishedBy CondominiumMember @relation(fields: [publishedById, condominiumId], references: [userId, condominiumId], onDelete: Restrict)
+  /// Até a 014 era uma FK composta para `condominium_members`, com `Restrict`, para o mural não se
+  /// perder numa troca de administrador. Só que nada trocava administrador: o que o `Restrict`
+  /// fazia na prática era impedir o vínculo de ser apagado. Agora o síndico remove pessoas, e o
+  /// aviso tem de ficar — então ele aponta para a pessoa. O `Restrict` continua valendo para a
+  /// CONTA: quem publicou não apaga a própria conta (`hasRecords`).
+  ///
+  /// O que se perdeu: o banco não garante mais que quem publicou pertencia ao condomínio. Quem
+  /// confere é o service, antes de gravar — e um vínculo que acaba é justamente o caso que a
+  /// coluna precisa aceitar.
+  publishedBy User              @relation(fields: [publishedById], references: [id], onDelete: Restrict)
 
   @@index([condominiumId, date(sort: Desc), id])
   @@map("notices")
@@ -265,6 +284,7 @@ model Unit {
   condominium   Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
   residents     UnitResident[]
   visitors      Visitor[]
+  joinRequests  JoinRequest[]
 
   // Alvo da FK composta de UnitResident: garante unidade do mesmo condomínio do vínculo (R-002).
   @@unique([id, condominiumId])
@@ -281,10 +301,19 @@ model User {
   email         String              @unique @db.VarChar(254)
   /// `scrypt$N$r$p$salt$hash` (research R-006). Nunca a senha.
   passwordHash  String              @map("password_hash")
+  /// `true` desde a criação da conta PELO SÍNDICO até a pessoa trocar a password (feature 014).
+  /// Nunca volta a `true`: é isso que deixa a marca no token ser segura (ADR 0018). Enquanto for
+  /// `true`, a conta só alcança o próprio perfil e a troca de password.
+  passwordIsProvisional Boolean     @default(false) @map("password_is_provisional")
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
   memberships   CondominiumMember[]
   refreshTokens RefreshToken[]
+  /// O pedido de entrada desta pessoa num condomínio, enquanto estiver pendente. No máximo um.
+  joinRequest   JoinRequest?
+  /// O que a pessoa publicou e postou. Apontam para cá, e não para o vínculo, desde a feature 014.
+  notices       Notice[]
+  foundItems    FoundItem[]
 
   @@map("users")
 }
@@ -300,9 +329,7 @@ model CondominiumMember {
   condominium      Condominium    @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
   residences       UnitResident[]
   authorizedVisits Visitor[]
-  notices          Notice[]
   reservations     Reservation[]
-  foundItems       FoundItem[]
 
   @@id([userId, condominiumId])
   // No máximo um administrador por condomínio. Herdado da regra do síndico (research R-003), que
@@ -311,6 +338,9 @@ model CondominiumMember {
   // No máximo um síndico por condomínio, do mesmo jeito. Os dois índices são independentes: um
   // condomínio pode ter um administrador e um síndico, que são pessoas diferentes (ADR 0017).
   @@unique([condominiumId], map: "condominium_members_one_manager_key", where: raw("role = 'manager'"))
+  // E uma PESSOA é síndica de no máximo um condomínio: quem já criou o seu não cria outro. É este
+  // índice, e não uma conferência no service, que segura dois pedidos simultâneos da mesma conta.
+  @@unique([userId], map: "condominium_members_one_condominium_per_manager_key", where: raw("role = 'manager'"))
   @@index([condominiumId])
   @@map("condominium_members")
 }
@@ -329,6 +359,35 @@ model UnitResident {
   @@id([userId, unitId])
   @@index([unitId, condominiumId])
   @@map("unit_residents")
+}
+
+/// Pedido de entrada de uma pessoa num condomínio, como moradora de uma unidade (feature 016).
+///
+/// **A linha existir É o "pendente".** Não há coluna de situação e não há histórico: aprovar,
+/// rejeitar e desistir APAGAM a linha — do mesmo jeito que a existência de uma reserva é a reserva.
+/// Toda resposta começa por esse `DELETE`, e só segue quem de fato apagou: é isso que dá um
+/// resultado só a duas respostas simultâneas (ADR 0021).
+///
+/// Não é um vínculo com uma marca de "pendente", de propósito: todas as conferências de permissão
+/// leem `condominium_members`, e cada uma teria de lembrar de excluir os pendentes — uma esquecida
+/// é um estranho dentro do prédio.
+model JoinRequest {
+  id            String   @id @default(uuid())
+  /// Único: uma pessoa tem no máximo um pedido. Sai junto com a conta.
+  userId        String   @unique @map("user_id")
+  condominiumId String   @map("condominium_id")
+  unitId        String   @map("unit_id")
+  /// Quando foi pedido. Um INSTANTE, lido na hora local de quem olha.
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  condominium Condominium @relation(fields: [condominiumId], references: [id], onDelete: Restrict)
+  /// A FK composta garante que a unidade pedida é do MESMO condomínio do pedido.
+  unit        Unit        @relation(fields: [unitId, condominiumId], references: [id, condominiumId], onDelete: Restrict)
+
+  // A lista de um condomínio, do pedido mais antigo para o mais novo.
+  @@index([condominiumId, createdAt, id])
+  @@map("join_requests")
 }
 
 // Renovação de sessão (feature 004). O valor da credencial nunca é gravado: só o hash SHA-256.
