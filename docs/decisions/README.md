@@ -27,6 +27,7 @@ forces at the time, the alternatives, and what it costs.
 | [0020](0020-reading-a-pass-needs-the-camera-and-records-the-entry.md) | Reading a pass needs the camera, answers in four values of one field, and records the entry once | Accepted | 2026-10 |
 | [0021](0021-a-join-request-is-a-row-that-an-answer-deletes.md) | A join request is a row that an answer deletes, and "pending" is not a membership | Accepted | 2026-10 |
 | [0022](0022-the-home-screen-has-no-tab-bar-and-composes-the-latest-notice.md) | The home screen has no tab bar, draws modules by kind, and composes the latest notice from the newsletter feature | Accepted | 2026-10 |
+| [0023](0023-the-visual-identity-is-amber-and-graphite-in-red-hat.md) | The visual identity is amber and graphite in Red Hat, and a text style picks a family instead of a weight | Accepted | 2026-10 |
 
 Decisions reconstructed from code carry the status `Reconstructed`. When a decision replaces
 another, the old one becomes `Superseded by NNNN` and is kept.

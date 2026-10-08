@@ -99,6 +99,21 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
   loose colour from `useTheme()` (`@/shared/theme`); every `<Text>` and every icon has a colour from
   the palette. There is no `Colors` export, on purpose — do not add one back to quiet the typecheck
   (ADR 0014). `tsc` catches an unconverted file; it does **not** catch colourless text.
+- **A text style picks its weight with `fontFamily: fonts.…`, never with `fontWeight`** (ADR 0023).
+  Each font file holds one weight; bold of 16 and above is `fonts.display`, smaller bold is
+  `fonts.bold`. Text with no `fontFamily` falls back to the system font and nothing catches it. The
+  two `@expo-google-fonts` packages have one importer, `mobile/shared/theme/fonts.ts`.
+- **A font size is `fontSizes.…` and a corner is `radius.…`**, both from `@/shared/theme`
+  (`shared/theme/scale.ts`). No new loose number. The exceptions are geometry: a circle (`999` or
+  half a side) and the symbol in `CondfySymbol`. Spacing has no token yet.
+- **Amber as text or as an icon is `accentText`, never `accent`** — `accent` on a light background
+  cannot be read. A changed colour in `Colors.ts` needs its text pairs checked against 4.5:1 again.
+- **The identity changes colour, type and the mark, never a layout.** Do not move, resize or remove
+  a component in its name.
+- **The symbol is drawn twice, on the same 64-unit grid**: `mobile/scripts/make-icons.js` writes the
+  icon files and `shared/components/CondfySymbol.tsx` draws it with views, at any size — the pass
+  and the sign-in screen both use it. Change both, then run the script; never edit
+  the PNGs.
 - **A wrong current password answers `400` on the field, never `401`.** A `401` makes the app renew
   the session and send the request again (ADR 0015).
 - **Ending an account's sessions after a password change means deleting its refresh tokens, not
@@ -130,7 +145,8 @@ cd mobile && npx tsc --noEmit && npm run lint   # gates
 - **A module declares its `kind`** in `mobile/features/home/data/modules.ts`: `everyday` is a grid
   card, `administration` a full-width row below the notice card. No component lists module names.
 - **There is no tab bar and no `(tabs)` group** (ADR 0022); the home screen is `app/index.tsx`.
-  Signing out is a row of Settings. `mobile/assets/images/` holds the one bundled image.
+  Signing out is a row of Settings. `mobile/assets/images/` holds the one bundled picture and the
+  generated icons.
 - **The visitor pass is always drawn with the light palette**, through a nested
   `ThemeProvider scheme="light"` — never through a colour constant. Its code (`passCode`) is sent
   only to whoever authorized the visit; never add it to a response for anybody else.

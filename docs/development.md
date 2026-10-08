@@ -176,6 +176,18 @@ npx prisma studio      # from server/
 4. Never edit a migration that has already been applied outside your machine.
 5. Update [data-model.md](data-model.md) in the same task.
 
+### Regenerating the app icons
+
+The icon, the Android adaptive icon, the favicon and the splash image in `mobile/assets/images/`
+are drawn from the symbol by a script with no dependencies:
+
+```bash
+cd mobile && node scripts/make-icons.js
+```
+
+Change the symbol in the script and in `CondfySymbol.tsx` together, then run it. The PNGs are
+committed and never edited by hand (ADR 0023).
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

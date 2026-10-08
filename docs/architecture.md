@@ -158,6 +158,17 @@ setting. `shared/theme/` does no I/O. Every `<Text>` and every icon takes its co
 palette; text with no colour is black, and black is invisible on dark
 ([ADR 0014](decisions/0014-colours-come-from-context-and-styles-are-made-from-the-palette.md)).
 
+**Type.** The app is set in Red Hat Display (titles) and Red Hat Text (everything else).
+[shared/theme/fonts.ts](../mobile/shared/theme/fonts.ts) is the only importer of the two font
+packages and exports `fonts`, the family names. A text style names one — `fontFamily: fonts.regular`
+— and declares no `fontWeight`: each font file holds a single weight, so the weight *is* the family.
+The root layout loads the files and keeps the splash screen up until they are ready. The size of a
+text and the radius of a corner are roles too — `fontSizes` and `radius`, from
+[shared/theme/scale.ts](../mobile/shared/theme/scale.ts) — and a style names one instead of a
+number. The palette
+values, the type and the symbol are the visual identity
+([ADR 0023](decisions/0023-the-visual-identity-is-amber-and-graphite-in-red-hat.md)).
+
 **There is no bottom bar.** Until feature 017 one held Home and a Sign out entry whose press was
 intercepted; signing out is now a row of Settings.
 
@@ -166,7 +177,8 @@ the hook that finds the notice live in `features/newsletter` — they are made o
 `Notice` and its preview rule — and `HomeScreen` gets both through `@/features/newsletter`. The card
 is always dark, by a nested `ThemeProvider scheme="dark"` whose styles are made inside it, the
 mirror of the visitor pass. Its background, `mobile/assets/images/notice-card-waves.png`, is the
-only image bundled with the app. Which modules are grid cards and which are full-width rows is the
+only picture bundled with the app; the other files in that folder are the icons generated from the
+symbol. Which modules are grid cards and which are full-width rows is the
 `kind` each declares in `modules.ts`.
 
 Apart from it, each screen still gets its state from its feature hook — the visitor list lives in
