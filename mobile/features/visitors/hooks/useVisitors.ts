@@ -12,7 +12,7 @@ import {
   sortByExpectedDate,
   validateNewVisitor,
 } from "@/features/visitors/domain/visitor";
-import { HttpError, useAuth } from "@/features/auth";
+import { HttpError, actsInCondominium, useAuth } from "@/features/auth";
 import {
   PassTarget,
   sharePassPicture,
@@ -74,6 +74,13 @@ export interface UseVisitorsResult {
   removing: boolean;
   /** Falha da remoção, exibida no diálogo (FR-009). */
   removalError: string | null;
+  /**
+   * A pessoa pode liberar um visitante no condomínio em tela. `false` para o porteiro, que vê a
+   * lista inteira e não escreve nada (feature 015): a tela não desenha o botão nem o formulário.
+   *
+   * Cortesia de interface. Quem recusa de verdade é a API.
+   */
+  canRegister: boolean;
   openForm: () => void;
   closeForm: () => void;
   addVisitor: (input: NewVisitor) => void;
@@ -473,7 +480,11 @@ export function useVisitors(): UseVisitorsResult {
         }
       : null;
 
+  const canRegister =
+    currentMembership !== null && actsInCondominium(currentMembership.role);
+
   return {
+    canRegister,
     openPass,
     showPass,
     closePass,

@@ -37,6 +37,7 @@ export default function ReservationsScreen() {
     photoUriOf,
     reload,
     canCreate,
+    canBook,
     formOpen,
     formPhoto,
     formErrors,
@@ -78,12 +79,16 @@ export default function ReservationsScreen() {
         }}
         photoUriOf={photoUriOf}
         onRetry={reload}
+        // "Minhas reservas" só para quem reserva. O porteiro consulta os locais e os dias, e não
+        // tem reserva própria para listar.
         footer={
-          <OwnReservationList
-            state={ownReservations.state}
-            onRetry={ownReservations.reload}
-            onCancel={ownReservations.askCancel}
-          />
+          canBook ? (
+            <OwnReservationList
+              state={ownReservations.state}
+              onRetry={ownReservations.reload}
+              onCancel={ownReservations.askCancel}
+            />
+          ) : undefined
         }
       />
 

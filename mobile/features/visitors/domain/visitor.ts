@@ -30,7 +30,7 @@ export interface VisitorAuthorizer {
    * O cargo de quem autorizou, no condomínio da visita. É o que deixa o comprovante dizer
    * "Resident …" ou "Administrator" sem adivinhar pelo nome.
    */
-  role: "resident" | "admin" | "manager";
+  role: "resident" | "admin" | "manager" | "doorman";
 }
 
 export interface Visitor {
@@ -54,6 +54,15 @@ export interface Visitor {
    * tela não decide quem pode abrir comprovante de quem.
    */
   passCode?: string;
+  /**
+   * Quando o visitante entrou: o instante em que o porteiro conferiu o comprovante pela primeira vez
+   * e ele estava válido, em ISO 8601 — ou `null` se isso ainda não aconteceu. Vem para todo mundo
+   * que vê a visita (feature 015).
+   *
+   * É um INSTANTE, e `expectedDate` é um dia de calendário: este é lido com `toDisplayDateTime`,
+   * na hora local; aquele, nunca.
+   */
+  enteredAt: string | null;
 }
 
 /**
@@ -163,7 +172,10 @@ function isVisitorAuthorizer(value: unknown): value is VisitorAuthorizer {
   return (
     typeof value.id === "string" &&
     typeof value.name === "string" &&
-    (value.role === "resident" || value.role === "admin" || value.role === "manager")
+    (value.role === "resident" ||
+      value.role === "admin" ||
+      value.role === "manager" ||
+      value.role === "doorman")
   );
 }
 
@@ -181,6 +193,7 @@ export function isVisitor(value: unknown): value is Visitor {
     typeof value.canRemove === "boolean" &&
     // Ausente é válido — é o caso de toda visita que outra pessoa autorizou.
     (value.passCode === undefined || typeof value.passCode === "string") &&
+    (value.enteredAt === null || typeof value.enteredAt === "string") &&
     typeof value.type === "string" &&
     (VISIT_TYPES as readonly string[]).includes(value.type) &&
     typeof value.expectedDate === "string" &&
@@ -231,6 +244,28 @@ export function passQrValue(passCode: string): string {
   return `${PASS_QR_PREFIX}${passCode}`;
 }
 
+const PASS_CODE_FORMAT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * O inverso de `passQrValue`: o código que um texto LIDO por uma câmera carrega, ou `null` quando
+ * o texto não é o de um comprovante do Condfy — um link, um código de pagamento, qualquer outro QR.
+ *
+ * É o "leitor futuro" de que o comentário acima fala (feature 015). Mora aqui, ao lado da função
+ * que escreve, para o prefixo existir num arquivo só; o leitor fica em outra feature e chega até
+ * aqui pelo `index.ts`.
+ *
+ * Um texto que não passa por aqui NUNCA sai do aparelho: não é enviado ao servidor, não é aberto e
+ * não é mostrado.
+ */
+export function passCodeOf(scanned: string): string | null {
+  if (!scanned.startsWith(PASS_QR_PREFIX)) {
+    return null;
+  }
+  const code = scanned.slice(PASS_QR_PREFIX.length);
+  return PASS_CODE_FORMAT.test(code) ? code.toLowerCase() : null;
+}
+
 /**
  * A frase de quem autoriza. O administrador aparece pelo cargo, sem nome pessoal (RN-MEM-04); o
  * servidor já manda "Administrator" em `name`, e o cargo vem em `role` para a frase não depender de
@@ -248,6 +283,10 @@ export function passAuthorizationLine(
       return `Manager authorizes your entry to ${condominiumName}.`;
     case "resident":
       return `Resident ${visitor.authorizedBy.name} authorizes your entry to ${condominiumName}.`;
+    // O porteiro não libera visita hoje (o servidor recusa); o caso existe porque quem liberou
+    // como administrador pode ter virado porteiro depois. Aparece com o próprio nome.
+    case "doorman":
+      return `${visitor.authorizedBy.name} authorizes your entry to ${condominiumName}.`;
   }
 }
 

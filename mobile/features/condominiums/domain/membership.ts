@@ -24,6 +24,8 @@ export function roleLabel(role: Role): string | null {
     // O síndico tem a palavra DELE: são dois cargos, e o card diz qual (FR-027 da 013).
     case "manager":
       return "Manager";
+    case "doorman":
+      return "Doorman";
     case "resident":
       return null;
   }

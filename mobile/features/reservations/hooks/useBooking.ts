@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { HttpError, useAuth } from "@/features/auth";
+import { HttpError, actsInCondominium, useAuth } from "@/features/auth";
 import {
   Availability,
   BookedCommonArea,
@@ -99,6 +99,13 @@ export type BookingState =
 
 export interface UseBookingResult {
   state: BookingState;
+  /**
+   * A pessoa pode RESERVAR neste condomínio. `false` para o porteiro, que abre esta tela só para
+   * consultar: vê o calendário, os horários livres e os ocupados, e não escolhe nem confirma nada.
+   *
+   * Cortesia de interface. Quem recusa de verdade é a API, que responde `403` a um porteiro.
+   */
+  canBook: boolean;
   selectDay: (date: string) => void;
   goToMonth: (offset: -1 | 1) => void;
   /** `true` quando ainda há mês reservável naquela direção (FR-021a). */
@@ -175,7 +182,9 @@ function daysByDate(availability: Availability): Map<string, DayAvailability> {
 export function useBooking(): UseBookingResult {
   // O id do local vem da rota `app/reservations/[id].tsx`, como no mural de avisos.
   const { id: commonAreaId } = useLocalSearchParams<{ id: string }>();
-  const { selectedCondominiumId } = useAuth();
+  const { selectedCondominiumId, currentMembership } = useAuth();
+  const canBook =
+    currentMembership !== null && actsInCondominium(currentMembership.role);
   const [state, setState] = useState<BookingState>({ status: "loading" });
   const mounted = useRef(true);
 
@@ -536,6 +545,7 @@ export function useBooking(): UseBookingResult {
 
   return {
     state,
+    canBook,
     selectDay,
     selectSlot,
     goToMonth,

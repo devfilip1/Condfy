@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -105,6 +105,12 @@ export default function CreateCondominiumScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
   const form = useCreateCondominium();
+
+  // Só cria um condomínio quem ainda não pertence a nenhum. Vale também para o instante depois de
+  // criar: o perfil recarrega já com o condomínio novo, e o destino é a home de qualquer jeito.
+  if (form.alreadyBelongs) {
+    return <Redirect href="/" />;
+  }
 
   return (
     <View style={styles.screen}>

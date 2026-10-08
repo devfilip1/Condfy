@@ -35,6 +35,12 @@ export interface SlotGridProps {
    * que o dia está cheio. Só o administrador chega a ver isto — para os outros a tela nem abre.
    */
   unavailable?: boolean;
+  /**
+   * Só consulta: os horários aparecem, mas nenhum é escolhido nem cancelado. É como o porteiro vê
+   * esta grade — ele confere se um dia está cheio e não reserva. Os horários NÃO ficam esmaecidos:
+   * esmaecido aqui quer dizer "aguarde", e não há o que aguardar.
+   */
+  readOnly?: boolean;
   onSelect: (slot: Slot) => void;
   onCancel: (slot: Slot) => void;
 }
@@ -128,6 +134,7 @@ export default function SlotGrid({
   busy,
   notice,
   unavailable = false,
+  readOnly = false,
   onSelect,
   onCancel,
 }: SlotGridProps) {
@@ -183,13 +190,19 @@ export default function SlotGrid({
               onPress={() => (held ? onCancel(slot) : onSelect(slot))}
               // Qualquer ação em voo trava a grade inteira: trocar de horário com uma reserva a
               // caminho deixaria a tela mostrando uma escolha diferente da que foi enviada.
-              disabled={busy !== null}
-              accessibilityRole="button"
-              accessibilityState={{ selected: selected, disabled: busy !== null }}
+              disabled={busy !== null || readOnly}
+              // Em modo de consulta não é um botão: é um horário, livre.
+              accessibilityRole={readOnly ? "text" : "button"}
+              accessibilityState={{
+                selected: selected,
+                disabled: busy !== null || readOnly,
+              }}
               accessibilityLabel={
-                held
-                  ? `Cancel the booking for ${slotLabel(slot)}`
-                  : slotLabel(slot)
+                readOnly
+                  ? `${slotLabel(slot)}, ${held ? "booked" : "free"}`
+                  : held
+                    ? `Cancel the booking for ${slotLabel(slot)}`
+                    : slotLabel(slot)
               }
             >
               <Text
@@ -203,7 +216,9 @@ export default function SlotGrid({
               </Text>
               {/* Diz que está segurado, nunca por quem: nome de quem reservou não entra aqui. */}
               {held ? (
-                <Text style={styles.heldLabel}>Booked · tap to cancel</Text>
+                <Text style={styles.heldLabel}>
+                  {readOnly ? "Booked" : "Booked · tap to cancel"}
+                </Text>
               ) : null}
             </TouchableOpacity>
           );

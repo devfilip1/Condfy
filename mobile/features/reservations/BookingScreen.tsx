@@ -93,6 +93,12 @@ const useStyles = makeStyles((colors) =>
       fontWeight: "bold",
       color: colors.textOnAccent,
     },
+    viewOnly: {
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
+      color: colors.textMuted,
+    },
   })
 );
 
@@ -101,6 +107,7 @@ export default function BookingScreen() {
   const { colors } = useTheme();
   const {
     state,
+    canBook,
     selectDay,
     selectSlot,
     goToMonth,
@@ -222,6 +229,7 @@ export default function BookingScreen() {
               busy={state.busy}
               notice={state.notice}
               unavailable={!state.commonArea.isAvailable}
+              readOnly={!canBook}
               onSelect={selectSlot}
               onCancel={setPendingCancel}
             />
@@ -241,6 +249,7 @@ export default function BookingScreen() {
             como concluir. Fica sempre visível e desabilitado até haver horário escolhido, em vez de
             aparecer e sumir e fazer a lista mudar de altura.
           */}
+          {canBook ? (
           <View style={styles.footer}>
             <TouchableOpacity
               style={[
@@ -263,6 +272,16 @@ export default function BookingScreen() {
               )}
             </TouchableOpacity>
           </View>
+          ) : (
+            // O porteiro consulta e não reserva: no lugar do botão, a frase que diz isso — para a
+            // tela não parecer quebrada, com horários que não respondem ao toque.
+            <View style={styles.footer}>
+              <Text style={styles.viewOnly}>
+                You can see which times are free. Booking is for residents and
+                whoever runs the condominium.
+              </Text>
+            </View>
+          )}
         </>
       ) : null}
 

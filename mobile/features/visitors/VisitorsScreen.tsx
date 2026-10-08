@@ -31,6 +31,7 @@ const useStyles = makeStyles((colors) =>
 export default function VisitorsScreen() {
   const styles = useStyles();
   const {
+    canRegister,
     list,
     reload,
     formOpen,
@@ -73,11 +74,12 @@ export default function VisitorsScreen() {
             onRemove={requestRemoval}
             onOpenPass={showPass}
           />
-          <AddButton onPress={openForm} />
+          {/* O porteiro lê a lista e não libera ninguém: sem botão e sem formulário. */}
+          {canRegister ? <AddButton onPress={openForm} /> : null}
         </>
       )}
       <VisitorFormModal
-        visible={formOpen}
+        visible={canRegister && formOpen}
         errors={formErrors}
         units={units}
         unitsHint={unitsHint}

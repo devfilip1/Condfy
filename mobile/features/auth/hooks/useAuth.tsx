@@ -8,10 +8,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 
 import {
   Credentials,
   FormErrors,
+  JoinRequestSummary,
   Profile,
   ProfileMembership,
   Session,
@@ -19,7 +21,7 @@ import {
   isFormErrors,
   hasNoErrors,
   managesCondominium,
-  validateSignUp,
+  validateResidentSignUp,
   validateSignIn,
 } from "@/features/auth/domain/session";
 import {
@@ -37,6 +39,7 @@ import {
   changePassword as trocarPasswordNoServico,
   deleteAccount as apagarContaNoServico,
   signUp as cadastrarNoServico,
+  withdrawJoinRequest as desistirNoServico,
   signIn as entrarNoServico,
   fetchProfile as buscarPerfilNoServico,
   refresh as renovarNoServico,
@@ -116,6 +119,23 @@ export interface UseAuthResult {
   /** Tenta buscar o perfil de novo depois de uma falha de rede. */
   reloadProfile: () => void;
   /**
+   * Busca o perfil de novo SEM passar por `loading` — para conferir, calado, se os vínculos e os
+   * cargos da pessoa mudaram. `reloadProfile` não serve para isso: ele põe o perfil em `loading`,
+   * o que fecha o bloqueio do condomínio e apaga a tela. Se a busca falhar, o perfil carregado
+   * fica como está.
+   *
+   * É chamado sozinho quando o aplicativo volta ao primeiro plano: é assim que quem foi removido
+   * de um condomínio, ou teve o cargo trocado pelo síndico, passa a ver isso (feature 014).
+   */
+  refreshProfile: () => Promise<void>;
+  /**
+   * `true` quando a conta foi criada pelo síndico e a pessoa ainda não escolheu a própria
+   * password. O layout raiz só desenha a tela de escolher a password enquanto isto durar.
+   *
+   * É cortesia de tela: o servidor recusa todas as outras rotas a essa conta (ADR 0018).
+   */
+  mustChoosePassword: boolean;
+  /**
    * Em qual condomínio a pessoa está olhando. Contexto de sessão, não de uma feature: Reservas e
    * Newsletter leem o mesmo valor, então as duas telas nunca discordam sobre qual prédio é.
    *
@@ -164,7 +184,29 @@ export interface UseAuthResult {
   /** Preenchido quando a sessão caiu sozinha, para a tela de input explicar. */
   sessionNotice: string | null;
   signIn: (email: string, password: string) => void;
-  signUp: (name: string, email: string, password: string) => void;
+  /**
+   * Cadastra — o que, desde a feature 016, é pedir para entrar num condomínio: a conta nasce com um
+   * pedido para aquela unidade. `null` num dos dois é um campo não escolhido, e vira mensagem.
+   */
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+    condominiumId: string | null,
+    unitId: string | null
+  ) => void;
+  /**
+   * O pedido de entrada desta pessoa, enquanto espera resposta; `null` nos outros casos. Com ele
+   * preenchido o layout raiz só desenha a tela de espera.
+   *
+   * É cortesia de tela: uma conta pendente não tem vínculo, e toda rota de condomínio a recusa.
+   */
+  pendingRequest: JoinRequestSummary | null;
+  /**
+   * Desiste do pedido: o servidor apaga o pedido e a conta, e a sessão local acaba. Se o pedido
+   * acabou de ser respondido, nada é apagado e o perfil é relido — a pessoa pode ter sido aprovada.
+   */
+  withdrawRequest: () => Promise<AccountChangeResult>;
   signOut: () => void;
   /** Troca o e-mail. No sucesso o perfil carregado já mostra o novo, sem entrar de novo. */
   changeEmail: (
@@ -351,6 +393,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile({ status: "loading" });
     void loadProfile();
   }, [loadProfile]);
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const fresh = await buscarPerfilNoServico();
+      if (mounted.current) {
+        // Só troca um perfil que já estava carregado: se ele está sendo buscado, ou a sessão
+        // acabou no meio do caminho, quem cuida disso é o outro caminho.
+        setProfile((current) =>
+          current.status === "ready" ? { status: "ready", profile: fresh } : current
+        );
+      }
+    } catch {
+      // De propósito: uma conferência que falha não é notícia. O perfil carregado continua valendo.
+    }
+  }, []);
+
+  // Voltou ao primeiro plano com sessão aberta: confere se os vínculos mudaram. O efeito que
+  // resolve o condomínio em uso, logo abaixo, descarta sozinho um condomínio que não é mais dela.
+  const authenticated = state.status === "authenticated";
+  useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        void refreshProfile();
+      }
+    });
+    return () => subscription.remove();
+  }, [authenticated, refreshProfile]);
 
   /**
    * Resolve em qual condomínio a pessoa está olhando, sempre que o perfil muda.
@@ -591,10 +663,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signUp = useCallback(
-    (name: string, email: string, password: string) => {
+    (
+      name: string,
+      email: string,
+      password: string,
+      condominiumId: string | null,
+      unitId: string | null
+    ) => {
       run(
-        () => cadastrarNoServico(name, email, password),
-        validateSignUp(name, email, password)
+        // Com um dos dois nulo a validação já recusou, e esta função nem é chamada.
+        () =>
+          cadastrarNoServico(name, email, password, condominiumId ?? "", unitId ?? ""),
+        validateResidentSignUp({ name, email, password, condominiumId, unitId })
       );
     },
     [run]
@@ -651,6 +731,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const fresh = await trocarPasswordNoServico(currentPassword, newPassword);
         credentials.current = fresh;
         await writeCredentials(fresh);
+        // Uma password escolhida pela pessoa nunca é provisória. Para a conta criada pelo síndico
+        // é isto que abre o aplicativo: o layout raiz deixa de exigir a tela de escolher a
+        // password (feature 014). O par de credenciais novo já veio sem a restrição.
+        if (mounted.current) {
+          setProfile((current) =>
+            current.status === "ready"
+              ? {
+                  status: "ready",
+                  profile: { ...current.profile, passwordIsProvisional: false },
+                }
+              : current
+          );
+        }
         return { ok: true };
       } catch (error: unknown) {
         return accountFailure(error);
@@ -675,6 +768,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [endSession]
   );
+
+  const withdrawRequest = useCallback(async (): Promise<AccountChangeResult> => {
+    try {
+      await desistirNoServico();
+      // A conta não existe mais: a sessão local acaba como ao apagar a conta.
+      await endSession(null);
+      return { ok: true };
+    } catch (error: unknown) {
+      // `404`: o pedido foi respondido um instante antes. Se foi aprovado, o perfil novo já traz o
+      // vínculo e o aplicativo abre; se foi rejeitado, a própria leitura encerra a sessão.
+      if (error instanceof HttpError && error.type === "server") {
+        await refreshProfile();
+      }
+      return accountFailure(error);
+    }
+  }, [endSession, refreshProfile]);
 
   /** Sair nunca depende de rede: apaga local, vai para anônimo e só então avisa (FR-017a). */
   const signOut = useCallback(() => {
@@ -702,6 +811,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canSwitchCondominium = (memberships?.length ?? 0) >= 2;
 
+  const mustChoosePassword =
+    profile.status === "ready" && profile.profile.passwordIsProvisional;
+
+  const pendingRequest =
+    profile.status === "ready" ? profile.profile.joinRequest : null;
+
   let condominiumGate: CondominiumGate;
   if (profile.status === "failed") {
     condominiumGate = "failed";
@@ -718,6 +833,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       profile,
       reloadProfile,
+      refreshProfile,
+      mustChoosePassword,
+      pendingRequest,
+      withdrawRequest,
       selectedCondominiumId,
       currentMembership,
       condominiumGate,
@@ -740,6 +859,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       profile,
       reloadProfile,
+      refreshProfile,
+      mustChoosePassword,
+      pendingRequest,
+      withdrawRequest,
       selectedCondominiumId,
       currentMembership,
       condominiumGate,

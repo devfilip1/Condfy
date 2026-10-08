@@ -63,6 +63,24 @@ export interface UseCreateCondominiumResult {
   /** Falha que não é de um field (rede ou servidor). */
   submitError: string | null;
   submit: () => void;
+  /**
+   * A pessoa já pertence a um condomínio, então não cria outro: só cria quem não pertence a nenhum,
+   * e um síndico tem um só. A tela a manda de volta para a home em vez de mostrar um formulário
+   * que o servidor recusaria.
+   *
+   * Cortesia de interface. Quem recusa de verdade é a API, com `409`.
+   */
+  alreadyBelongs: boolean;
+}
+
+/** A explicação que veio no corpo de um `409`, ou a frase geral quando não veio nenhuma. */
+function conflictMessageOf(body: unknown): string {
+  return typeof body === "object" &&
+    body !== null &&
+    "message" in body &&
+    typeof (body as { message: unknown }).message === "string"
+    ? (body as { message: string }).message
+    : MESSAGE_SERVER_ERROR;
 }
 
 /** Tira do objeto as chaves indicadas — a mensagem de um campo sai quando a pessoa mexe nele. */
@@ -89,7 +107,9 @@ function fieldErrorsFrom(error: unknown): FormErrors | null {
 
 export function useCreateCondominium(): UseCreateCondominiumResult {
   const router = useRouter();
-  const { adoptCondominium } = useAuth();
+  const { adoptCondominium, profile } = useAuth();
+  const alreadyBelongs =
+    profile.status === "ready" && profile.profile.memberships.length > 0;
   const [name, setNameValue] = useState("");
   const [address, setAddressValue] = useState("");
   const [blocks, setBlocks] = useState<NewBlock[]>([EMPTY_BLOCK]);
@@ -250,6 +270,10 @@ export function useCreateCondominium(): UseCreateCondominiumResult {
           // Quem reage é o AuthProvider, levando à tela de entrada: nada a mostrar aqui.
         } else if (error instanceof HttpError && error.type === "network") {
           setSubmitError(MESSAGE_OFFLINE);
+        } else if (error instanceof HttpError && error.type === "conflict") {
+          // `409`: a conta já pertence a um condomínio. O servidor explica, e é a explicação dele
+          // que aparece — "algo deu errado" esconderia a única informação útil.
+          setSubmitError(conflictMessageOf(error.body));
         } else {
           setSubmitError(MESSAGE_SERVER_ERROR);
         }
@@ -281,5 +305,6 @@ export function useCreateCondominium(): UseCreateCondominiumResult {
     submitting,
     submitError,
     submit,
+    alreadyBelongs,
   };
 }

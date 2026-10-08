@@ -11,3 +11,4 @@ export { default as ChangeEmailScreen } from "@/features/settings/ChangeEmailScr
 export { default as ChangePasswordScreen } from "@/features/settings/ChangePasswordScreen";
 export { default as SupportScreen } from "@/features/settings/SupportScreen";
 export { default as DeleteAccountScreen } from "@/features/settings/DeleteAccountScreen";
+export { default as FirstPasswordScreen } from "@/features/settings/FirstPasswordScreen";

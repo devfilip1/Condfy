@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import FoundItemFormModal from "@/features/lostAndFound/components/FoundItemFormModal";
@@ -28,6 +28,7 @@ export default function LostAndFoundScreen() {
   const {
     state,
     canManage,
+    canRead,
     reload,
     photoUriOf,
     viewingItem,
@@ -46,6 +47,11 @@ export default function LostAndFoundScreen() {
     notice,
     toggleStatus,
   } = useFoundItems();
+
+  // O porteiro não tem achados e perdidos: quem chega por um link direto volta para a home.
+  if (!canRead) {
+    return <Redirect href="/" />;
+  }
 
   return (
     <View style={styles.screen}>

@@ -13,7 +13,7 @@ import {
   Visitor,
   unitDescription,
 } from "@/features/visitors/domain/visitor";
-import { toDisplayDate } from "@/shared/lib/calendar";
+import { toDisplayDate, toDisplayDateTime } from "@/shared/lib/calendar";
 
 export interface VisitorCardProps {
   visitor: Visitor;
@@ -108,6 +108,12 @@ const useStyles = makeStyles((colors) =>
       fontWeight: "600",
       color: colors.textPrimary,
     },
+    entered: {
+      marginTop: 8,
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.successStrong,
+    },
   })
 );
 
@@ -122,6 +128,10 @@ export default function VisitorCard({
   // O card abre o comprovante quando a visita veio com o código — o servidor só o manda a quem a
   // autorizou. Este componente não confere quem é quem.
   const opensPass = onOpenPass !== undefined && visitor.passCode !== undefined;
+  const entered =
+    visitor.enteredAt !== null
+      ? `Came in · ${toDisplayDateTime(visitor.enteredAt)}`
+      : null;
 
   const content = (
     <View style={styles.content}>
@@ -156,6 +166,11 @@ export default function VisitorCard({
           {toDisplayDate(visitor.expectedDate)}
         </Text>
       </View>
+      {/*
+        O visitante já entrou: o porteiro conferiu o comprovante e ele estava válido. É um INSTANTE,
+        lido na hora local de quem olha — ao contrário da data acima, que é um dia de calendário.
+      */}
+      {entered ? <Text style={styles.entered}>{entered}</Text> : null}
     </View>
   );
 
@@ -165,7 +180,7 @@ export default function VisitorCard({
         <Pressable
           onPress={() => onOpenPass(visitor)}
           accessibilityRole="button"
-          accessibilityLabel={`${visitor.name}, ${TYPE_LABELS[visitor.type]}, ${toDisplayDate(visitor.expectedDate)}`}
+          accessibilityLabel={`${visitor.name}, ${TYPE_LABELS[visitor.type]}, ${toDisplayDate(visitor.expectedDate)}${entered ? `, ${entered}` : ""}`}
           accessibilityHint="Opens the pass"
         >
           {content}

@@ -29,8 +29,6 @@ export interface CondominiumCardListProps {
   onChoose: (condominiumId: string) => void;
   onRetry: () => void;
   onSignOut: () => void;
-  /** Abre a criação de um condomínio: quem já pertence a algum cria outro por aqui. */
-  onCreate: () => void;
 }
 
 const useStyles = makeStyles((colors) =>
@@ -68,20 +66,6 @@ const useStyles = makeStyles((colors) =>
     footer: {
       gap: 4,
     },
-    create: {
-      height: 48,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.cardBackground,
-    },
-    createText: {
-      fontSize: 15,
-      fontWeight: "600",
-      color: colors.textPrimary,
-    },
     signOut: {
       alignSelf: "center",
       paddingVertical: 12,
@@ -99,7 +83,6 @@ export default function CondominiumCardList({
   onChoose,
   onRetry,
   onSignOut,
-  onCreate,
 }: CondominiumCardListProps) {
   const styles = useStyles();
   switch (state.status) {
@@ -138,14 +121,10 @@ export default function CondominiumCardList({
           )}
           ListFooterComponent={
             <View style={styles.footer}>
-              {/* Discreto, abaixo dos cards: escolher um condomínio é a ação principal desta tela. */}
-              <TouchableOpacity
-                onPress={onCreate}
-                accessibilityRole="button"
-                style={styles.create}
-              >
-                <Text style={styles.createText}>Create a condominium</Text>
-              </TouchableOpacity>
+              {/*
+                Aqui havia um "Create a condominium". Saiu: só cria um condomínio quem ainda não
+                pertence a nenhum, e quem chega a esta tela pertence a dois ou mais.
+              */}
               <TouchableOpacity
                 onPress={onSignOut}
                 accessibilityRole="button"

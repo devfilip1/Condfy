@@ -1,7 +1,8 @@
 /**
  * Regras puras de conta e sessão.
  *
- * As mensagens são idênticas às de `server/src/auth/auth.dto.ts`: o formulário exibe tanto o error
+ * As mensagens são idênticas às de `server/src/auth/auth.dto.ts` — cinco campos no cadastro desde a
+ * feature 016: o formulário exibe tanto o error
  * detectado aqui quanto o devolvido pelo servidor, sob o mesmo field, sem traduzir nada.
  * Esta camada não importa React nem React Native.
  */
@@ -30,6 +31,9 @@ export interface FormErrors {
   name?: string;
   email?: string;
   password?: string;
+  /** Os dois do cadastro de morador: onde a pessoa diz que mora (feature 016). */
+  condominiumId?: string;
+  unitId?: string;
 }
 
 export const PASSWORD_MIN_LENGTH = 8;
@@ -81,6 +85,35 @@ export function validateSignUp(
   return errors;
 }
 
+/** O que o cadastro de um morador envia: os três dados da conta e onde ele mora. */
+export interface ResidentSignUp {
+  name: string;
+  email: string;
+  password: string;
+  /** `null` enquanto nada foi escolhido na lista. */
+  condominiumId: string | null;
+  unitId: string | null;
+}
+
+/**
+ * Cadastro pelo aplicativo: **cadastrar-se é pedir para entrar num condomínio** (feature 016).
+ *
+ * São CINCO campos, com as mesmas mensagens de `validateSignUp` em `server/src/auth/auth.dto.ts`.
+ * Compõe `validateSignUp` em vez de substituí-la, de propósito: a conta que o síndico cria para um
+ * administrador ou um porteiro passa pelas mesmas três regras e não tem unidade nenhuma — o módulo
+ * de cargos chama aquela função com os seus três argumentos, e ela não pode mudar de assinatura.
+ */
+export function validateResidentSignUp(input: ResidentSignUp): FormErrors {
+  const errors = validateSignUp(input.name, input.email, input.password);
+  if (input.condominiumId === null || input.condominiumId.length === 0) {
+    errors.condominiumId = "Choose your condominium.";
+  }
+  if (input.unitId === null || input.unitId.length === 0) {
+    errors.unitId = "Choose your apartment.";
+  }
+  return errors;
+}
+
 /** `true` quando a validação não encontrou nenhum error. */
 export function hasNoErrors(errors: FormErrors): boolean {
   return Object.keys(errors).length === 0;
@@ -129,7 +162,7 @@ export function isFormErrors(value: unknown): value is FormErrors {
   if (!isObject(value)) {
     return false;
   }
-  return (["name", "email", "password"] as const).every(
+  return (["name", "email", "password", "condominiumId", "unitId"] as const).every(
     (field) => value[field] === undefined || typeof value[field] === "string"
   );
 }
@@ -141,11 +174,13 @@ export function isFormErrors(value: unknown): value is FormErrors {
 /**
  * Cargo de uma pessoa num condomínio. Os mesmos valores do enum do banco.
  *
- * São três: morador, administrador e síndico. O síndico (`manager`) saiu na feature 007 e VOLTOU
- * na 013, como um cargo próprio — é quem criou o condomínio —, e não como outro nome do
- * administrador. Um condomínio pode ter os dois.
+ * São quatro: morador, administrador, síndico e porteiro. O síndico (`manager`) saiu na feature 007
+ * e VOLTOU na 013, como um cargo próprio — é quem criou o condomínio —, e não como outro nome do
+ * administrador. Um condomínio pode ter os dois. O porteiro (`doorman`) voltou na 014 e ganhou a
+ * portaria na 015: não cuida do condomínio, vê as visitas de todos, confere comprovantes e não
+ * escreve nada.
  */
-export type Role = "resident" | "admin" | "manager";
+export type Role = "resident" | "admin" | "manager" | "doorman";
 
 /**
  * Quem cuida de um condomínio: o administrador ou o síndico.
@@ -157,6 +192,25 @@ export type Role = "resident" | "admin" | "manager";
  */
 export function managesCondominium(role: Role): boolean {
   return role === "admin" || role === "manager";
+}
+
+/**
+ * Quem AGE num condomínio: libera visitante, reserva local. Todo mundo, menos o porteiro — que vê
+ * as visitas de todos e confere comprovantes, mas não escreve nada (feature 015).
+ *
+ * Espelho de `actsInCondominium` em `server/src/lib/roles.ts`, e cortesia de tela: serve para não
+ * oferecer um botão que o servidor recusaria. Um `switch` de propósito — um quinto cargo não compila
+ * enquanto alguém não decidir por ele.
+ */
+export function actsInCondominium(role: Role): boolean {
+  switch (role) {
+    case "resident":
+    case "admin":
+    case "manager":
+      return true;
+    case "doorman":
+      return false;
+  }
 }
 
 /** Unidade onde a pessoa mora. `block` é `null` em condomínio sem blocos. */
@@ -197,7 +251,43 @@ export interface Profile {
   id: string;
   name: string;
   email: string;
+  /**
+   * A password ainda é a que o síndico definiu ao criar a conta (feature 014). Enquanto for `true`
+   * o aplicativo só mostra a tela de escolher a password; o servidor recusa todo o resto de
+   * qualquer jeito.
+   */
+  passwordIsProvisional: boolean;
+  /**
+   * O pedido de entrada desta pessoa, ENQUANTO estiver pendente; `null` em todos os outros casos.
+   * Com ele preenchido `memberships` vem vazia e o aplicativo mostra só a tela de espera
+   * (feature 016).
+   */
+  joinRequest: JoinRequestSummary | null;
   memberships: ProfileMembership[];
+}
+
+/** O pedido de entrada de quem está esperando: em qual condomínio, para qual unidade, desde quando. */
+export interface JoinRequestSummary {
+  condominium: { id: string; name: string };
+  unit: { block: string | null; number: string };
+  /** ISO 8601. Um INSTANTE: lido com `toDisplayDateTime`, na hora local. */
+  requestedAt: string;
+}
+
+function isJoinRequestSummary(value: unknown): value is JoinRequestSummary {
+  if (!isObject(value)) {
+    return false;
+  }
+  const { condominium, unit } = value;
+  return (
+    isObject(condominium) &&
+    typeof condominium.id === "string" &&
+    typeof condominium.name === "string" &&
+    isObject(unit) &&
+    (unit.block === null || typeof unit.block === "string") &&
+    typeof unit.number === "string" &&
+    typeof value.requestedAt === "string"
+  );
 }
 
 /**
@@ -210,7 +300,7 @@ export function unitLabel(unit: ProfileUnit): string {
   return unit.block === null ? unit.number : `${unit.block}-${unit.number}`;
 }
 
-const ROLES: readonly string[] = ["resident", "admin", "manager"];
+const ROLES: readonly string[] = ["resident", "admin", "manager", "doorman"];
 
 function isProfileUnit(value: unknown): value is ProfileUnit {
   if (!isObject(value)) {
@@ -250,6 +340,8 @@ export function isProfile(value: unknown): value is Profile {
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     typeof value.email === "string" &&
+    typeof value.passwordIsProvisional === "boolean" &&
+    (value.joinRequest === null || isJoinRequestSummary(value.joinRequest)) &&
     Array.isArray(value.memberships) &&
     value.memberships.every(isProfileMembership)
   );

@@ -21,6 +21,7 @@ const ROLE_LABELS: Record<ProfileMembership["role"], string> = {
   resident: "Resident",
   admin: "Administrator",
   manager: "Manager",
+  doorman: "Doorman",
 };
 
 const useStyles = makeStyles((colors) =>

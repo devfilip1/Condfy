@@ -18,25 +18,43 @@ import { makeStyles, useTheme } from "@/shared/theme";
  * O bloqueio do condomínio mora AQUI, e não em cada tela, porque este é o único lugar por onde toda
  * rota passa. Uma checagem dentro da home cobriria a navegação e deixaria passar um link direto
  * para `/reservations` (FR-004).
+ *
+ * Desde a feature 014 há um segundo bloqueio, que vem ANTES do condomínio: a conta criada pelo
+ * síndico só alcança a tela de escolher a própria password, até escolher. Mora aqui pelo mesmo
+ * motivo. É cortesia de tela — o servidor recusa todas as outras rotas a essa conta de qualquer
+ * jeito (ADR 0018).
+ *
+ * E desde a feature 016 há um terceiro, entre os dois: quem se cadastrou e espera a aprovação de
+ * quem cuida do condomínio só alcança a tela de espera. A ordem é: password provisória, pedido
+ * pendente, escolha de condomínio. Os três têm a mesma forma — e o mesmo jeito de trancar todo
+ * mundo, se a condição for invertida.
  */
 function Navegacao() {
   const styles = useStyles();
   const { scheme } = useTheme();
-  const { state, condominiumGate } = useAuth();
+  const { state, condominiumGate, mustChoosePassword, pendingRequest } =
+    useAuth();
   const segmentos = useSegments();
   const router = useRouter();
 
   const status = state.status;
   const emTelaPublica = segmentos[0] === "(auth)";
   /**
-   * A tela de escolha E a de criar um condomínio: quem ainda não escolheu pode ir de uma para a
-   * outra. Sem a segunda aqui, o botão "Create a condominium" da própria tela de escolha seria
-   * devolvido para ela pelo redirecionamento abaixo (feature 013). Continua exigindo sessão: quem
-   * não entrou é mandado para a tela de entrada antes de chegar neste teste.
+   * Só a tela de escolha. Até a regra de "um condomínio por síndico" a de criar também contava,
+   * porque a tela de escolha tinha um botão para ela; quem chega à escolha pertence a dois ou mais
+   * condomínios, e quem pertence a algum não cria outro — então o botão saiu, e a rota com ele.
    */
-  const naEscolha =
-    segmentos[0] === "choose-condominium" ||
-    segmentos[0] === "create-condominium";
+  const naEscolha = segmentos[0] === "choose-condominium";
+
+  const naPrimeiraPassword = segmentos[0] === "first-password";
+
+  /** A password ainda é a que o síndico definiu: só a tela de escolher a própria serve. */
+  const deveTrocarPassword = status === "authenticated" && mustChoosePassword;
+
+  const naEspera = segmentos[0] === "awaiting-approval";
+
+  /** O pedido de entrada ainda não foi respondido: só a tela de espera serve. */
+  const deveEsperar = status === "authenticated" && pendingRequest !== null;
 
   /** Falta escolher, ou o perfil nem carregou para saber se falta: só a tela de escolha serve. */
   const deveEscolher =
@@ -57,6 +75,30 @@ function Navegacao() {
     if (condominiumGate === "resolving") {
       return;
     }
+    // Antes do condomínio: com a password provisória não há condomínio a escolher ainda.
+    if (deveTrocarPassword) {
+      if (!naPrimeiraPassword) {
+        router.replace("/first-password");
+      }
+      return;
+    }
+    // A password foi escolhida — ou nunca foi provisória, e alguém digitou o endereço na mão.
+    if (naPrimeiraPassword) {
+      router.replace("/");
+      return;
+    }
+    // Depois da password e antes do condomínio: quem espera não tem condomínio a escolher.
+    if (deveEsperar) {
+      if (!naEspera) {
+        router.replace("/awaiting-approval");
+      }
+      return;
+    }
+    // O pedido foi aprovado — ou nunca houve um, e alguém digitou o endereço na mão.
+    if (naEspera) {
+      router.replace("/");
+      return;
+    }
     if (deveEscolher) {
       if (!naEscolha) {
         router.replace("/choose-condominium");
@@ -66,7 +108,18 @@ function Navegacao() {
     if (emTelaPublica) {
       router.replace("/");
     }
-  }, [status, condominiumGate, deveEscolher, emTelaPublica, naEscolha, router]);
+  }, [
+    status,
+    condominiumGate,
+    deveTrocarPassword,
+    naPrimeiraPassword,
+    deveEsperar,
+    naEspera,
+    deveEscolher,
+    emTelaPublica,
+    naEscolha,
+    router,
+  ]);
 
   // Os ícones da barra do sistema no contrário do fundo: claros na aparência escura.
   const barra = <StatusBar style={scheme === "dark" ? "light" : "dark"} />;
@@ -96,11 +149,14 @@ function Navegacao() {
   }
 
   /**
-   * Falta escolher e a rota atual ainda não é a de escolha: o redirecionamento do efeito acima
+   * Falta escolher — o condomínio ou a password — e a rota atual ainda não é a que serve: o redirecionamento do efeito acima
    * acontece logo depois deste render. Nesse intervalo o navegador PRECISA estar montado — não dá
    * para navegar sem ele —, então a rota existe, mas coberta: nada dela chega a ser visto.
    */
-  const cobrir = deveEscolher && !naEscolha;
+  const cobrir =
+    (deveTrocarPassword && !naPrimeiraPassword) ||
+    (!deveTrocarPassword && deveEsperar && !naEspera) ||
+    (!deveTrocarPassword && !deveEsperar && deveEscolher && !naEscolha);
 
   return (
     <View style={styles.raiz}>

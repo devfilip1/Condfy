@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { HttpError, useAuth } from "@/features/auth";
+import { HttpError, actsInCondominium, useAuth } from "@/features/auth";
 import {
   PhotoSource,
   SelectedPhoto,
@@ -67,6 +67,14 @@ export interface UseCommonAreasResult {
    * Cortesia de interface — a tela oferece ou esconde o botão; quem recusa de verdade é a API.
    */
   canCreate: boolean;
+  /**
+   * A pessoa pode RESERVAR no condomínio em tela. `false` para o porteiro, que entra neste módulo
+   * só para consultar — ver os locais e se um dia está cheio. Com `false` a tela não mostra "minhas
+   * reservas": ele não reserva, então não tem nenhuma para listar.
+   *
+   * Cortesia de interface. Quem recusa de verdade é a API.
+   */
+  canBook: boolean;
   formOpen: boolean;
   /** A foto já escolhida para o local em preenchimento, ou `null`. */
   formPhoto: SelectedPhoto | null;
@@ -295,6 +303,8 @@ export function useCommonAreas(): UseCommonAreasResult {
     reload,
     // Pelo NOME do cargo, e não por `managesCondominium`: criar um local é só do síndico (ADR 0017).
     canCreate: currentMembership?.role === "manager",
+    canBook:
+      currentMembership !== null && actsInCondominium(currentMembership.role),
     formOpen,
     formPhoto,
     formErrors,

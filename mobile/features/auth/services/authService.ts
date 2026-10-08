@@ -34,11 +34,21 @@ export async function signIn(email: string, password: string): Promise<Session> 
 export async function signUp(
   name: string,
   email: string,
-  password: string
+  password: string,
+  condominiumId: string,
+  unitId: string
 ): Promise<Session> {
+  // Cadastrar-se é pedir para entrar: a conta nasce com um pedido para aquela unidade daquele
+  // condomínio, e fica esperando quem cuida dele confirmar (feature 016).
   const response = await request("/accounts", {
     method: "POST",
-    body: { name: name.trim(), email: normalizeEmail(email), password },
+    body: {
+      name: name.trim(),
+      email: normalizeEmail(email),
+      password,
+      condominiumId,
+      unitId,
+    },
     skipAuth: true,
   });
   if (!isSession(response)) {
@@ -138,4 +148,13 @@ export async function changePassword(
 /** Apaga a conta. A password vai no body de um `DELETE`, nunca na URL. */
 export async function deleteAccount(currentPassword: string): Promise<void> {
   await request("/me", { method: "DELETE", body: { currentPassword } });
+}
+
+/**
+ * A pessoa desiste do próprio pedido de entrada. O servidor apaga o pedido E a conta — sem pedir a
+ * password, porque uma conta que só espera não guarda nada. Um `404` quer dizer que o pedido acabou
+ * de ser respondido.
+ */
+export async function withdrawJoinRequest(): Promise<void> {
+  await request("/me/join-request", { method: "DELETE" });
 }

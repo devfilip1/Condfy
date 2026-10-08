@@ -57,6 +57,11 @@ export interface UseFoundItemsResult {
   state: ShelfState;
   /** `true` só para o administrador DO CONDOMÍNIO EM TELA. Cortesia de interface. */
   canManage: boolean;
+  /**
+   * `false` para o porteiro, que perdeu achados e perdidos na feature 015. A tela o manda de volta
+   * para a home e nenhum pedido é feito. Cortesia: a lista responde `403` a ele de qualquer jeito.
+   */
+  canRead: boolean;
   reload: () => void;
   /**
    * O endereço completo da foto de um item. O servidor manda um caminho relativo, porque não sabe
@@ -116,8 +121,14 @@ function fieldErrorsFrom(error: unknown): FormErrors | null {
 export function useFoundItems(): UseFoundItemsResult {
   // Em qual condomínio a pessoa está é decidido uma vez, para o aplicativo inteiro, na tela de
   // escolha (feature 009). Aqui ele só é lido.
-  const { profile, selectedCondominiumId, managesSelectedCondominium } =
-    useAuth();
+  const {
+    profile,
+    selectedCondominiumId,
+    currentMembership,
+    managesSelectedCondominium,
+  } = useAuth();
+  // Só o porteiro não lê a prateleira. Sem vínculo carregado ainda, não há o que recusar.
+  const canRead = currentMembership?.role !== "doorman";
   const [state, setState] = useState<ShelfState>({ status: "loading" });
   const [viewingItem, setViewingItem] = useState<FoundItem | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -171,13 +182,13 @@ export function useFoundItems(): UseFoundItemsResult {
   }, []);
 
   useEffect(() => {
-    if (selectedCondominiumId === null) {
+    if (selectedCondominiumId === null || !canRead) {
       return;
     }
     // A recusa falava do condomínio que a pessoa acabou de deixar.
     setNotice(null);
     void load(selectedCondominiumId);
-  }, [selectedCondominiumId, load]);
+  }, [selectedCondominiumId, canRead, load]);
 
   const reload = useCallback(() => {
     if (selectedCondominiumId !== null) {
@@ -372,6 +383,7 @@ export function useFoundItems(): UseFoundItemsResult {
   return {
     state,
     canManage: managesSelectedCondominium,
+    canRead,
     reload,
     photoUriOf,
     viewingItem,

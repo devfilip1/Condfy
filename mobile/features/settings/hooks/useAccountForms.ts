@@ -139,7 +139,19 @@ export interface UseChangePasswordResult extends Submission {
   submit: () => void;
 }
 
-export function useChangePassword(): UseChangePasswordResult {
+export interface UseChangePasswordOptions {
+  /**
+   * Não volta para a tela anterior depois de trocar. É o caso da PRIMEIRA password de uma conta
+   * criada pelo síndico (feature 014): não existe tela anterior, e quem leva a pessoa para dentro
+   * do aplicativo é o layout raiz, quando o perfil deixa de ser provisório.
+   */
+  stayOnSuccess?: boolean;
+}
+
+export function useChangePassword(
+  options: UseChangePasswordOptions = {}
+): UseChangePasswordResult {
+  const { stayOnSuccess = false } = options;
   const { changePassword } = useAuth();
   const router = useRouter();
   const { run, ...submission } = useSubmit();
@@ -150,11 +162,11 @@ export function useChangePassword(): UseChangePasswordResult {
     void run(validatePasswordChange({ currentPassword, newPassword }), () =>
       changePassword(currentPassword, newPassword)
     ).then((changed) => {
-      if (changed) {
+      if (changed && !stayOnSuccess) {
         router.back();
       }
     });
-  }, [run, currentPassword, newPassword, changePassword, router]);
+  }, [run, currentPassword, newPassword, changePassword, router, stayOnSuccess]);
 
   return {
     ...submission,
