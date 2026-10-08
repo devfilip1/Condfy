@@ -5,7 +5,7 @@ import {
   apartmentText,
 } from "@/features/joinRequests/domain/joinRequest";
 import { toDisplayDateTime } from "@/shared/lib/calendar";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Card de um pedido de entrada: quem pede, para qual unidade, desde quando — e as duas respostas.
@@ -29,28 +29,30 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 6,
     },
     name: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     email: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     apartment: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     asked: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
     actions: {
@@ -60,7 +62,7 @@ const useStyles = makeStyles((colors) =>
     },
     button: {
       flex: 1,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingVertical: 12,
       alignItems: "center",
     },
@@ -68,8 +70,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accent,
     },
     approveLabel: {
-      fontSize: 14,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
     reject: {
@@ -77,8 +79,8 @@ const useStyles = makeStyles((colors) =>
       borderColor: colors.danger,
     },
     rejectLabel: {
-      fontSize: 14,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.danger,
     },
     disabled: {

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import {
   WEEKDAY_INITIALS,
   CalendarMonth,
@@ -27,8 +27,8 @@ export interface DateFieldProps {
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     label: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 8,
@@ -40,7 +40,7 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 15,
       paddingVertical: 14,
     },
@@ -49,7 +49,8 @@ const useStyles = makeStyles((colors) =>
     },
     triggerValue: {
       flex: 1,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     triggerPlaceholder: {
@@ -70,8 +71,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accent,
     },
     shortcutLabel: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     calendar: {
@@ -79,7 +80,7 @@ const useStyles = makeStyles((colors) =>
       padding: 12,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 16,
+      borderRadius: radius.card,
       backgroundColor: colors.cardBackground,
     },
     calendarHeader: {
@@ -94,8 +95,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.chipBackground,
     },
     monthLabel: {
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     week: {
@@ -107,8 +108,8 @@ const useStyles = makeStyles((colors) =>
       paddingVertical: 6,
     },
     weekdayLabel: {
-      fontSize: 11,
-      fontWeight: "600",
+      fontSize: fontSizes.caption,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       color: colors.textMuted,
     },
@@ -133,16 +134,18 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accent,
     },
     dayLabel: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     dayLabelSelected: {
-      fontWeight: "700",
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
     error: {
       marginTop: 6,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
   })

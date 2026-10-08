@@ -8,7 +8,7 @@ import {
   blockCodeErrorKey,
   blockUnitCountErrorKey,
 } from "@/features/condominiums/domain/newCondominium";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Os blocos do condomínio no formulário: as linhas, o "acrescentar" e o total de unidades.
@@ -35,12 +35,14 @@ const useStyles = makeStyles((colors) =>
       gap: 12,
     },
     hint: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.textMuted,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
     footer: {
@@ -55,21 +57,21 @@ const useStyles = makeStyles((colors) =>
       gap: 6,
       paddingVertical: 10,
       paddingHorizontal: 14,
-      borderRadius: 12,
+      borderRadius: radius.control,
       backgroundColor: colors.chipBackground,
     },
     addDisabled: {
       opacity: 0.5,
     },
     addLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     total: {
       flexShrink: 1,
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

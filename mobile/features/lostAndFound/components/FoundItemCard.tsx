@@ -10,7 +10,7 @@ import {
 import StatusBadge from "@/features/lostAndFound/components/StatusBadge";
 import { FoundItem } from "@/features/lostAndFound/domain/foundItem";
 import Photo from "@/shared/components/Photo";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import { toDisplayDateTime } from "@/shared/lib/calendar";
 
 /**
@@ -48,7 +48,7 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       // Para a foto herdar os cantos de cima do card sem repetir o raio nela.
@@ -62,14 +62,15 @@ const useStyles = makeStyles((colors) =>
       padding: 15,
     },
     description: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     // Menor e mais apagado que a descrição, de propósito: são duas informações, e uma é a principal
     // (FR-011).
     place: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     footer: {
@@ -81,7 +82,8 @@ const useStyles = makeStyles((colors) =>
     },
     postedAt: {
       flexShrink: 1,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     action: {
@@ -90,7 +92,7 @@ const useStyles = makeStyles((colors) =>
       marginBottom: 15,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 12,
+      borderRadius: radius.control,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.screenBackground,
@@ -99,8 +101,8 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.5,
     },
     actionText: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

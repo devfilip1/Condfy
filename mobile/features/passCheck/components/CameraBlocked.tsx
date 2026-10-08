@@ -2,7 +2,7 @@ import { Octicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, useTheme } from "@/shared/theme";
 
 /**
  * A câmera não pode ser usada: por quê, e o que fazer.
@@ -35,13 +35,14 @@ const useStyles = makeStyles((colors) =>
       gap: 16,
     },
     title: {
-      fontSize: 17,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       textAlign: "center",
       color: colors.textPrimary,
     },
     text: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textMuted,
@@ -56,8 +57,8 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
     },
     linkLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

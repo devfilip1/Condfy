@@ -8,7 +8,7 @@ import SettingsRow from "@/features/settings/components/SettingsRow";
 import { useAppearance } from "@/features/settings/hooks/useAppearance";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * Tela de Configurações: apenas composição.
@@ -35,8 +35,8 @@ const useStyles = makeStyles((colors) =>
     },
     section: {
       marginTop: 12,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       color: colors.textMuted,

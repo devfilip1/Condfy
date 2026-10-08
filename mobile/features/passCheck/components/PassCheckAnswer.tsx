@@ -10,7 +10,7 @@ import {
   unitText,
 } from "@/features/passCheck/domain/passCheck";
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * A resposta de UMA conferência: o resultado, o que ele quer dizer e — quando há — a visita.
@@ -49,31 +49,33 @@ const useStyles = makeStyles((colors) =>
       gap: 10,
     },
     outcome: {
-      fontSize: 28,
-      fontWeight: "bold",
+      fontSize: fontSizes.display,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     detail: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textMuted,
     },
     visit: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 4,
     },
     name: {
-      fontSize: 18,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     line: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

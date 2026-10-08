@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { ProfileMembership, unitLabel } from "@/features/auth";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Um vínculo da pessoa, como os dados pessoais o mostram: o condomínio, o cargo e as unidades.
@@ -28,19 +28,20 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 4,
     },
     name: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     detail: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

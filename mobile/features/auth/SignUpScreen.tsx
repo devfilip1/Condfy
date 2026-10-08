@@ -22,7 +22,7 @@ import FormField from "@/shared/components/FormField";
 import PrimaryButton from "@/shared/components/PrimaryButton";
 import { PASSWORD_MIN_LENGTH } from "@/features/auth/domain/session";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
@@ -39,7 +39,8 @@ const useStyles = makeStyles((colors) =>
       gap: 18,
     },
     hint: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       textAlign: "center",
       color: colors.textSecondary,
@@ -52,34 +53,37 @@ const useStyles = makeStyles((colors) =>
       paddingVertical: 4,
     },
     retryLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     title: {
-      fontSize: 26,
-      fontWeight: "bold",
+      fontSize: fontSizes.display,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     subtitle: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       color: colors.textSecondary,
       marginBottom: 6,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.danger,
     },
     footer: {
       marginTop: 4,
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       textAlign: "center",
       color: colors.textSecondary,
     },
     link: {
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

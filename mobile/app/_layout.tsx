@@ -1,4 +1,6 @@
+import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
@@ -6,7 +8,11 @@ import { StyleSheet, View } from "react-native";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { AppearanceProvider } from "@/features/settings";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontFiles, makeStyles, useTheme } from "@/shared/theme";
+
+// A tela de abertura fica até a letra carregar: sem isto o primeiro quadro sairia na letra do
+// sistema e trocaria de letra na frente da pessoa.
+SplashScreen.preventAutoHideAsync();
 
 /**
  * Decide o que a pessoa vê conforme o state da sessão — e, desde a feature 009, conforme ela já
@@ -198,6 +204,21 @@ const useStyles = makeStyles((colors) =>
 );
 
 export default function RootLayout() {
+  const [fontsLoaded, fontsError] = useFonts(fontFiles);
+  // Um erro também encerra a espera: o aplicativo abre na letra do sistema, em vez de ficar preso
+  // na tela de abertura por causa de um arquivo de fonte.
+  const fontsSettled = fontsLoaded || fontsError !== null;
+
+  useEffect(() => {
+    if (fontsSettled) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsSettled]);
+
+  if (!fontsSettled) {
+    return null;
+  }
+
   return (
     // A aparência fica POR FORA da sessão: a tela de entrar também tem tema, e a escolha é do
     // aparelho, não de quem entrou (feature 010, FR-029).

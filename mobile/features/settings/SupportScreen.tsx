@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import SupportContactRow from "@/features/settings/components/SupportContactRow";
 import { useSupport } from "@/features/settings/hooks/useSupport";
 import HeaderModule from "@/shared/components/HeaderModule";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Tela de suporte: apenas composição.
@@ -26,19 +26,21 @@ const useStyles = makeStyles((colors) =>
       gap: 12,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
       marginBottom: 6,
     },
     notice: {
       backgroundColor: colors.accentSoft,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
     },
     noticeText: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
   })

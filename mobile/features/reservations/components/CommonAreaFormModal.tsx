@@ -19,7 +19,7 @@ import {
   NAME_MAX_LENGTH,
 } from "@/features/reservations/domain/newCommonArea";
 import PhotoField from "@/shared/components/PhotoField";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Formulário de um novo local de reserva: o nome, a taxa de uso e a foto — os três obrigatórios.
@@ -60,20 +60,21 @@ const useStyles = makeStyles((colors) =>
     sheet: {
       maxHeight: "92%",
       backgroundColor: colors.screenBackground,
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      borderTopLeftRadius: radius.sheet,
+      borderTopRightRadius: radius.sheet,
       paddingHorizontal: 24,
       paddingTop: 24,
     },
     heading: {
-      fontSize: 20,
-      fontWeight: "bold",
+      fontSize: fontSizes.title,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
       marginBottom: 20,
     },
     field: { marginBottom: 18 },
     label: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 6,
@@ -82,26 +83,27 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
-    hint: { fontSize: 13, color: colors.textMuted, marginTop: 6 },
-    error: { fontSize: 13, color: colors.danger, marginTop: 6 },
+    hint: { fontSize: fontSizes.label, fontFamily: fonts.regular, color: colors.textMuted, marginTop: 6 },
+    error: { fontSize: fontSizes.label, fontFamily: fonts.regular, color: colors.danger, marginTop: 6 },
     actions: { flexDirection: "row", gap: 12, marginTop: 8 },
     button: {
       flex: 1,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingVertical: 14,
       alignItems: "center",
     },
     cancel: { backgroundColor: colors.chipBackground },
     submit: { backgroundColor: colors.accent },
     disabled: { opacity: 0.5 },
-    cancelLabel: { fontWeight: "600", color: colors.textPrimary },
-    submitLabel: { fontWeight: "bold", color: colors.textOnAccent },
+    cancelLabel: { fontFamily: fonts.semibold, color: colors.textPrimary },
+    submitLabel: { fontFamily: fonts.bold, color: colors.textOnAccent },
   })
 );
 

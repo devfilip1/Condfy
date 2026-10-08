@@ -18,7 +18,7 @@ import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Tela de uma pessoa com cargo: apenas composição.
@@ -39,42 +39,45 @@ const useStyles = makeStyles((colors) =>
     },
     person: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 4,
     },
     name: {
-      fontSize: 18,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     detail: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     section: {
       gap: 12,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
     note: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.success,
     },
     removeButton: {
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingVertical: 14,
       alignItems: "center",
       backgroundColor: colors.danger,
     },
     removeLabel: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnStrong,
     },
   })

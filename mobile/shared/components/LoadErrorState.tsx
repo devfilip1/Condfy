@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 export interface LoadErrorStateProps {
   message: string;
@@ -17,20 +17,21 @@ const useStyles = makeStyles((colors) =>
       gap: 20,
     },
     message: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textSecondary,
     },
     button: {
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 24,
       paddingVertical: 12,
     },
     buttonText: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
   })

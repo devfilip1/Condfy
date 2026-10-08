@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * O que a home diz a uma conta que ainda não pertence a condomínio nenhum — e a oferta de criar um.
@@ -20,19 +20,20 @@ const useStyles = makeStyles((colors) =>
     card: {
       marginTop: 20,
       padding: 18,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.cardBackground,
       gap: 12,
     },
     title: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     text: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
@@ -40,12 +41,12 @@ const useStyles = makeStyles((colors) =>
       height: 48,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.accent,
     },
     buttonLabel: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
   })

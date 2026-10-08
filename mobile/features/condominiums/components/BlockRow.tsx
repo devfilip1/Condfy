@@ -5,7 +5,7 @@ import {
   BLOCK_CODE_MAX_LENGTH,
   NewBlock,
 } from "@/features/condominiums/domain/newCondominium";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Um bloco do condomínio no formulário: a sigla, quantas unidades ele tem, e o remover.
@@ -44,7 +44,8 @@ const useStyles = makeStyles((colors) =>
       minWidth: 0,
     },
     label: {
-      fontSize: 11,
+      fontSize: fontSizes.caption,
+      fontFamily: fonts.regular,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 4,
@@ -53,17 +54,19 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     inputInvalid: {
       borderColor: colors.danger,
     },
     error: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 16,
       color: colors.danger,
       marginTop: 4,

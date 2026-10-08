@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { ProfileCondominium, condominiumPhotoUri } from "@/features/auth";
 import Photo from "@/shared/components/Photo";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, useTheme } from "@/shared/theme";
 
 /**
  * O banner da home: a foto e o nome do condomínio em que a pessoa está.
@@ -51,8 +51,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.overlay,
     },
     name: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       textTransform: "uppercase",
       color: colors.textOnOverlay,
     },
@@ -70,8 +70,8 @@ const useStyles = makeStyles((colors) =>
       boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.15)",
     },
     switchText: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

@@ -38,6 +38,9 @@ export type Scheme = "light" | "dark";
 
 export type { Palette } from "@/shared/constants/Colors";
 
+export { fontFiles, fonts } from "@/shared/theme/fonts";
+export { fontSizes, radius } from "@/shared/theme/scale";
+
 export interface Theme {
   scheme: Scheme;
   colors: Palette;

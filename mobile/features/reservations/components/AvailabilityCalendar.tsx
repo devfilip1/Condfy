@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import DayDot, { DayDotProps } from "@/features/reservations/components/DayDot";
 import { DayAvailability } from "@/features/reservations/domain/slot";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import {
   CalendarMonth,
   WEEKDAY_INITIALS,
@@ -45,7 +45,7 @@ const useStyles = makeStyles((colors) =>
       padding: 12,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 16,
+      borderRadius: radius.card,
       backgroundColor: colors.cardBackground,
     },
     header: {
@@ -63,8 +63,8 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.35,
     },
     monthLabel: {
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     week: {
@@ -76,8 +76,8 @@ const useStyles = makeStyles((colors) =>
       paddingVertical: 6,
     },
     weekdayLabel: {
-      fontSize: 11,
-      fontWeight: "600",
+      fontSize: fontSizes.caption,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       color: colors.textMuted,
     },
@@ -101,7 +101,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accentSoft,
     },
     dayLabel: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     dayLabelDisabled: {

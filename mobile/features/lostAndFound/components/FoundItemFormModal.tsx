@@ -21,7 +21,7 @@ import {
   SelectedPhoto,
 } from "@/features/lostAndFound/domain/foundItem";
 import Photo from "@/shared/components/Photo";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Formulário de um item encontrado: a foto, o que é e onde foi achado.
@@ -59,22 +59,23 @@ const useStyles = makeStyles((colors) =>
     },
     sheet: {
       backgroundColor: colors.screenBackground,
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      borderTopLeftRadius: radius.sheet,
+      borderTopRightRadius: radius.sheet,
       paddingHorizontal: 24,
       paddingTop: 24,
       maxHeight: "90%",
     },
     heading: {
-      fontSize: 20,
-      fontWeight: "bold",
+      fontSize: fontSizes.title,
+      fontFamily: fonts.display,
       textTransform: "uppercase",
       color: colors.textPrimary,
       marginBottom: 20,
     },
     field: { marginBottom: 18 },
     label: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 6,
@@ -83,7 +84,7 @@ const useStyles = makeStyles((colors) =>
     photo: {
       width: "100%",
       height: PHOTO_HEIGHT,
-      borderRadius: 14,
+      borderRadius: radius.control,
       borderWidth: 1,
       borderColor: colors.inputBorder,
     },
@@ -94,38 +95,40 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
-      borderRadius: 14,
+      borderRadius: radius.control,
       borderWidth: 1,
       borderColor: colors.inputBorder,
       backgroundColor: colors.inputBackground,
       paddingVertical: 12,
     },
-    photoButtonLabel: { fontWeight: "600", color: colors.textPrimary },
+    photoButtonLabel: { fontFamily: fonts.semibold, color: colors.textPrimary },
     input: {
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     descriptionInput: { minHeight: 80, textAlignVertical: "top" },
     counter: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
       marginTop: 4,
       textAlign: "right",
     },
-    error: { fontSize: 13, color: colors.danger, marginTop: 6 },
+    error: { fontSize: fontSizes.label, fontFamily: fonts.regular, color: colors.danger, marginTop: 6 },
     actions: { flexDirection: "row", gap: 12, marginTop: 8 },
-    button: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+    button: { flex: 1, borderRadius: radius.control, paddingVertical: 14, alignItems: "center" },
     cancel: { backgroundColor: colors.chipBackground },
     submit: { backgroundColor: colors.accent },
     disabled: { opacity: 0.5 },
-    cancelLabel: { fontWeight: "600", color: colors.textPrimary },
-    submitLabel: { fontWeight: "bold", color: colors.textOnAccent },
+    cancelLabel: { fontFamily: fonts.semibold, color: colors.textPrimary },
+    submitLabel: { fontFamily: fonts.bold, color: colors.textOnAccent },
   })
 );
 

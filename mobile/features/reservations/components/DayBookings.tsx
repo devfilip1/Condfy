@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { BookedSlot, slotLabel } from "@/features/reservations/domain/slot";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * As reservas do dia escolhido: os horários do local que já têm dono, de quem quer que seja.
@@ -39,14 +39,15 @@ const useStyles = makeStyles((colors) =>
       gap: 10,
     },
     heading: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       color: colors.textMuted,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
       paddingVertical: 12,
     },
@@ -64,14 +65,14 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "center",
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.chipBackground,
       paddingHorizontal: 8,
       paddingVertical: 12,
     },
     pillLabel: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textMuted,
     },
     // A que dá para cancelar usa as cores da pílula `held` do `SlotGrid`: é a mesma ação, vista
@@ -89,7 +90,8 @@ const useStyles = makeStyles((colors) =>
     },
     cancelLabel: {
       marginTop: 2,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

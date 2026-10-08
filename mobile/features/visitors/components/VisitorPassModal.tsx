@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import VisitorPass from "@/features/visitors/components/VisitorPass";
 import { OpenPass } from "@/features/visitors/domain/visitor";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * O pop-up do comprovante: o quadrado e, EMBAIXO dele, o botão de compartilhar.
@@ -67,7 +67,8 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "center",
     },
     notice: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       textAlign: "center",
       color: colors.textOnOverlay,
@@ -78,15 +79,15 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.accent,
     },
     shareButtonBusy: {
       opacity: 0.6,
     },
     shareLabel: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textOnAccent,
     },
   })

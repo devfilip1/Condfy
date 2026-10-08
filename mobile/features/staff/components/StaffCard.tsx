@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { STAFF_ROLE_LABELS, StaffMember } from "@/features/staff/domain/staff";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Card de uma pessoa com cargo: nome, e-mail, o cargo e, quando for o caso, o aviso de que ela
@@ -22,7 +22,7 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
@@ -36,28 +36,30 @@ const useStyles = makeStyles((colors) =>
     name: {
       flex: 1,
       minWidth: 0,
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     role: {
       backgroundColor: colors.chipBackground,
-      borderRadius: 10,
+      borderRadius: radius.tag,
       paddingHorizontal: 10,
       paddingVertical: 4,
     },
     roleLabel: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     email: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     pending: {
       marginTop: 2,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
   })

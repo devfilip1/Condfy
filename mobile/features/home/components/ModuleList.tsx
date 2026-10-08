@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Module } from "@/features/home/data/modules";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
@@ -21,11 +21,11 @@ const useStyles = makeStyles((colors) =>
       borderStyle: "solid",
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 35,
+      borderRadius: radius.card,
       width: 160,
     },
     iconContainer: {
-      borderRadius: 15,
+      borderRadius: radius.control,
       padding: 10,
       marginBottom: 10,
       backgroundColor: colors.iconSurface,
@@ -36,11 +36,12 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
     },
     title: {
-      fontWeight: "bold",
-      fontSize: 16,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.heading,
       color: colors.textPrimary,
     },
     desc: {
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
   })
@@ -87,7 +88,15 @@ export function ModuleItem({ modul }: { modul: Module }) {
           {/* Sem cor o ícone é preto, e preto some na aparência escura (ADR 0014). */}
           <Octicons name={modul.icon} size={40} color={colors.textPrimary} />
         </View>
-        <Text style={styles.title}>{modul.name}</Text>
+        {/* Uma linha só: o nome mais comprido encolhe um pouco em vez de quebrar o cartão. */}
+        <Text
+          style={styles.title}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+        >
+          {modul.name}
+        </Text>
         <Text style={styles.desc}>{modul.description}</Text>
       </View>
     </TouchableOpacity>

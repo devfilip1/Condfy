@@ -1,10 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { unitLabel, useAuth } from "@/features/auth";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, useTheme } from "@/shared/theme";
 
 /** O mesmo texto de `server/src/lib/displayName.ts`. Mudou um? Mude o outro. */
 const ADMINISTRATOR_DISPLAY_NAME = "Administrator";
@@ -13,7 +12,7 @@ const MANAGER_DISPLAY_NAME = "Manager";
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     container: {
-      height: 100,
+      height: 110,
       justifyContent: "center",
       paddingHorizontal: 20,
       paddingTop: 45,
@@ -24,14 +23,14 @@ const useStyles = makeStyles((colors) =>
       top: 60,
     },
     unit: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
       color: colors.textSecondary,
-      fontWeight: "semibold",
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
     },
     name: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       textTransform: "uppercase",
       color: colors.textPrimary,
     },

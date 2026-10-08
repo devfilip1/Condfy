@@ -12,7 +12,7 @@ import {
 import FormField from "@/shared/components/FormField";
 import PrimaryButton from "@/shared/components/PrimaryButton";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
@@ -27,37 +27,41 @@ const useStyles = makeStyles((colors) =>
       gap: 18,
     },
     title: {
-      fontSize: 26,
-      fontWeight: "bold",
+      fontSize: fontSizes.display,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     subtitle: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       color: colors.textSecondary,
       marginBottom: 6,
     },
     notice: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.textMuted,
       backgroundColor: colors.accentSoft,
-      borderRadius: 12,
+      borderRadius: radius.control,
       padding: 12,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.danger,
     },
     footer: {
       marginTop: 4,
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       textAlign: "center",
       color: colors.textSecondary,
     },
     link: {
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

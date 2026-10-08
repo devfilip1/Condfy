@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Module } from "@/features/home/data/modules";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Um módulo de ADMINISTRAÇÃO na home: uma linha baixa, de ponta a ponta.
@@ -30,7 +30,7 @@ const useStyles = makeStyles((colors) =>
       gap: 14,
       paddingHorizontal: 16,
       paddingVertical: 14,
-      borderRadius: 24,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.cardBackground,
@@ -38,7 +38,7 @@ const useStyles = makeStyles((colors) =>
     iconContainer: {
       width: 48,
       height: 48,
-      borderRadius: 14,
+      borderRadius: radius.control,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: colors.iconSurface,
@@ -49,12 +49,13 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     title: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     desc: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
   })

@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import {
   VisitType,
   Visitor,
@@ -40,7 +40,7 @@ const useStyles = makeStyles((colors) =>
       marginBottom: 15,
       padding: 20,
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       boxShadow: "0px 4px 3px rgba(0, 0, 0, 0.1)",
       display: "flex",
       flexDirection: "column",
@@ -59,13 +59,14 @@ const useStyles = makeStyles((colors) =>
       minWidth: 0,
     },
     name: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
       textTransform: "uppercase",
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     role: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
     content: {
@@ -96,22 +97,24 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     authorizedBy: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     unit: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     date: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     entered: {
       marginTop: 8,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.successStrong,
     },
   })

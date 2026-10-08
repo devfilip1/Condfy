@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { FoundItemStatus } from "@/features/lostAndFound/domain/foundItem";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * O status de um item, como etiqueta.
@@ -35,8 +35,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.chipBackground,
     },
     label: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
     },
     foundLabel: {
       color: colors.textPrimary,

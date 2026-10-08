@@ -20,7 +20,7 @@ import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
 import Photo from "@/shared/components/Photo";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 import { formatCurrency } from "@/shared/lib/currency";
 
@@ -56,12 +56,13 @@ const useStyles = makeStyles((colors) =>
     photo: {
       marginHorizontal: 20,
       height: PHOTO_HEIGHT,
-      borderRadius: 16,
+      borderRadius: radius.card,
     },
     fee: {
       marginHorizontal: 20,
       marginTop: 12,
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     availabilitySwitch: {
@@ -82,19 +83,20 @@ const useStyles = makeStyles((colors) =>
       height: 52,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.accent,
     },
     confirmButtonDisabled: {
       opacity: 0.45,
     },
     confirmButtonText: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textOnAccent,
     },
     viewOnly: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       textAlign: "center",
       color: colors.textMuted,

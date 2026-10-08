@@ -5,7 +5,7 @@ import {
   STAFF_ROLE_LABELS,
   StaffRole,
 } from "@/features/staff/domain/staff";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * A escolha do cargo: Administrator ou Doorman, e mais nada (FR-012).
@@ -36,8 +36,8 @@ const useStyles = makeStyles((colors) =>
       gap: 6,
     },
     label: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     options: {
@@ -46,7 +46,7 @@ const useStyles = makeStyles((colors) =>
     },
     option: {
       flex: 1,
-      borderRadius: 14,
+      borderRadius: radius.control,
       borderWidth: 1,
       borderColor: colors.inputBorder,
       backgroundColor: colors.inputBackground,
@@ -61,16 +61,18 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.5,
     },
     optionLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     hint: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
   })

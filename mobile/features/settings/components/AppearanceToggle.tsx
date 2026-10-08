@@ -1,7 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { Scheme, makeStyles, useTheme } from "@/shared/theme";
+import {
+  Scheme,
+  fontSizes,
+  fonts,
+  makeStyles,
+  radius,
+  useTheme,
+} from "@/shared/theme";
 
 /**
  * A escolha entre aparência clara e escura: duas opções lado a lado, a que está valendo marcada.
@@ -35,7 +42,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.cardBackground,
@@ -47,11 +54,12 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accentSoft,
     },
     label: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     labelSelected: {
-      fontWeight: "bold",
+      fontFamily: fonts.bold,
     },
   })
 );

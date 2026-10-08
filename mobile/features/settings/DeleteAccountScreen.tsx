@@ -11,7 +11,7 @@ import { useDeleteAccount } from "@/features/settings/hooks/useAccountForms";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import FormField from "@/shared/components/FormField";
 import HeaderModule from "@/shared/components/HeaderModule";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Tela de apagar a conta: apenas composição.
@@ -39,28 +39,30 @@ const useStyles = makeStyles((colors) =>
     },
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 10,
     },
     heading: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     text: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
     deleteButton: {
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingVertical: 14,
       alignItems: "center",
       backgroundColor: colors.danger,
@@ -69,8 +71,8 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.6,
     },
     deleteLabel: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnStrong,
     },
   })

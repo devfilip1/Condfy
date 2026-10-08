@@ -7,7 +7,7 @@ import { useAddStaffMember } from "@/features/staff/hooks/useAddStaffMember";
 import FormField from "@/shared/components/FormField";
 import HeaderModule from "@/shared/components/HeaderModule";
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * Tela de trazer uma pessoa com cargo: apenas composição.
@@ -27,12 +27,14 @@ const useStyles = makeStyles((colors) =>
       gap: 18,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
   })

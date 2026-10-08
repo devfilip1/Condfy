@@ -6,7 +6,7 @@ import {
   unitsLine,
 } from "@/features/condominiums/domain/membership";
 import Photo from "@/shared/components/Photo";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Card de um condomínio na tela de escolha: a foto, o nome, onde a pessoa mora nele e o cargo dela
@@ -33,7 +33,7 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       // Para a foto herdar os cantos de cima do card sem repetir o raio nela.
@@ -62,18 +62,19 @@ const useStyles = makeStyles((colors) =>
     name: {
       flex: 1,
       minWidth: 0,
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
       textTransform: "uppercase",
     },
     current: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textMuted,
     },
     units: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     role: {
@@ -85,8 +86,8 @@ const useStyles = makeStyles((colors) =>
       paddingVertical: 5,
     },
     roleText: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

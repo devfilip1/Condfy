@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 export interface PrimaryButtonProps {
   label: string;
@@ -14,7 +14,7 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     button: {
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingVertical: 14,
       alignItems: "center",
     },
@@ -22,8 +22,8 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.6,
     },
     label: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
   })

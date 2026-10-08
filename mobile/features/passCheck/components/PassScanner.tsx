@@ -1,7 +1,7 @@
 import { CameraView } from "expo-camera";
 import { StyleSheet, Text, View } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * A câmera apontada para o comprovante de um visitante.
@@ -48,13 +48,13 @@ const useStyles = makeStyles((colors) =>
     frame: {
       width: 240,
       height: 240,
-      borderRadius: 24,
+      borderRadius: radius.card,
       borderWidth: 3,
       borderColor: colors.textOnOverlay,
     },
     hint: {
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       textAlign: "center",
       color: colors.textOnOverlay,
     },

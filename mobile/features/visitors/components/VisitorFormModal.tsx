@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import DateField from "@/shared/components/DateField";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import {
   FormErrors,
   NAME_MAX_LENGTH,
@@ -68,8 +68,8 @@ const useStyles = makeStyles((colors) =>
     },
     sheet: {
       backgroundColor: colors.cardBackground,
-      borderTopLeftRadius: 25,
-      borderTopRightRadius: 25,
+      borderTopLeftRadius: radius.sheet,
+      borderTopRightRadius: radius.sheet,
       paddingHorizontal: 25,
       paddingTop: 12,
       // A altura máxima é relativa ao espaço restante acima do teclado, não à tela inteira.
@@ -84,8 +84,8 @@ const useStyles = makeStyles((colors) =>
       marginBottom: 16,
     },
     title: {
-      fontSize: 20,
-      fontWeight: "bold",
+      fontSize: fontSizes.title,
+      fontFamily: fonts.display,
       textTransform: "uppercase",
       color: colors.textPrimary,
       marginBottom: 20,
@@ -94,8 +94,8 @@ const useStyles = makeStyles((colors) =>
       marginBottom: 18,
     },
     label: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 8,
@@ -104,10 +104,11 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 15,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     chips: {
@@ -117,20 +118,21 @@ const useStyles = makeStyles((colors) =>
     chip: {
       paddingVertical: 10,
       paddingHorizontal: 16,
-      borderRadius: 12,
+      borderRadius: radius.control,
       backgroundColor: colors.chipBackground,
     },
     chipSelected: {
       backgroundColor: colors.accent,
     },
     chipLabel: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     error: {
       marginTop: 6,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
     actions: {
@@ -142,7 +144,7 @@ const useStyles = makeStyles((colors) =>
     button: {
       paddingVertical: 12,
       paddingHorizontal: 22,
-      borderRadius: 12,
+      borderRadius: radius.control,
     },
     cancelButton: {
       backgroundColor: colors.chipBackground,
@@ -155,12 +157,13 @@ const useStyles = makeStyles((colors) =>
     },
     submitError: {
       marginTop: 4,
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.danger,
     },
     buttonLabel: {
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

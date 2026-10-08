@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, useTheme } from "@/shared/theme";
 
 export interface HeaderModuleProps {
   name: string;
@@ -29,8 +29,8 @@ const useStyles = makeStyles((colors) =>
       paddingHorizontal: 8,
     },
     title: {
-      fontSize: 25,
-      fontWeight: "bold",
+      fontSize: fontSizes.display,
+      fontFamily: fonts.display,
       textTransform: "uppercase",
       // Sem cor o texto é preto, e preto some na aparência escura (ADR 0014).
       color: colors.textPrimary,

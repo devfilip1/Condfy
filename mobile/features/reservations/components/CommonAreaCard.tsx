@@ -2,7 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { CommonArea } from "@/features/reservations/domain/commonArea";
 import Photo from "@/shared/components/Photo";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 import { formatCurrency } from "@/shared/lib/currency";
 
 /**
@@ -31,7 +31,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 16,
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 14,
@@ -41,21 +41,22 @@ const useStyles = makeStyles((colors) =>
     image: {
       width: IMAGE_SIZE,
       height: IMAGE_SIZE,
-      borderRadius: 16,
+      borderRadius: radius.card,
     },
     texts: {
       flex: 1,
       minWidth: 0,
     },
     name: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
       textTransform: "uppercase",
     },
     fee: {
       marginTop: 4,
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
     // Apagado, mas não invisível: o local continua na lista de propósito (FR-011). Só a foto e os
@@ -73,8 +74,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.chipBackground,
     },
     unavailableText: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textMuted,
     },
   })

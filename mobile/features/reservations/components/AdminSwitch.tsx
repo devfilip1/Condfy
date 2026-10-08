@@ -1,6 +1,6 @@
 import { StyleSheet, Switch, Text, View } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Um interruptor do administrador, com o nome do que ele controla e uma frase dizendo o que faz.
@@ -33,7 +33,7 @@ const useStyles = makeStyles((colors) =>
       marginHorizontal: 20,
       paddingHorizontal: 16,
       paddingVertical: 14,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.cardBackground,
@@ -47,12 +47,13 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     title: {
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     description: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.textMuted,
     },

@@ -5,7 +5,7 @@ import { useNotices } from "@/features/newsletter/hooks/useNotices";
 import EmptyState from "@/shared/components/EmptyState";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
@@ -30,16 +30,18 @@ const useStyles = makeStyles((colors) =>
       gap: 12,
     },
     title: {
-      fontSize: 22,
-      fontWeight: "bold",
+      fontSize: fontSizes.title,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     date: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
     body: {
-      fontSize: 16,
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.regular,
       lineHeight: 24,
       color: colors.textPrimary,
     },

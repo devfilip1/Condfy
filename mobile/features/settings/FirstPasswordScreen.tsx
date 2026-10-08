@@ -6,7 +6,7 @@ import { useChangePassword } from "@/features/settings/hooks/useAccountForms";
 import FormField from "@/shared/components/FormField";
 import HeaderModule from "@/shared/components/HeaderModule";
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * A primeira password de uma conta criada pelo síndico: apenas composição.
@@ -34,12 +34,14 @@ const useStyles = makeStyles((colors) =>
       gap: 18,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
     signOut: {
@@ -47,8 +49,8 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
     },
     signOutLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textMuted,
     },
   })

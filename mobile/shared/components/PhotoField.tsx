@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import Photo from "@/shared/components/Photo";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * O campo de foto de um formulário: a pré-visualização, uma linha de orientação e as ações.
@@ -40,10 +40,11 @@ const useStyles = makeStyles((colors) =>
     preview: {
       width: "100%",
       aspectRatio: 16 / 9,
-      borderRadius: 16,
+      borderRadius: radius.card,
     },
     hint: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     actions: {
@@ -54,24 +55,25 @@ const useStyles = makeStyles((colors) =>
     action: {
       paddingVertical: 10,
       paddingHorizontal: 14,
-      borderRadius: 12,
+      borderRadius: radius.control,
       backgroundColor: colors.chipBackground,
     },
     actionDisabled: {
       opacity: 0.5,
     },
     actionLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     removeLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.danger,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
   })

@@ -9,7 +9,7 @@ import {
 import CondominiumCard from "@/features/condominiums/components/CondominiumCard";
 import { ChoiceState } from "@/features/condominiums/hooks/useCondominiumChoice";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Os condomínios da pessoa, com um state visível para cada situação.
@@ -47,20 +47,21 @@ const useStyles = makeStyles((colors) =>
       gap: 20,
     },
     message: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textSecondary,
     },
     retry: {
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 24,
       paddingVertical: 12,
     },
     retryText: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
     footer: {
@@ -71,8 +72,8 @@ const useStyles = makeStyles((colors) =>
       paddingVertical: 12,
     },
     signOutText: {
-      fontSize: 15,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textMuted,
     },
   })

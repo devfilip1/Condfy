@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Uma linha do menu de configurações: ícone, rótulo, e a seta de "abre outra tela".
@@ -27,7 +27,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 14,
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       paddingHorizontal: 16,
@@ -39,15 +39,16 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     label: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     labelDanger: {
       color: colors.danger,
     },
     detail: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

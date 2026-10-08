@@ -19,7 +19,7 @@ import {
 import { useCreateCondominium } from "@/features/condominiums/hooks/useCreateCondominium";
 import HeaderModule from "@/shared/components/HeaderModule";
 import PhotoField from "@/shared/components/PhotoField";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Tela de criação de um condomínio: apenas composição.
@@ -45,7 +45,8 @@ const useStyles = makeStyles((colors) =>
       gap: 22,
     },
     label: {
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       textTransform: "uppercase",
       color: colors.textMuted,
       marginBottom: 6,
@@ -54,10 +55,11 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.inputBorder,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     multiline: {
@@ -65,7 +67,8 @@ const useStyles = makeStyles((colors) =>
       textAlignVertical: "top",
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
       marginTop: 6,
     },
@@ -79,7 +82,8 @@ const useStyles = makeStyles((colors) =>
       gap: 10,
     },
     submitError: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.danger,
     },
@@ -87,15 +91,15 @@ const useStyles = makeStyles((colors) =>
       height: 52,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.accent,
     },
     submitDisabled: {
       opacity: 0.5,
     },
     submitLabel: {
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textOnAccent,
     },
   })

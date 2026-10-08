@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { SupportContact } from "@/features/settings/data/support";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Um contato do suporte: o canal, e o número ou endereço escrito por extenso.
@@ -25,7 +25,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 14,
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       paddingHorizontal: 16,
@@ -37,12 +37,13 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     title: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     label: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
   })

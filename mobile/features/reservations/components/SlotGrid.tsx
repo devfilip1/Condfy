@@ -2,7 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Slot, slotLabel } from "@/features/reservations/domain/slot";
 import { BookingBusy } from "@/features/reservations/hooks/useBooking";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
@@ -57,25 +57,27 @@ const useStyles = makeStyles((colors) =>
       gap: 10,
     },
     heading: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       color: colors.textMuted,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
       paddingVertical: 12,
     },
     notice: {
       backgroundColor: colors.accentSoft,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
     },
     noticeText: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     grid: {
@@ -92,7 +94,7 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "center",
       borderWidth: 2,
       borderColor: colors.successStrong,
-      borderRadius: 14,
+      borderRadius: radius.control,
       backgroundColor: colors.cardBackground,
       paddingHorizontal: 8,
       paddingVertical: 12,
@@ -109,8 +111,8 @@ const useStyles = makeStyles((colors) =>
       opacity: 0.5,
     },
     pillLabel: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.successStrong,
     },
     pillLabelSelected: {
@@ -121,7 +123,8 @@ const useStyles = makeStyles((colors) =>
     },
     heldLabel: {
       marginTop: 2,
-      fontSize: 12,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

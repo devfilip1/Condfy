@@ -6,7 +6,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
 import PrimaryButton from "@/shared/components/PrimaryButton";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * A tela de espera: o pedido de entrada foi enviado e ainda não foi respondido.
@@ -39,7 +39,8 @@ const useStyles = makeStyles((colors) =>
       gap: 12,
     },
     text: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textMuted,
@@ -47,19 +48,20 @@ const useStyles = makeStyles((colors) =>
     request: {
       alignSelf: "stretch",
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
       gap: 4,
     },
     condominium: {
-      fontSize: 17,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     unit: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     link: {
@@ -67,13 +69,13 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
     },
     linkLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     dangerLabel: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.danger,
     },
   })

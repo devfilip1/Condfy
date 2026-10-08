@@ -9,7 +9,7 @@ import {
 import OwnReservationCard from "@/features/reservations/components/OwnReservationCard";
 import { OwnReservation } from "@/features/reservations/domain/reservation";
 import { OwnReservationsState } from "@/features/reservations/hooks/useOwnReservations";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * A seção "minhas reservas", que fica embaixo dos locais.
@@ -38,25 +38,26 @@ const useStyles = makeStyles((colors) =>
       gap: 14,
     },
     heading: {
-      fontSize: 18,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
       textTransform: "uppercase",
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     retry: {
       alignSelf: "flex-start",
       backgroundColor: colors.accent,
-      borderRadius: 14,
+      borderRadius: radius.control,
       paddingHorizontal: 24,
       paddingVertical: 12,
     },
     retryText: {
-      fontSize: 15,
-      fontWeight: "bold",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.bold,
       color: colors.textOnAccent,
     },
     loading: {

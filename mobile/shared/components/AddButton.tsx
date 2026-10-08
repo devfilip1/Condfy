@@ -1,7 +1,7 @@
 import { Octicons } from "@expo/vector-icons";
 import { StyleSheet, TouchableOpacity } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fonts, makeStyles, useTheme } from "@/shared/theme";
 
 export interface AddButtonProps {
   onPress: () => void;
@@ -27,7 +27,7 @@ const useStyles = makeStyles((colors) =>
       boxShadow: "3px 4px 5px rgba(0, 0, 0, 0.1)",
     },
     label: {
-      fontWeight: "bold",
+      fontFamily: fonts.bold,
     },
   })
 );

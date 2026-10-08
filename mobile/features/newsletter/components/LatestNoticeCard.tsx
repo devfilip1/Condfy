@@ -3,7 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { Notice, previewOf } from "@/features/newsletter/domain/notice";
 import { toDisplayDayMonth } from "@/shared/lib/calendar";
-import { ThemeProvider, makeStyles } from "@/shared/theme";
+import {
+  ThemeProvider,
+  fontSizes,
+  fonts,
+  makeStyles,
+  radius,
+} from "@/shared/theme";
 
 /**
  * O card do último aviso, na home: o título, o começo do texto e a data, sobre o fundo de ondas.
@@ -35,7 +41,7 @@ const useStyles = makeStyles((colors) =>
   StyleSheet.create({
     card: {
       marginTop: 20,
-      borderRadius: 28,
+      borderRadius: radius.card,
       overflow: "hidden",
       backgroundColor: colors.screenBackground,
       borderWidth: 1,
@@ -47,7 +53,7 @@ const useStyles = makeStyles((colors) =>
       right: 0,
       bottom: 0,
       left: 0,
-      opacity: 0.45,
+      opacity: 0.25,
     },
     content: {
       paddingHorizontal: 20,
@@ -62,21 +68,23 @@ const useStyles = makeStyles((colors) =>
     title: {
       flex: 1,
       minWidth: 0,
-      fontSize: 17,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textOnOverlay,
     },
     label: {
-      fontSize: 11,
+      fontSize: fontSizes.caption,
+      fontFamily: fonts.regular,
       letterSpacing: 0.5,
-      color: colors.textOnOverlay,
+      color: colors.accent,
     },
     preview: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       // Reserva as duas linhas: um aviso curto não deixa o card mais baixo que os outros.
       minHeight: 40,
-      color: colors.successStrong,
+      color: colors.accent,
     },
     footer: {
       flexDirection: "row",
@@ -84,12 +92,13 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "space-between",
     },
     date: {
-      fontSize: 13,
-      color: colors.successStrong,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
+      color: colors.accent,
     },
     cue: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textOnOverlay,
     },
   })

@@ -8,7 +8,7 @@ import { usePassCheck } from "@/features/passCheck/hooks/usePassCheck";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * Tela de conferência de comprovante: apenas composição.
@@ -35,8 +35,8 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.overlay,
     },
     checkingLabel: {
-      fontSize: 17,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textOnOverlay,
     },
   })

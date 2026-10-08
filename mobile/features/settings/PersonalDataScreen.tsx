@@ -6,7 +6,7 @@ import { usePersonalData } from "@/features/settings/hooks/usePersonalData";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * Tela de dados pessoais: apenas composição. Só leitura.
@@ -29,7 +29,7 @@ const useStyles = makeStyles((colors) =>
     },
     card: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 16,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
@@ -39,26 +39,28 @@ const useStyles = makeStyles((colors) =>
       gap: 2,
     },
     label: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       color: colors.textMuted,
     },
     value: {
-      fontSize: 16,
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     section: {
       marginTop: 12,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       color: colors.textMuted,
     },
     hint: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
   })

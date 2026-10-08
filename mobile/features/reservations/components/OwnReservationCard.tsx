@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { OwnReservation } from "@/features/reservations/domain/reservation";
 import { slotLabel } from "@/features/reservations/domain/slot";
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 import { toDisplayDate } from "@/shared/lib/calendar";
 
 /**
@@ -26,7 +26,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 12,
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 15,
@@ -37,8 +37,8 @@ const useStyles = makeStyles((colors) =>
       gap: 8,
     },
     name: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
       textTransform: "uppercase",
     },
@@ -54,19 +54,20 @@ const useStyles = makeStyles((colors) =>
       gap: 6,
     },
     detailText: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textMuted,
     },
     cancelButton: {
       borderWidth: 1,
       borderColor: colors.danger,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 10,
     },
     cancelText: {
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: fontSizes.body,
+      fontFamily: fonts.semibold,
       color: colors.danger,
     },
   })

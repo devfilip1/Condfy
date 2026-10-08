@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 export interface EmptyStateProps {
   message: string;
@@ -15,7 +15,8 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "center",
     },
     message: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       textAlign: "center",
       color: colors.textSecondary,

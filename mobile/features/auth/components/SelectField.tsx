@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-import { makeStyles, useTheme } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius, useTheme } from "@/shared/theme";
 
 /**
  * Um campo de escolha: mostra o que foi escolhido e, ao toque, abre a lista do que existe.
@@ -50,8 +50,8 @@ const useStyles = makeStyles((colors) =>
       gap: 6,
     },
     label: {
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     input: {
@@ -59,7 +59,7 @@ const useStyles = makeStyles((colors) =>
       alignItems: "center",
       gap: 10,
       minHeight: 48,
-      borderRadius: 14,
+      borderRadius: radius.control,
       borderWidth: 1,
       borderColor: colors.inputBorder,
       backgroundColor: colors.inputBackground,
@@ -74,16 +74,19 @@ const useStyles = makeStyles((colors) =>
     },
     value: {
       flex: 1,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     placeholder: {
       flex: 1,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textSecondary,
     },
     error: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       color: colors.danger,
     },
     backdrop: {
@@ -93,8 +96,8 @@ const useStyles = makeStyles((colors) =>
     },
     sheet: {
       maxHeight: "70%",
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      borderTopLeftRadius: radius.sheet,
+      borderTopRightRadius: radius.sheet,
       backgroundColor: colors.cardBackground,
       paddingTop: 16,
       paddingBottom: 24,
@@ -102,8 +105,8 @@ const useStyles = makeStyles((colors) =>
     sheetTitle: {
       paddingHorizontal: 20,
       paddingBottom: 12,
-      fontSize: 16,
-      fontWeight: "bold",
+      fontSize: fontSizes.heading,
+      fontFamily: fonts.display,
       color: colors.textPrimary,
     },
     option: {
@@ -117,13 +120,15 @@ const useStyles = makeStyles((colors) =>
     },
     optionLabel: {
       flex: 1,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
     empty: {
       paddingHorizontal: 20,
       paddingVertical: 24,
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       textAlign: "center",
       color: colors.textMuted,
     },

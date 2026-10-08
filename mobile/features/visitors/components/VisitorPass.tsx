@@ -9,7 +9,13 @@ import {
   passQrValue,
 } from "@/features/visitors/domain/visitor";
 import { toDisplayDate } from "@/shared/lib/calendar";
-import { ThemeProvider, makeStyles } from "@/shared/theme";
+import {
+  ThemeProvider,
+  fontSizes,
+  fonts,
+  makeStyles,
+  radius,
+} from "@/shared/theme";
 
 /**
  * O comprovante de liberação de uma visita: o QUADRADO, que é o que vira imagem ao compartilhar.
@@ -49,7 +55,7 @@ const useStyles = makeStyles((colors) =>
       justifyContent: "space-between",
       paddingHorizontal: 20,
       paddingVertical: 18,
-      borderRadius: 24,
+      borderRadius: radius.card,
       backgroundColor: colors.cardBackground,
     },
     texts: {
@@ -58,21 +64,22 @@ const useStyles = makeStyles((colors) =>
       gap: 4,
     },
     greeting: {
-      fontSize: 20,
-      fontWeight: "bold",
+      fontSize: fontSizes.title,
+      fontFamily: fonts.display,
       textAlign: "center",
       color: colors.textPrimary,
     },
     authorization: {
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       textAlign: "center",
       color: colors.textMuted,
     },
     validity: {
       marginTop: 2,
-      fontSize: 13,
-      fontWeight: "600",
+      fontSize: fontSizes.label,
+      fontFamily: fonts.semibold,
       textAlign: "center",
       color: colors.textPrimary,
     },

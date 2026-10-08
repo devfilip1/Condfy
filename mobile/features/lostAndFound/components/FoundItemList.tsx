@@ -6,7 +6,7 @@ import { ShelfState } from "@/features/lostAndFound/hooks/useFoundItems";
 import EmptyState from "@/shared/components/EmptyState";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 /**
  * A prateleira, com um state visível para cada situação.
@@ -45,12 +45,13 @@ const useStyles = makeStyles((colors) =>
     },
     notice: {
       backgroundColor: colors.accentSoft,
-      borderRadius: 12,
+      borderRadius: radius.control,
       paddingHorizontal: 14,
       paddingVertical: 12,
     },
     noticeText: {
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
     },
   })

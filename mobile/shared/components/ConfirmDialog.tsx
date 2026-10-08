@@ -1,6 +1,6 @@
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles, radius } from "@/shared/theme";
 
 export interface ConfirmDialogProps {
   visible: boolean;
@@ -36,18 +36,20 @@ const useStyles = makeStyles((colors) =>
     },
     dialog: {
       backgroundColor: colors.cardBackground,
-      borderRadius: 20,
+      borderRadius: radius.card,
       padding: 25,
       gap: 25,
     },
     message: {
-      fontSize: 15,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 22,
       color: colors.textPrimary,
     },
     error: {
       marginTop: -15,
-      fontSize: 13,
+      fontSize: fontSizes.label,
+      fontFamily: fonts.regular,
       lineHeight: 18,
       color: colors.danger,
     },
@@ -59,7 +61,7 @@ const useStyles = makeStyles((colors) =>
     button: {
       paddingVertical: 12,
       paddingHorizontal: 20,
-      borderRadius: 12,
+      borderRadius: radius.control,
     },
     buttonDisabled: {
       opacity: 0.6,
@@ -75,11 +77,11 @@ const useStyles = makeStyles((colors) =>
       backgroundColor: colors.accent,
     },
     cancelLabel: {
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textPrimary,
     },
     confirmLabel: {
-      fontWeight: "600",
+      fontFamily: fonts.semibold,
       color: colors.textOnStrong,
     },
   })

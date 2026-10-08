@@ -9,7 +9,7 @@ import EmptyState from "@/shared/components/EmptyState";
 import HeaderModule from "@/shared/components/HeaderModule";
 import LoadErrorState from "@/shared/components/LoadErrorState";
 import LoadingState from "@/shared/components/LoadingState";
-import { makeStyles } from "@/shared/theme";
+import { fontSizes, fonts, makeStyles } from "@/shared/theme";
 
 /**
  * Tela do módulo de pedidos de entrada: apenas composição.
@@ -31,7 +31,8 @@ const useStyles = makeStyles((colors) =>
     notice: {
       marginHorizontal: 20,
       marginBottom: 8,
-      fontSize: 14,
+      fontSize: fontSizes.body,
+      fontFamily: fonts.regular,
       lineHeight: 20,
       color: colors.textMuted,
     },
