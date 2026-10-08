@@ -93,8 +93,9 @@ export default function HeaderHome() {
         </Text>
       </View>
       {/*
-        Até a feature 010 este era o botão de sair. Sair foi para a barra de baixo, ao lado da
-        Home, com confirmação; aqui ficou a entrada das configurações (FR-001).
+        Até a feature 010 este era o botão de sair. Hoje é a entrada das configurações — e, desde a
+        feature 017, é por elas que se sai: a barra de baixo, que guardou o botão nesse meio-tempo,
+        deixou de existir.
       */}
       <TouchableOpacity
         style={styles.settings}

@@ -1,9 +1,12 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { useAuth } from "@/features/auth";
 import AppearanceToggle from "@/features/settings/components/AppearanceToggle";
 import SettingsRow from "@/features/settings/components/SettingsRow";
 import { useAppearance } from "@/features/settings/hooks/useAppearance";
+import ConfirmDialog from "@/shared/components/ConfirmDialog";
 import HeaderModule from "@/shared/components/HeaderModule";
 import { makeStyles } from "@/shared/theme";
 
@@ -14,7 +17,8 @@ import { makeStyles } from "@/shared/theme";
  * aparência do aplicativo, o suporte e a saída definitiva.
  *
  * A aparência não é uma tela: é um controle aqui mesmo, porque não tem formulário e vale na hora.
- * Sair da conta não está aqui — foi para a barra de baixo, ao lado da Home.
+ * Sair da conta mora aqui desde a feature 017, na seção "Session": a barra de baixo, que o
+ * guardava, deixou de existir. Continua pedindo confirmação.
  */
 
 const useStyles = makeStyles((colors) =>
@@ -43,6 +47,9 @@ const useStyles = makeStyles((colors) =>
 export default function SettingsScreen() {
   const styles = useStyles();
   const { scheme, setAppearance } = useAppearance();
+  const { signOut } = useAuth();
+  // O único state da tela: o diálogo de confirmação está aberto. Morava no layout das abas.
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
   return (
     <View style={styles.screen}>
@@ -76,6 +83,17 @@ export default function SettingsScreen() {
           onPress={() => router.push("/settings/support")}
         />
 
+        {/*
+          Sair fica separado de apagar a conta, e acima: é a ação comum, e não é destrutiva — a
+          conta continua lá. Por isso o diálogo dela é neutro, e o de apagar é vermelho.
+        */}
+        <Text style={styles.section}>Session</Text>
+        <SettingsRow
+          icon="log-out-outline"
+          label="Sign out"
+          onPress={() => setConfirmingSignOut(true)}
+        />
+
         <Text style={styles.section}>Danger zone</Text>
         <SettingsRow
           icon="trash-outline"
@@ -84,6 +102,18 @@ export default function SettingsScreen() {
           onPress={() => router.push("/settings/delete-account")}
         />
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmingSignOut}
+        message="Sign out of your account?"
+        confirmLabel="Sign out"
+        tone="neutral"
+        onConfirm={() => {
+          setConfirmingSignOut(false);
+          signOut();
+        }}
+        onCancel={() => setConfirmingSignOut(false)}
+      />
     </View>
   );
 }

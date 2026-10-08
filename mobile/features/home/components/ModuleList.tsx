@@ -1,25 +1,18 @@
 import { Octicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Module } from "@/features/home/data/modules";
 import { makeStyles, useTheme } from "@/shared/theme";
 
 const useStyles = makeStyles((colors) =>
   StyleSheet.create({
-    overContainer: {
-      display: "flex",
+    grid: {
       marginTop: 20,
-    },
-    row: {
+      flexDirection: "row",
+      flexWrap: "wrap",
       justifyContent: "space-between",
-      marginBottom: 20,
+      rowGap: 20,
     },
     container: {
       padding: 25,
@@ -60,15 +53,15 @@ export interface ModuleListProps {
 
 export default function ModuleList({ modules }: ModuleListProps) {
   const styles = useStyles();
+  // Uma `View` que quebra a linha, e não uma `FlatList`: a home agora rola inteira, e uma lista
+  // virtualizada dentro de um `ScrollView` briga com a rolagem dele. São no máximo cinco cards —
+  // não há o que virtualizar (feature 017).
   return (
-    <FlatList
-      style={styles.overContainer}
-      data={modules}
-      keyExtractor={(item) => item.name}
-      renderItem={({ item }) => <ModuleItem modul={item} />}
-      numColumns={2}
-      columnWrapperStyle={styles.row}
-    />
+    <View style={styles.grid}>
+      {modules.map((modul) => (
+        <ModuleItem key={modul.name} modul={modul} />
+      ))}
+    </View>
   );
 }
 

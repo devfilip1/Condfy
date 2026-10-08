@@ -49,6 +49,22 @@ export function toDisplayDate(isoDate: string): string {
 }
 
 /**
+ * Só o dia e o mês de um dia de calendário: `2026-10-07` → `07/10`. É como o card do último aviso,
+ * na home, mostra a data.
+ *
+ * Como `toDisplayDate`, CORTA o texto e nunca passa por `Date`: um dia de calendário não tem fuso, e
+ * convertê-lo é como ele vira o dia anterior num fuso negativo. Devolve o texto recebido quando ele
+ * não é uma data.
+ */
+export function toDisplayDayMonth(isoDate: string): string {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!parts) {
+    return isoDate;
+  }
+  return `${parts[3]}/${parts[2]}`;
+}
+
+/**
  * Converte um INSTANTE (`2026-10-05T23:10:00.000Z`) para exibição, no horário local do aparelho:
  * `05/10/2026, 20:10`.
  *
