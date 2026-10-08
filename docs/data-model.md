@@ -16,17 +16,20 @@ erDiagram
     CONDOMINIUM ||--o{ UNIT : has
     CONDOMINIUM ||--o{ CONDOMINIUM_MEMBER : has
     USER ||--o{ CONDOMINIUM_MEMBER : has
+    USER ||--o| JOIN_REQUEST : "asks through"
+    CONDOMINIUM ||--o{ JOIN_REQUEST : receives
+    UNIT ||--o{ JOIN_REQUEST : "is asked for by"
     CONDOMINIUM_MEMBER ||--o{ UNIT_RESIDENT : "lives through"
     UNIT ||--o{ UNIT_RESIDENT : houses
     CONDOMINIUM_MEMBER ||--o{ VISITOR : authorizes
     UNIT ||--o{ VISITOR : "is visited by"
     CONDOMINIUM ||--o{ COMMON_AREA : offers
     CONDOMINIUM ||--o{ NOTICE : announces
-    CONDOMINIUM_MEMBER ||--o{ NOTICE : publishes
+    USER ||--o{ NOTICE : publishes
     COMMON_AREA ||--o{ RESERVATION : "is booked as"
     CONDOMINIUM_MEMBER ||--o{ RESERVATION : books
     CONDOMINIUM ||--o{ FOUND_ITEM : shelves
-    CONDOMINIUM_MEMBER ||--o{ FOUND_ITEM : posts
+    USER ||--o{ FOUND_ITEM : posts
 
     CONDOMINIUM {
         uuid id PK
@@ -50,7 +53,7 @@ erDiagram
     CONDOMINIUM_MEMBER {
         uuid user_id PK_FK
         uuid condominium_id PK_FK
-        enum role "resident | admin"
+        enum role "resident | admin | manager | doorman"
     }
     UNIT_RESIDENT {
         uuid user_id PK_FK
@@ -132,10 +135,16 @@ A **block** is not a table: it is the `block` value its units share. The rule th
 from the app has a code of one or two letters is **not** a CHECK, because existing rows have `T1`
 and `NULL`; it lives in the validation.
 
-The role enum has three values — `resident`, `admin`, `manager` — and
-`condominium_members_one_manager_key` allows at most one síndico per condominium. The enum value was
-added in a migration of its own: Postgres will not let a transaction use an enum value it has just
-added ([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)).
+The role enum has four values — `resident`, `admin`, `manager`, `doorman` — and
+`condominium_members_one_manager_key` allows at most one síndico per condominium, and
+`condominium_members_one_condominium_per_manager_key` — the same partial index on `user_id` — allows
+a person to be the síndico of at most one. Each enum value
+was added in a migration of its own: Postgres will not let a transaction use an enum value it has
+just added ([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)).
+
+`doorman` returned in feature 014. There is **no** index limiting doormen — a condominium has any
+number — and no database rule that a doorman lives in no unit, as there is none for the
+administrator or the síndico: the service never creates a residency for them.
 
 The photo is an address, not stored bytes. [ADR 0012](decisions/0012-files-live-in-the-database-and-are-served-by-signed-paths.md)
 is about photos taken in the app; nobody uploads this one, it is example data.
@@ -167,6 +176,7 @@ One account per person, for the whole system — not per condominium.
 |---|---|
 | `email` | Unique system-wide, stored lowercase and trimmed, format checked by the database |
 | `password_hash` | `scrypt$N$r$p$salt$hash` — never the password ([RN-USR-02](business-rules.md#rn-usr-02--the-password-is-never-stored-in-a-readable-or-reversible-form)) |
+| `password_is_provisional` | `true` from the creation of the account **by a síndico** until the person changes the password; `false` for every other account. Never set back to `true` — which is what makes the restriction in the token safe ([ADR 0018](decisions/0018-a-provisional-account-carries-a-restriction-in-its-token.md)) |
 
 ### CondominiumMember
 
@@ -176,6 +186,27 @@ not on `User`.
 
 Primary key `(user_id, condominium_id)`; a partial unique index allows at most one `admin` per
 condominium ([RN-MEM-02](business-rules.md#rn-mem-02--at-most-one-admin-per-condominium)).
+
+### JoinRequest
+
+Somebody asking to live in one apartment of one condominium (feature 016).
+
+| Field | Meaning |
+|---|---|
+| `user_id` | Who asks. **Unique**: a person has at most one request. `ON DELETE CASCADE` — it leaves with the account |
+| `condominium_id`, `unit_id` | Where. A composite key to `units(id, condominium_id)` guarantees the apartment is of that condominium, as for a visit |
+| `created_at` | When it was asked — an **instant** |
+
+Indexed by `(condominium_id, created_at, id)`: the list of a condominium, oldest first.
+
+**There is no status column, on purpose.** A row exists while the request is pending and is deleted
+by any answer — approve, reject or withdraw — the way the existence of a reservation is the
+booking. That delete is the first statement of every answer, and only the transaction that really
+removed the row continues, which is what gives two simultaneous answers one outcome
+([ADR 0021](decisions/0021-a-join-request-is-a-row-that-an-answer-deletes.md)).
+
+It is **not** a membership with a "pending" flag: every permission check reads
+`condominium_members`, and each would have to remember to skip the pending ones.
 
 ### UnitResident
 
@@ -215,6 +246,18 @@ visits point at it (`Restrict`), the same asymmetry `unit_residents` uses.
 
 Indexed by `expected_date` (the global list order), by `(condominium_id, expected_date)` for the
 per-condominium list that the resident feature will need, and by `(unit_id, condominium_id)`.
+
+#### `entered_at`: when the visitor came in
+
+`visitors.entered_at` is a `TIMESTAMPTZ(3)`, `NULL` until the first time the visit's pass is checked
+and found valid, then written **once** and never changed
+([RN-GAT-02](business-rules.md#rn-gat-02--the-first-valid-check-records-that-the-visitor-came-in-once)).
+The only writer is the pass check, through an update conditional on the column still being `NULL`
+— which is what makes two simultaneous checks record one entry.
+
+It is an **instant**, in a row whose other date, `expected_date`, is a calendar day. With
+`found_items.posted_at` it is one of the two instants in the schema: it travels as full ISO 8601
+and is read in local time. There is no table of checks; this column is all a check leaves behind.
 
 ### CommonArea
 
@@ -310,14 +353,14 @@ row, which is why the preview and the detail screen are separate views of one re
 
 | Field | Meaning |
 |---|---|
-| `published_by_id` | The user side of the publisher's membership. Recorded for accountability. The id is **never exposed** by the API; the publisher's display name is, since 2026-10-06 |
+| `published_by_id` | The **user** who published — a plain foreign key to `users` since feature 014. Recorded for accountability. The id is **never exposed** by the API; the publisher's display name is, since 2026-10-06 |
 | `title` | Stored trimmed, up to 120 characters |
 | `body` | Up to 5000 characters, newlines included, and **not** stored trimmed |
 | `date` | The calendar day the notice refers to; the list orders by it, newest first |
 
 | Constraint | Guarantees |
 |---|---|
-| `(published_by_id, condominium_id) → condominium_members(user_id, condominium_id)` | The publisher belongs to the condominium they published to |
+| `published_by_id → users(id)`, `ON DELETE RESTRICT` | The publisher is an account that exists, and that account cannot be deleted while the notice does |
 | `notices_title_check` | `title = btrim(title) AND title <> ''` |
 | `notices_body_check` | `btrim(body) <> '' AND length(body) <= 5000` |
 
@@ -337,15 +380,27 @@ key can require that a membership row exists, not that its `role` column holds a
 A trigger would be worse. The rule belongs to the moment of publishing, not to the row's lifetime —
 an administrator being replaced must not retroactively invalidate what they announced.
 
-So the database guarantees **membership** and the service guarantees **role**
+So the service guarantees the **role**
 ([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)). It is the first rule in the
 project that the schema cannot hold, and worth remembering as a pattern rather than an exception.
+
+Until feature 014 the database at least guaranteed **membership**, through a composite key to
+`condominium_members`. Since then the publisher points at the user, and membership is checked by
+the service too — see Deletion below for what that bought.
 
 #### Deletion
 
 Both foreign keys are `Restrict`, a departure from visitors on purpose. A visit is about a person
 receiving someone, so it leaves with their membership. A notice is the condominium speaking; losing
 the board because an administrator was replaced would be a defect, not a cascade.
+
+**The publisher's key points at `users`, not at the membership**
+([ADR 0019](decisions/0019-what-a-person-published-points-at-the-person.md)). When it pointed at
+the membership, the `Restrict` did protect the board — by making the membership of anybody who had
+published impossible to delete, at a time nothing deleted memberships. Feature 014 lets the síndico
+remove people, so the notice now outlives the membership and still refuses the deletion of the
+**account**. What was traded: the database no longer proves the publisher belonged to that
+condominium; `publishNotice` checks it before writing.
 
 ### FoundItem
 
@@ -401,15 +456,16 @@ is checked by the server before writing, by file signature; a CHECK cannot read 
 
 #### Why the role is not a database constraint
 
-The same limit as notices: a composite key can require that a membership exists, not that its
-`role` is `admin`. The database guarantees **membership**, the service guarantees **role**
+The same limit as notices: a key can require that a row exists, not that a `role` is `admin`. The
+service guarantees **membership and role** — the poster points at `users` since feature 014, like
+a notice's publisher
 ([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)).
 
 #### Deletion
 
-Nothing deletes a found item in the application. The poster's membership is `Restrict`, as on
-notices and unlike visitors: the shelf is the condominium's, and must not empty because the
-administrator was replaced.
+Nothing deletes a found item in the application. `posted_by_id` points at `users` with `Restrict`,
+as on notices and unlike visitors: the shelf is the condominium's, and stays when whoever posted is
+removed from it ([ADR 0019](decisions/0019-what-a-person-published-points-at-the-person.md)).
 
 ## RefreshToken and LoginAttempt
 
@@ -462,6 +518,12 @@ The database does more than store: it refuses invalid data. A full list is in
 | `20260921011928_create_visitante` | First visitors table, then named in Portuguese |
 | `20260929040257_rename_visitors_to_english` | Renamed table, columns and enum to English, keeping the rows |
 | `20260929040409_create_users_condominiums` | Condominiums, units, users, memberships, residency, plus every `CHECK`, partial index and trigger |
+| `20261007130001_add_doorman_role` | The `doorman` enum value, alone in its file |
+| `20261007130002_point_authors_at_users` | `notices.published_by_id` and `found_items.posted_by_id` now reference `users`, not the membership |
+| `20261007130003_add_provisional_password` | `users.password_is_provisional`, `false` for every existing account |
+| `20261007140001_add_visitor_entered_at` | `visitors.entered_at`, a nullable instant, `NULL` for every existing visit |
+| `20261007150001_one_condominium_per_manager` | A partial unique index on `condominium_members(user_id)` `WHERE role = 'manager'`: one condominium per síndico |
+| `20261007160001_add_join_requests` | The `join_requests` table, its unique index on `user_id` and its composite key to `units` |
 
 Schema changes go through `npx prisma migrate dev`; applied migrations are never edited
 ([development.md](development.md#changing-the-schema)).

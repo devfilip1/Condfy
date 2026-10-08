@@ -112,14 +112,21 @@ If the list cannot be fetched, the screen shows a failure message and a *Try aga
 
 What a person sees in the visitor list depends on their role in that condominium:
 
-- the **administrator** sees every visit of the condominium, to any unit and authorized by anyone;
+- the **administrator** sees every visit of the condominium, to any unit and authorized by anyone
+  — and so do the síndico (RN-MEM-05) and, since feature 015, the **doorman**, for whom it is the
+  gate's notebook: past, today's and future;
 - a **resident** sees only the visits they authorized themselves — not those of a neighbour, and
   not those of somebody they live with.
 
 Every card says **who authorized** the visit and **for which unit**, with the block and the number.
 On the administrator's list that is what tells one visit from another.
 
-**Seeing is not removing.** A visit is removed only by whoever authorized it. The administrator
+**Seeing is not removing.** A **doorman** removes nothing and registers nothing — the screen offers
+them no way to, and they are refused by any other route. That holds even for a visit they
+authorized themselves as administrator before the síndico changed their role: on those cards too
+there is no remove control and no pass.
+
+A visit is removed only by whoever authorized it. The administrator
 sees everybody's and can delete only their own; on the others the card has no remove control at
 all. A removal aimed at somebody else's visit deletes nothing and answers as if the visit were
 already gone (RN-VIS-07), so it reveals nothing.
@@ -189,8 +196,10 @@ share a picture, the picture is saved instead and the person is told.
 A pass is valid for the **expected day of the visit** and no other. Once that day has passed, the
 pass says it is no longer valid and cannot be shared.
 
-**Nobody reads a code inside the app yet.** At the gate the pass is checked by eye; a reader is a
-later feature, and it will find the code already stored with each visit.
+**The doorman reads the code** with the camera (RN-GAT-01). The pass did not change for that: its
+code already identified one visit, so a pass shared before the reader existed reads like any other.
+The label on the pass itself — valid, or no longer valid — is still worked out on the device and
+decides nothing; at the gate the answer is the server's.
 
 - **Where:** [VisitorPass.tsx](../mobile/features/visitors/components/VisitorPass.tsx),
   [VisitorPassModal.tsx](../mobile/features/visitors/components/VisitorPassModal.tsx),
@@ -212,16 +221,27 @@ Two condominiums may share the same name; they are told apart by id.
 - **Where:** `CHECK condominiums_name_check` in
   [create_users_condominiums migration](../server/prisma/migrations/20260929040409_create_users_condominiums/migration.sql)
 
-### RN-CON-03 · Anybody signed in creates a condominium and becomes its síndico
+### RN-CON-03 · Whoever belongs to no condominium creates one, once, and becomes its síndico
 
-A signed-in person creates a condominium from the app with four things: its **name** (up to 100
+**Only somebody who belongs to no condominium may create one, and so a síndico has exactly one.**
+Creating is what makes a person a síndico; a resident, an administrator or a doorman of any
+condominium cannot create one, and a síndico cannot create a second. Until 2026-10-07 anybody
+signed in could, any number of times.
+
+Two things enforce it, and both are needed. The service refuses an account that already has a
+membership of **any** role. And a unique index allows a person one `manager` membership — which is
+what stops two creations sent by the same account at the same moment, since both would pass the
+first check. A refusal is a `409`, not a field error: nothing typed was wrong.
+
+A person creates a condominium from the app with four things: its **name** (up to 100
 characters), its **address** (free text, up to 200), its **blocks** and, optionally, a **photo**.
 Whoever creates it becomes its **síndico** (RN-MEM-05). There is no approval and nothing checks that
 the person really runs that building; two condominiums may share a name (RN-CON-01).
 
 The offer appears on the home screen of an account that belongs to no condominium, as a button the
-person can leave alone, and on the condominium chooser for somebody who already belongs to one.
-After creating, the person is taken straight into the new condominium.
+person can leave alone — and nowhere else. The condominium chooser had the same offer until this
+rule; whoever reaches the chooser belongs to two or more condominiums. After creating, the person
+is taken straight into the new condominium.
 
 Creation is **all or nothing**: the condominium, every unit of every block and the membership of the
 síndico are written together or not at all. A new condominium starts with one member — its síndico.
@@ -230,8 +250,16 @@ Nothing lets a resident join one from the app yet.
 Nothing about a condominium can be changed afterwards yet.
 
 - **Where:** `createCondominium` in
-  [condominium.service.ts](../server/src/condominiums/condominium.service.ts), and
+  [condominium.service.ts](../server/src/condominiums/condominium.service.ts); the partial unique
+  index `condominium_members_one_condominium_per_manager_key`; and
   [useCreateCondominium.ts](../mobile/features/condominiums/hooks/useCreateCondominium.ts)
+- **Message:** `You already belong to a condominium, so you cannot create one.`
+- **Not decided:** how a person comes to run a second building. Today they would need a second
+  account.
+- **Since feature 016** the account that can create a condominium is no longer produced by signing
+  up, which is for residents. It is created outside the app, with `npm run account:create`. And an
+  account with a pending request to join cannot create one: `Your request to join a condominium is
+  still pending.`
 
 ### RN-CON-04 · A condominium is created with at least one block, each with a code of one or two letters
 
@@ -345,10 +373,16 @@ impossible by construction.
 A second `admin` membership is rejected, and so is a second `manager`. The two limits are
 independent: a condominium may have one administrator **and** one síndico, who are different people
 because a membership carries one role. Having neither is allowed. Whether a management company may
-have several administrators is open.
+have several administrators was open until feature 014, when the product owner settled it: **still
+one**. To replace the administrator the síndico removes the current one and appoints another
+(RN-STF-02). Doormen have no limit.
+
+The limit also runs the other way for the síndico: **a person is the síndico of at most one
+condominium** (RN-CON-03). An administrator has no such limit.
 
 - **Where:** partial unique indexes `condominium_members_one_admin_key` (`WHERE role = 'admin'`)
-  and `condominium_members_one_manager_key` (`WHERE role = 'manager'`)
+  and `condominium_members_one_manager_key` (`WHERE role = 'manager'`), both on the condominium;
+  and `condominium_members_one_condominium_per_manager_key`, on the person
 
 ### RN-MEM-03 · Removing a membership removes that person's residency in that condominium
 
@@ -365,7 +399,10 @@ It follows the role, which is per condominium and per moment:
 
 - the same person shows their own name in a condominium where they are a resident;
 - it is the role **now** that counts, not the one at the time — a notice published by somebody who
-  is no longer the administrator shows that person's name.
+  is no longer the administrator shows that person's name;
+- that includes somebody who **no longer belongs to the condominium at all** but whose account
+  still exists. When the síndico removes a person the account is normally deleted and their
+  notices pass to the síndico (RN-STF-04); this case is the exception described there.
 
 Two places keep the real name on purpose: the person's own Settings, which show their account as it
 is, and the sign-in data. The profile route is not changed; the home screen swaps what it shows.
@@ -377,7 +414,8 @@ is, and the sign-in data. The profile route is not changed; the home screen swap
 
 ### RN-MEM-05 · The síndico is a role of its own, and is in charge like the administrator
 
-There are three roles: resident, administrator and **síndico** (`manager`). The síndico is whoever
+There were three roles when this rule was written — resident, administrator and **síndico**
+(`manager`) — and a fourth, the doorman, since feature 014 (RN-MEM-06). The síndico is whoever
 created the condominium, lives in no unit of it, and is **not** the administrator under another
 name ([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)).
 
@@ -385,8 +423,9 @@ name ([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)).
 síndico".** The question "who is in charge of this condominium" is asked in one place on each side,
 and a role is never compared with `admin` to decide a permission.
 
-What the síndico can do that the administrator cannot has not been defined yet: for now, exactly
-the same. The roles are kept apart so that they can diverge.
+What the síndico can do that the administrator cannot began as nothing, and the roles were kept
+apart so that they could diverge. They have, twice: creating a place to book (RN-RSV-14) and
+managing roles (RN-STF-01).
 
 The síndico goes by **"Manager"** inside their condominium, the way the administrator goes by
 "Administrator" (RN-MEM-04), and cannot delete their account while they are one.
@@ -394,6 +433,39 @@ The síndico goes by **"Manager"** inside their condominium, the way the adminis
 - **Where:** `managesCondominium` in [roles.ts](../server/src/lib/roles.ts) and in
   [session.ts](../mobile/features/auth/domain/session.ts); `displayNameOf` in
   [displayName.ts](../server/src/lib/displayName.ts)
+
+### RN-MEM-06 · The doorman sees every visit, checks passes, and writes nothing
+
+There are four roles since feature 014: resident, administrator, síndico and **doorman**
+(`doorman`, porteiro). A condominium has any number of doormen; a doorman lives in no unit and
+appears under their own name, with the role label "Doorman".
+
+A doorman is **not** in charge of the condominium: `managesCondominium` answers no, so every rule
+that says "the administrator or the síndico" refuses them. Since feature 015 they differ from a
+resident in three directions at once, and each is a named question rather than a comparison with
+the role:
+
+| | The doorman | Asked by |
+|---|---|---|
+| Sees every visit of the condominium | **yes** — like whoever is in charge (RN-VIS-11) | `seesEveryVisit` |
+| Registers a visitor, removes one, gets a pass, books a place | **no** | `actsInCondominium` |
+| Sees the places to book and which times of a day are free | yes, to consult — as any member | — |
+| Reads lost & found | **no** (RN-LAF-01) | `readsLostAndFound` |
+| Reads the notice board | yes, as any member | — |
+| Checks a visitor's pass | **yes, and nobody else does** (RN-GAT-01) | the role by name |
+
+Their home screen has four modules: Visitors, Reservations, Newsletter and Pass check.
+
+**Reservations is read-only for a doorman.** They open it to see whether a day is full — the
+places, the calendar, the free times and the taken ones — and nothing in it answers to a touch that
+would book: no time can be picked, there is no confirm button, and "My bookings" is not shown. The
+server already refused a doorman's booking; what changed on 2026-10-07 is that the module is on
+their home screen.
+
+- **Where:** [roles.ts](../server/src/lib/roles.ts);
+  [modules.ts](../mobile/features/home/data/modules.ts)
+- **Messages:** `A doorman cannot register visitors.` · `A doorman cannot book a place.` ·
+  `A doorman has no access to lost & found.`
 
 ### RN-RES-01 · A resident only lives in units of a condominium they belong to
 
@@ -409,6 +481,9 @@ the same `condominium_id`, so a mismatch cannot be inserted.
 Checked at the end of each transaction, not at each statement, so a membership and its first
 residency can be created together. A transaction that ends with a resident without a unit is
 rolled back. Managers and doormen may live in a unit but are not required to.
+
+Approving a request to join (RN-JOI-03) is the first thing in the application that creates a
+resident, and it creates the membership and the residency in one transaction for this reason.
 
 - **Where:** function `enforce_resident_has_unit` and the two
   `CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY DEFERRED` in the migration
@@ -469,6 +544,14 @@ the same credential race in the database and exactly one wins. The loser takes t
 because something changed elsewhere, and the API never has to trust a claim about permissions.
 Confirmed on 2026-10-02 by decoding a token returned by `POST /sessions`.
 
+**One exception since feature 014, and it is not a permission.** The token of an account whose
+password is still provisional carries `prov: true` (RN-STF-03). It only ever *removes* access, so a
+stale one errs on the closed side: too restricted, never too open. It is cleared only by changing
+the password, which issues a new pair on the spot, and it can never need to be added to a live
+session — an account is provisional from its creation and never becomes provisional again. Every
+other account's token is unchanged
+([ADR 0018](decisions/0018-a-provisional-account-carries-a-restriction-in-its-token.md)).
+
 There is no `iss` and no `aud` either, on purpose. One API signs and verifies with one secret, so an
 issuer claim would only be checked against itself; it starts paying off when a second service or a
 second environment shares the key. Worth knowing before changing this: adding `{ issuer: … }` to the
@@ -501,19 +584,26 @@ it is forgotten: the orphan credential dies by expiry or on the first reuse atte
 - **Where:** `signOut` in [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx) and in
   [auth.service.ts](../server/src/auth/auth.service.ts)
 
-### RN-AUT-08 · An account is created without a condominium
+### RN-AUT-08 · Signing up creates an account that is asking to join a condominium
 
-Sign-up asks for name, e-mail and password, and signs the person in. It creates no membership, no
-role and no residency: linking a person to a condominium is a later feature. A `resident`
-membership without a unit would be refused by the database anyway
-([RN-RES-02](#rn-res-02--every-resident-lives-in-at-least-one-unit)).
+Sign-up asks for name, e-mail and password **and for where the person lives**, and signs them in.
+It creates no membership, no role and no residency: it creates the account together with a
+**request to join** (RN-JOI-01), and the person belongs to nowhere until somebody in charge
+approves it. Until feature 016 sign-up created an account with no condominium and nothing else.
 
-- **Where:** `signUp` in [auth.service.ts](../server/src/auth/auth.service.ts)
+An account comes to exist in two other ways, and neither goes through sign-up:
+
+- created **by a síndico**, already with a role in their condominium (RN-STF-02);
+- created **by the script** `npm run account:create`, belonging to nowhere and with no request —
+  the account of somebody who will create a condominium (RN-CON-03).
+
+- **Where:** `signUp` in [auth.service.ts](../server/src/auth/auth.service.ts);
+  [createAccount.ts](../server/scripts/createAccount.ts)
 - **Messages:** `This e-mail is already in use.` · `Enter a valid e-mail.` ·
-  `Password must be at least 8 characters.`
-- **Risk accepted:** sign-up is open and visitors are still global, so anyone who reaches the
-  server can create an account and see every visitor. Acceptable only on a development network;
-  before publishing, sign-up needs approval by an admin or an invite.
+  `Password must be at least 8 characters.` · `Choose your condominium.` · `Choose your apartment.`
+- **Closed:** the risk recorded here until feature 016 — that anyone who reached the server could
+  create an account and see every visitor. A new account now sees nothing of any condominium until
+  it is approved.
 
 ---
 
@@ -902,10 +992,63 @@ someone signs out. Until a choice is made the app follows the device's own setti
 
 ### RN-APP-02 · Signing out asks first
 
-Signing out lives in the bottom bar, beside Home, and asks for confirmation. Settings took its old
-place at the top of the home screen.
+Signing out lives in **Settings**, in a "Session" section of its own, and asks for confirmation —
+"Sign out of your account?" — before anything happens. It works without a connection, as it always
+did (RN-AUT-07).
 
-- **Where:** [app/(tabs)/_layout.tsx](../mobile/app/%28tabs%29/_layout.tsx)
+Until feature 017 it lived in a bar at the bottom of the home screen, beside a "Home" entry. That
+bar is gone: it had one destination and one action, so it switched between nothing. The screens
+that hold a person before the home screen — choosing a condominium, the first password, awaiting
+approval — keep their own sign-out, since Settings cannot be reached from them.
+
+- **Where:** [SettingsScreen.tsx](../mobile/features/settings/SettingsScreen.tsx)
+
+## The home screen
+
+What the home screen shows, top to bottom, since feature 017: the header and the banner of the
+condominium; the grid of everyday modules; the latest notice; the administration modules. An
+element that is absent leaves no gap, and the screen scrolls.
+
+### RN-HOM-01 · The latest notice is on the home screen, and it is the one the board lists first
+
+Under the grid, every member sees a card with the **most recent notice** of the condominium they
+are in: its title, the beginning of its text as running text on two lines, and its date as day and
+month. Touching it anywhere opens the notice in full — the screen the Newsletter module leads to.
+
+"Most recent" is the first notice of the Newsletter list, which is ordered by the notice's own date
+(RN-NWS-01). The card reads the head of that same list, so it can never disagree with the module.
+
+The card is **not shown** when the condominium has no notice, for an account that belongs to no
+condominium, and when the notice could not be loaded — in that last case silently: the board, in
+its module, is where a failure is explained and retried. On a change of condominium the previous
+notice is dropped at once.
+
+The card is **always dark**, with its wave background, whatever the appearance of the app — as the
+visitor pass is always light.
+
+- **Where:** `useLatestNotice` in
+  [useLatestNotice.ts](../mobile/features/newsletter/hooks/useLatestNotice.ts);
+  [LatestNoticeCard.tsx](../mobile/features/newsletter/components/LatestNoticeCard.tsx);
+  [HomeScreen.tsx](../mobile/features/home/HomeScreen.tsx)
+- **Cost accepted:** the home screen downloads the whole board to show one notice.
+
+### RN-HOM-02 · Everyday modules are cards in a grid; administration modules are rows below the notice
+
+A module is one of two kinds, and the kind decides how the home screen draws it — not who sees it,
+which did not change:
+
+| Kind | Modules | Drawn as |
+|---|---|---|
+| Everyday | Visitors, Reservations, Newsletter, Lost & Found, Pass check | A card in the grid |
+| Administration | Roles, Requests | A low row running the full width, **below the latest notice** |
+
+So a resident and a doorman see four cards and no row; an administrator sees four cards and
+Requests; a síndico sees four cards, then Roles and Requests. Pass check is the doorman's daily
+tool and stays in the grid.
+
+- **Where:** `kind` in [modules.ts](../mobile/features/home/data/modules.ts);
+  [ModuleList.tsx](../mobile/features/home/components/ModuleList.tsx) and
+  [ModuleRow.tsx](../mobile/features/home/components/ModuleRow.tsx)
 
 ## Choosing a condominium
 
@@ -959,18 +1102,26 @@ device holds ([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-a
 
 ## Lost & found
 
-### RN-LAF-01 · The shelf is read by everyone in the condominium
+### RN-LAF-01 · The shelf is read by everyone in the condominium except the doorman
 
-Every member sees what was found in their condominium, whatever their role, and nobody sees the
+Every member sees what was found in their condominium — **except a doorman**, who lost lost & found
+in feature 015: it is not on their home screen, and the list is refused to them. Nobody sees the
 items of a condominium they do not belong to. Newest first, with the id breaking ties. Each item
 shows its photo, what it is, where it was found in smaller text, when it was posted and its status.
 
 Tapping an item opens its photo alone and uncropped, for anyone who can see the shelf. Tapping
 again, anywhere, closes it.
 
+The photo of an item is refused to a doorman **because the list is**: a photo is only reachable
+through the signed path the list hands out (RN-LAF-05). A path a person was given before they
+became a doorman works until it expires, within the hour. An administrator made a doorman loses the
+shelf too, including the items they posted, which stay for everybody else.
+
 - **Where:** `listFoundItems` in
-  [foundItem.service.ts](../server/src/condominiums/foundItem.service.ts);
+  [foundItem.service.ts](../server/src/condominiums/foundItem.service.ts), asking
+  `readsLostAndFound`;
   [FoundItemPhotoModal.tsx](../mobile/features/lostAndFound/components/FoundItemPhotoModal.tsx)
+- **Message:** `A doorman has no access to lost & found.`
 
 ### RN-LAF-02 · Only the administrator posts, and the API is what enforces it
 
@@ -1037,6 +1188,268 @@ it is shown in the reader's local time, with the time of day.
 
 - **Where:** the `posted_at` default in the migration, and `toDisplayDateTime` in
   [calendar.ts](../mobile/shared/lib/calendar.ts)
+
+## Roles
+
+The síndico's module for staffing the condominium (feature 014). In code the resource is `staff`;
+on the screen it reads "Roles".
+
+### RN-STF-01 · Managing roles is the síndico's alone
+
+Listing who holds a role, bringing somebody in, changing a role, removing a person and setting a
+provisional password are all refused to everybody but the **síndico** of that condominium — the
+administrator included, although the administrator is in charge of it. It is the second permission
+that asks for the síndico by name instead of for "whoever is in charge", after creating a place to
+book (RN-RSV-14).
+
+Somebody of the condominium with another role is told they cannot; somebody outside it gets the
+answer of a condominium that does not exist
+([ADR 0010](decisions/0010-permission-rules-live-in-the-service.md)). The module's card is offered
+on the home screen only to the síndico, which is courtesy.
+
+The module only ever reaches the administrator and the doormen. The síndico's own role and a
+resident's can be neither changed nor removed through it: every query filters by those two roles.
+
+- **Where:** `requireManager` in [staff.service.ts](../server/src/condominiums/staff.service.ts);
+  `canManage` in [useStaff.ts](../mobile/features/staff/hooks/useStaff.ts)
+- **Message:** `Only the condominium manager can manage roles.`
+
+### RN-STF-02 · The síndico creates the account, and the account is born with its role
+
+A person receives a role by having an account **created for them**: the síndico gives a name, an
+e-mail, a provisional password and a role — Administrator or Doorman, nothing else. The account and
+its role are written together or not at all. No session is opened for it: the síndico hands the
+password over by their own means.
+
+Name, e-mail and password follow the rules of signing up, with the same messages. Two refusals come
+only from the server, each decided by a unique index rather than by a read before the write:
+
+- the e-mail already belongs to an account — so **somebody who already uses the app cannot be given
+  a role yet**, including a resident of the same building;
+- the role is Administrator and the condominium has one (RN-MEM-02). The form shows that option
+  unavailable beforehand.
+
+A taken e-mail counts toward the same limit that stops e-mails being scanned through sign-up:
+anybody becomes a síndico by creating a condominium, so the form would otherwise be a way around it.
+
+- **Where:** `addStaffMember` in [staff.service.ts](../server/src/condominiums/staff.service.ts);
+  the mirrored validation in [staff.dto.ts](../server/src/condominiums/staff.dto.ts) and
+  [staff.ts](../mobile/features/staff/domain/staff.ts)
+- **Messages:** sign-up's, plus `Choose a role.` · `This e-mail is already in use.` ·
+  `This condominium already has an administrator.`
+- **Risk accepted:** nothing checks that an e-mail belongs to whoever is named. A mistyped address
+  is corrected by removing the person, which deletes the account and frees it (RN-STF-04).
+
+### RN-STF-03 · An account created by a síndico reaches nothing until its owner chooses a password
+
+The síndico knows the provisional password. Until the person replaces it, the account can read its
+own profile and change its password — and **nothing else**, by any route. The app shows only the
+screen that asks for a new password, at every sign-in and every opening, until it is chosen.
+
+Choosing it is an ordinary password change (RN-ACC-01): the person types the provisional password
+again, and a new one that must differ from it. From then on the provisional one opens nothing.
+
+While — and only while — the password is still provisional, the síndico may set **another** in its
+place; the previous one stops working and the person's sessions end. Once the person has chosen
+their own, the síndico has no way to see, set or reset it, and the list stops marking them as "Has
+not signed in yet". A person who then forgets it cannot be helped: nothing recovers a password yet.
+
+- **Where:** `authenticate` and `authenticateAllowingProvisional` in
+  [authenticate.ts](../server/src/auth/authenticate.ts); `changePassword` in
+  [auth.service.ts](../server/src/auth/auth.service.ts); `setProvisionalPassword` in
+  [staff.service.ts](../server/src/condominiums/staff.service.ts); the gate in
+  [app/_layout.tsx](../mobile/app/_layout.tsx) and
+  [FirstPasswordScreen.tsx](../mobile/features/settings/FirstPasswordScreen.tsx)
+- **Messages:** `Choose a new password to continue.` (a `403`, never a `401`) ·
+  `This person already chose their own password.`
+- **Decision:** [ADR 0018](decisions/0018-a-provisional-account-carries-a-restriction-in-its-token.md)
+
+### RN-STF-04 · Removing a person deletes the account created for them and keeps what the condominium owns
+
+The síndico removes an administrator or a doorman after a confirmation that names the person and
+the role. What happens then:
+
+- the person no longer belongs to that condominium, from their very next request;
+- **the account the síndico created for them is deleted**, with its sessions. It was created for
+  that role and leaves with it; the confirmation says so before anything happens. The e-mail is
+  free again — which is also how a mistyped address is corrected: remove, and add again;
+- the visits they authorized and the bookings they held **go with them**, as for any membership
+  that ends (RN-MEM-03);
+- the notices they published and the found items they posted **stay**, and pass to the síndico who
+  removed them: there is no person left to name, so the notices read as published by "Manager".
+
+All of it is one transaction. **One exception:** an account that also belongs to another
+condominium, or published something another condominium keeps, is not deleted — only its link here
+ends, and what it published here keeps its name (RN-MEM-04). A síndico does not decide for somebody
+else's building. A role only comes with a new account today, so this is a guard rather than a
+common path.
+
+The server refuses at once. The person's app finds out when it next renews the session or is
+brought back to the foreground: the account is gone, and it lands on the sign-in screen.
+
+- **Where:** `removeStaffMember` in [staff.service.ts](../server/src/condominiums/staff.service.ts);
+  `refreshProfile` in [useAuth.tsx](../mobile/features/auth/hooks/useAuth.tsx)
+- **Decision:** [ADR 0019](decisions/0019-what-a-person-published-points-at-the-person.md)
+
+### RN-STF-05 · A role changes between doorman and administrator, under the limit of one
+
+The síndico turns a doorman into the administrator and back. Becoming administrator is refused
+while somebody else is one. The person keeps their account, their password and — because the
+membership did not end — the bookings they hold. What they can do follows the new role from their
+next request, without signing in again.
+
+- **Where:** `changeStaffRole` in [staff.service.ts](../server/src/condominiums/staff.service.ts)
+
+## Joining a condominium
+
+How a resident arrives (feature 016).
+
+### RN-JOI-01 · Signing up is asking to join, and the place is chosen from what exists
+
+To sign up a person chooses the **condominium** they live in, the **block** — where the condominium
+has blocks — and the **apartment**, each from a list. None is typed: nobody asks to join a place
+that does not exist. Changing a choice clears the ones below it.
+
+The lists are open to somebody without an account, and show buildings and numbers only: the name
+and address of each condominium, block codes and apartment numbers. Never who lives anywhere, or
+whether anybody does.
+
+The account and its request are created together or not at all. The apartment must be of the
+condominium chosen, which the database also guarantees. A person has at most one request, and a
+request never expires.
+
+- **Where:** `signUp` in [auth.service.ts](../server/src/auth/auth.service.ts);
+  [directory.service.ts](../server/src/condominiums/directory.service.ts);
+  [useSignUpForm.ts](../mobile/features/auth/hooks/useSignUpForm.ts) and
+  [SignUpScreen.tsx](../mobile/features/auth/SignUpScreen.tsx)
+- **Messages:** `Choose your condominium.` · `Choose your apartment.`
+
+### RN-JOI-02 · Until answered, the person signs in and sees only that they are waiting
+
+A person with a pending request **can sign in**, and sees one screen: that their request to join a
+named condominium, for a named apartment, is awaiting approval. They are not a member of the
+condominium in any sense — they see none of its modules or data and appear in none of its lists
+except Requests.
+
+On the server a pending account is simply an account with no membership: every route that takes a
+condominium refuses it as it refuses any stranger, and creating a condominium is refused while the
+request stands. The routes about the person's own account — e-mail, password, deleting it — remain
+reachable by somebody calling the API directly; the app offers none of them.
+
+Nobody is notified. The app re-reads the profile when it is opened, when it returns to the front,
+and when the person touches **Check again**.
+
+- **Where:** `joinRequest` in `getProfile`, [auth.service.ts](../server/src/auth/auth.service.ts);
+  the gate in [app/_layout.tsx](../mobile/app/_layout.tsx);
+  [AwaitingApprovalScreen.tsx](../mobile/features/auth/AwaitingApprovalScreen.tsx)
+
+### RN-JOI-03 · Whoever is in charge answers, and every request has exactly one outcome
+
+The **administrator or the síndico** of a condominium sees its pending requests in the Requests
+module — each with the person's name, e-mail, the apartment and when it was asked, oldest first —
+and answers each one, after a confirmation. A resident and a doorman see none; somebody in charge
+of another condominium sees none of this one's.
+
+| Answer | What happens |
+|---|---|
+| **Approve** | The person becomes a resident of that condominium living in that apartment, and can do everything a resident can from their next action. An apartment may have any number of residents |
+| **Reject** | The request **and the person's account** cease to exist. The e-mail is free to sign up again |
+| **Withdraw** — by the person, from the waiting screen | The same as a rejection: the request and the account are removed |
+
+**Exactly one outcome.** Two people approving at once, or an approval crossing a withdrawal, cannot
+both take effect: every answer begins by removing the request, and only the one that actually
+removed it goes on. The other is told the request no longer exists — shown in the app as a note,
+not as a failure, since there is nothing to do about it.
+
+**There is no history.** A request exists while it is pending and is gone once answered; who
+approved whom is not kept, and no reason is given for a rejection.
+
+Withdrawing asks for no password, unlike deleting an account from Settings: an account that is only
+waiting holds nothing to take over.
+
+- **Where:** `approveJoinRequest` and `rejectJoinRequest` in
+  [joinRequest.service.ts](../server/src/condominiums/joinRequest.service.ts);
+  `withdrawJoinRequest` in [auth.service.ts](../server/src/auth/auth.service.ts);
+  [useJoinRequests.ts](../mobile/features/joinRequests/hooks/useJoinRequests.ts)
+- **Messages:** `Only whoever runs the condominium can answer requests.` ·
+  `This request no longer exists.` · in the app, `This request was already answered.`
+- **Decision:** [ADR 0021](decisions/0021-a-join-request-is-a-row-that-an-answer-deletes.md)
+
+## The gate
+
+What the doorman does with a visitor's pass (feature 015).
+
+### RN-GAT-01 · Only a doorman checks a pass, and the answer is one of four
+
+A doorman points the camera at the QR code of a visitor's pass and gets exactly one answer:
+
+| Answer | When | Shows the visit |
+|---|---|---|
+| **Valid** | The visit is expected **today**, in this condominium | yes |
+| **Not valid yet** | It is expected on a later day | yes, with the day |
+| **Expired** | It was expected on a day that has passed | yes, with the day |
+| **Not recognised** | Anything else | no |
+
+**"Today" is the server's**, at the moment of the check — never the date of the doorman's phone, and
+nothing the pass says.
+
+**Not recognised is one answer for four cases** and tells none apart: a code that never existed, a
+visit that was removed, a visit to another condominium, and a QR code that is not a Condfy pass.
+That last one is answered by the app itself — the text read is never sent, opened or shown.
+
+**Nobody but a doorman checks a pass.** The síndico and the administrator, who already see every
+visit, do not have the module and are refused: a decision of the product owner. A condominium with
+no doorman checks by eye, from the list.
+
+A check that could not be made — no connection, a refusal — says so. It is never shown as any of
+the four answers, and above all never as Valid.
+
+Valid is told apart by its words and its symbol as well as its colour.
+
+- **Where:** `checkPass` in
+  [passCheck.service.ts](../server/src/condominiums/passCheck.service.ts); `passCodeOf` in
+  [visitor.ts](../mobile/features/visitors/domain/visitor.ts);
+  [usePassCheck.ts](../mobile/features/passCheck/hooks/usePassCheck.ts) and
+  [PassCheckAnswer.tsx](../mobile/features/passCheck/components/PassCheckAnswer.tsx)
+- **Messages:** `Only a doorman can check a pass.` ·
+  `Couldn't check this pass. Check your connection and try again.`
+
+### RN-GAT-02 · The first valid check records that the visitor came in, once
+
+The first time a visit's pass is answered Valid, the visit is recorded as **entered at that
+moment**. It happens by the check itself — the doorman confirms nothing in a second step.
+
+- **A pass is never used up.** Read again that day, it is Valid again; the answer adds that the
+  visitor already came in, and when. That is what tells the doorman to ask when two people show the
+  same pass.
+- **The time is written once.** A later check does not change it, and two doormen reading the same
+  pass at the same instant record one entry, not two.
+- **Only a Valid answer records.** Not valid yet, Expired, Not recognised and a failed check leave
+  nothing behind.
+- **Everybody who sees the visit sees it**: the doorman, whoever is in charge, and the resident who
+  authorized it, who learns from their own list that the delivery arrived. Nobody is notified.
+- **Nothing undoes it.** Nobody marks or unmarks an entry by hand, and removing the visit removes
+  its record.
+
+The check itself is not kept: there is no history of readings and no record of which doorman read.
+
+- **Where:** `entered_at` on `visitors`; the conditional update in `checkPass`,
+  [passCheck.service.ts](../server/src/condominiums/passCheck.service.ts);
+  [VisitorCard.tsx](../mobile/features/visitors/components/VisitorCard.tsx)
+- **Cost accepted:** a pass checked and then turned away still shows as entered.
+- **Decision:** [ADR 0020](decisions/0020-reading-a-pass-needs-the-camera-and-records-the-entry.md)
+
+### RN-GAT-03 · Without the camera the gate works from the list
+
+The camera is asked for when the doorman opens Pass check, never before, and the reason given is
+reading visitors' passes. Refused, or on a device with no usable camera, the module says why it
+cannot read a pass, offers the way to allow it where there is one, and points to the Visitors list.
+Allowing it in the device's settings works on return, without signing out.
+
+Nothing the camera sees is stored or sent — only the code that was read.
+
+- **Where:** [cameraPermission.ts](../mobile/features/passCheck/services/cameraPermission.ts);
+  [CameraBlocked.tsx](../mobile/features/passCheck/components/CameraBlocked.tsx)
 
 ## Inconsistencies and gaps found
 

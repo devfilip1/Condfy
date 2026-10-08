@@ -87,3 +87,8 @@ inside.
 
 **Evidence:** [notice.service.ts](../../server/src/condominiums/notice.service.ts),
 [notice.controller.ts](../../server/src/condominiums/notice.controller.ts)
+
+> **Amended in part by [0019](0019-what-a-person-published-points-at-the-person.md) (2026-10).** Since
+> feature 014 the publisher of a notice points at the user, not at the membership, so the schema no
+> longer guarantees membership for notices and found items: the service checks it too. The rest of
+> this decision stands.

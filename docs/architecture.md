@@ -82,8 +82,10 @@ already is one.
 
 **Navigation.** [expo-router](https://docs.expo.dev/router/introduction/) maps files in
 [mobile/app/](../mobile/app) to routes. `_layout.tsx` at the root declares a `Stack`;
-[app/(tabs)/_layout.tsx](../mobile/app/%28tabs%29/_layout.tsx) declares the bottom `Tabs` with
-Home and About. Route files are one line — [app/visitors.tsx](../mobile/app/visitors.tsx)
+there is no tab navigator — the home screen is the ordinary route `/`
+([app/index.tsx](../mobile/app/index.tsx)) since feature 017, which removed the `(tabs)` group
+([ADR 0022](decisions/0022-the-home-screen-has-no-tab-bar-and-composes-the-latest-notice.md)).
+Route files are one line — [app/visitors.tsx](../mobile/app/visitors.tsx)
 re-exports `@/features/visitors` — so screens live with their feature and the route file only
 declares that the URL exists. The only guards are the two in the root layout, described below.
 
@@ -101,6 +103,40 @@ passes through, so a direct link to a module is held as well as a tap
 ([ADR 0013](decisions/0013-the-current-condominium-is-chosen-once-and-is-never-a-permission.md)).
 Features read which condominium is current — `selectedCondominiumId`, `currentMembership` — from
 `@/features/auth`; none has a control of its own to change it.
+
+Since feature 014 the layout holds a **password gate** as well, and it comes first. An account a
+síndico created has `mustChoosePassword` until its owner replaces the provisional password; while
+it is true the only route allowed is `/first-password`. Like the condominium gate it is courtesy on
+the screen — the server answers `403` to everything else that account asks for
+([ADR 0018](decisions/0018-a-provisional-account-carries-a-restriction-in-its-token.md)).
+
+Since feature 016 there is a **third gate**, between those two: somebody who signed up and whose
+request to join has not been answered has `pendingRequest`, and the only route allowed is
+`/awaiting-approval`. The order is password, request, condominium.
+
+The profile is also re-read, quietly, whenever the app returns to the foreground
+(`refreshProfile`): that is how somebody removed from a condominium, or whose role was changed,
+comes to see it without signing in again.
+
+**Signing up** is the one place the app reads data without a session: the two lists of the
+directory, fetched with `skipAuth` by `features/auth/services/directoryService.ts`. The three
+choices live in `useSignUpForm`; the dropdown, `SelectField`, is written by hand and stays in
+`features/auth/` until something else needs one. **The `joinRequests` feature** is the module of
+whoever is in charge, "Requests" on the screen
+([ADR 0021](decisions/0021-a-join-request-is-a-row-that-an-answer-deletes.md)).
+
+**The `passCheck` feature** is the doorman's module, and the only place the app uses the camera
+to read rather than to photograph. `usePassCheck` is a small state machine — `scanning` →
+`checking` → `answered` or `failed`, and one touch back to `scanning` — because a camera reports
+the QR code in front of it many times a second: a ref ignores every reading but the first, and a
+sequence number drops an answer that belongs to a previous pass. A text that is not a Condfy pass
+is answered on the device and never sent. `expo-camera` is imported by two files, both in this
+feature ([ADR 0020](decisions/0020-reading-a-pass-needs-the-camera-and-records-the-entry.md)).
+
+**The `staff` feature** is the síndico's module, "Roles" on the screen: `/staff` lists who holds a
+role, `/staff/new` brings somebody in, `/staff/[userId]` changes a role, sets another provisional
+password and removes. It is the first module on the home screen that belongs to one role
+([modules.ts](../mobile/features/home/data/modules.ts)).
 
 **Theming.** Colours are never read from a constant. `shared/constants/Colors.ts` holds two palettes
 with the same keys, and `shared/theme/` carries the one in use through context. A component builds
@@ -122,8 +158,16 @@ setting. `shared/theme/` does no I/O. Every `<Text>` and every icon takes its co
 palette; text with no colour is black, and black is invisible on dark
 ([ADR 0014](decisions/0014-colours-come-from-context-and-styles-are-made-from-the-palette.md)).
 
-**The bottom bar** has two entries and only one is a screen: Home, and Sign out, whose press is
-intercepted to ask for confirmation instead of navigating.
+**There is no bottom bar.** Until feature 017 one held Home and a Sign out entry whose press was
+intercepted; signing out is now a row of Settings.
+
+**The home screen composes a card that belongs to another feature.** The latest-notice card and
+the hook that finds the notice live in `features/newsletter` — they are made of the board's
+`Notice` and its preview rule — and `HomeScreen` gets both through `@/features/newsletter`. The card
+is always dark, by a nested `ThemeProvider scheme="dark"` whose styles are made inside it, the
+mirror of the visitor pass. Its background, `mobile/assets/images/notice-card-waves.png`, is the
+only image bundled with the app. Which modules are grid cards and which are full-width rows is the
+`kind` each declares in `modules.ts`.
 
 Apart from it, each screen still gets its state from its feature hook — the visitor list lives in
 [useVisitors.ts](../mobile/features/visitors/hooks/useVisitors.ts). That hook models the

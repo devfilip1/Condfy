@@ -93,3 +93,8 @@ of explanation instead of a `500`.
 **Evidence:** [auth.service.ts](../../server/src/auth/auth.service.ts),
 [auth.controller.ts](../../server/src/auth/auth.controller.ts),
 [useAuth.tsx](../../mobile/features/auth/hooks/useAuth.tsx)
+
+> **One exception, recorded in [0021](0021-a-join-request-is-a-row-that-an-answer-deletes.md) (2026-10).**
+> Withdrawing a request to join — `DELETE /me/join-request` — removes the account without asking
+> for the password. It works only while the request is pending, when the account holds nothing.
+> `DELETE /me` is unchanged.

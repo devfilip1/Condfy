@@ -73,3 +73,7 @@ whoever authorized that visit.
   `expo-sharing` also registered itself as a config plugin in `app.json`.
 - **Two "only file" rules now exist that the typecheck does not enforce**, and they are recorded in
   `CLAUDE.md`: a second import of any of these libraries is a design question, not a convenience.
+
+> **Continued in [0020](0020-reading-a-pass-needs-the-camera-and-records-the-entry.md) (2026-10).** A reader
+> exists since feature 015: the doorman checks a pass with the camera, and the server decides
+> whether it is valid. A fourth library with an "only these files" rule came with it, `expo-camera`.

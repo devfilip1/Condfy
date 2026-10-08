@@ -46,7 +46,7 @@ Types: `Credentials` (`accessToken`, `refreshToken`, `expiresAt`, `refreshExpire
 
 | Route | Body | Success | Failures |
 |---|---|---|---|
-| `POST /accounts` | `{ name, email, password }` | `201` `Session` — signs in right away, account starts with no condominium | `400` `{ errors }` (name, e-mail format, e-mail in use, password under 8 chars) · `429` when the origin created too many accounts |
+| `POST /accounts` | `{ name, email, password, condominiumId, unitId }` | `201` `Session` — signs in right away; the account is created **with a pending request to join that condominium**, and belongs to none until it is approved | `400` `{ errors }` (name, e-mail format, e-mail in use, password under 8 chars, `Choose your condominium.`, `Choose your apartment.` — the last also for a unit of another condominium) · `429` when the origin created too many accounts |
 | `POST /sessions` | `{ email, password }` | `200` `Session` | `401` `E-mail or password is incorrect.` — the same answer for a wrong password and an unknown e-mail · `429` + `Retry-After` after 5 failures |
 | `POST /sessions/refresh` | `{ refreshToken }` | `200` `Credentials` — rotates and extends the 30-day deadline | `401` when unknown, expired, or already used — and an already-used one revokes every credential of that user |
 | `DELETE /sessions` | `{ refreshToken }` | `204` always — idempotent | — |
@@ -56,6 +56,25 @@ The access token carries only `sub`, `iat` and `exp`: no role, no condominium, n
 `iss` or `aud` either
 ([RN-AUT-05](business-rules.md#rn-aut-05--the-access-token-carries-identity-and-nothing-else)).
 That is exactly why `GET /me` exists.
+
+**One exception, since feature 014**: the token of an account whose password is still the one a
+síndico set carries `"prov": true` as well. `POST /sessions` and `POST /sessions/refresh` issue it;
+nothing in their bodies changes. Every other account's token is exactly what it was
+([ADR 0018](decisions/0018-a-provisional-account-carries-a-restriction-in-its-token.md)).
+
+### The answer a provisional password gets
+
+Every route that requires a session — **except** `GET /me` and `PATCH /me/password` — answers a
+token with `prov: true` like this, whatever was asked:
+
+```http
+403 Forbidden
+{ "message": "Choose a new password to continue.", "code": "passwordChangeRequired" }
+```
+
+**It is `403` and never `401`.** A `401` makes the app renew the session and repeat the request,
+and the renewed token is restricted too — a loop. `PATCH /me/email` and `DELETE /me` are among the
+routes refused.
 
 ## `GET /me`
 
@@ -67,17 +86,30 @@ interface Profile {
   id: string;
   name: string;
   email: string;        // never the password hash
+  passwordIsProvisional: boolean;  // true until an account created by a síndico changes its password
+  joinRequest: null | {            // the person's request to join, WHILE it is pending
+    condominium: { id: string; name: string };
+    unit: { block: string | null; number: string };
+    requestedAt: string;           // ISO 8601 instant
+  };
   memberships: {
     condominium: {
       id: string; name: string;
       imageUrl: string | null;    // an https address, or null
       photoPath: string | null;   // relative and signed, when a photo was uploaded
     };
-    role: "resident" | "admin" | "manager";
+    role: "resident" | "admin" | "manager" | "doorman";
     units: { id: string; block: string | null; number: string }[];
   }[];
 }
 ```
+
+`passwordIsProvisional` is what tells the app to show nothing but the screen where the person
+chooses a password. This route is one of the two a provisional password can reach.
+
+`joinRequest` is not `null` exactly while the person's request is waiting; `memberships` is then
+empty and the app shows only the waiting screen. It becomes `null` when the request is approved —
+and a `resident` membership appears — or the account ceases to exist.
 
 `condominium.imageUrl` is the condominium's photo, or `null`. It is delivered **here** rather than
 by a route of its own on purpose: the profile is built from the caller's own memberships, so it
@@ -167,6 +199,11 @@ Body: `{ currentPassword, newPassword }`.
 On success **every renewal credential of the account is deleted** and one fresh pair is returned.
 The caller must store it in place of the old one. Other devices can no longer renew; each keeps
 working until the access token it already holds expires — at most 15 minutes.
+
+This is also how an account created by a síndico **stops being provisional**: the provisional
+password goes in `currentPassword`, the account's flag is cleared in the same write as the new
+password, and the pair returned carries no restriction. There is no separate route for a first
+password ([RN-STF-03](business-rules.md#rn-stf-03--an-account-created-by-a-síndico-reaches-nothing-until-its-owner-chooses-a-password)).
 
 ### `DELETE /me`
 
@@ -400,6 +437,7 @@ the grid. `reservedById` is not accepted either: identity comes from the token.
 | `201` | `{ id, commonAreaId, date, startMinute, endMinute }` | Booked |
 | `400` | `{ "errors": { date?, startMinute? } }` | Not a real date, before today, more than 60 days ahead, or not one of the eight grid times |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "A doorman cannot book a place." }` | The caller's role in that condominium is `doorman` |
 | `404` | `{ "message": "Common area not found." }` | Unknown, unavailable or foreign place, or the caller is not a member |
 | **`409`** | `{ "message": "That time was just taken. Pick another one." }` | Somebody else booked that slot between the caller reading the list and confirming |
 | `409` | `{ "message": "This place is unavailable. Switch it on to book it." }` | The place is switched off **and** the caller is the administrator. Anyone else gets the `404` above |
@@ -546,13 +584,17 @@ or compare it. `condominiumId`, who posted, and the photo bytes are absent on pu
 
 ### `GET /condominiums/:condominiumId/found-items`
 
-Everything found in the condominium, newest first, returned items included. Any membership will do.
+Everything found in the condominium, newest first, returned items included. Any membership will do
+**except a doorman's**, who has no access to lost & found since feature 015.
 
 | Status | Body | When |
 |---|---|---|
 | `200` | `FoundItem[]` — `[]` when nothing was found | The caller has a membership |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "A doorman has no access to lost & found." }` | The caller's role in that condominium is `doorman` |
 | `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller has no membership — the same answer |
+
+The photo route is not changed: its permission is the signed path, which only this list hands out.
 
 Ordered by `postedAt` descending, then `id` descending, so two items of the same instant never swap.
 There is no route for a single item: the card shows everything.
@@ -682,8 +724,11 @@ publishing another.
 
 ## `POST /condominiums`
 
-Creates a condominium and makes the caller its **síndico** (`manager`). Requires a session; any
-signed-in account may call it — creating a condominium is what makes somebody its síndico.
+Creates a condominium and makes the caller its **síndico** (`manager`). Requires a session and an
+account that **belongs to no condominium** and has no pending request: creating one is what makes
+somebody a síndico, and a síndico has exactly one. Since feature 016 no route creates such an
+account — sign-up is for residents — so it comes from `npm run account:create`
+([development.md](development.md#an-account-for-a-future-síndico)).
 
 ```json
 {
@@ -707,15 +752,18 @@ signed-in account may call it — creating a condominium is what makes somebody 
 | Status | Body | When |
 |---|---|---|
 | `201` | the new membership of the caller — one item of `memberships` in `GET /me`, with `role: "manager"` and `units: []` | Created, with every unit of every block |
-| `400` | `{ "errors": { … } }` | A rule of [RN-CON-03 to RN-CON-05](business-rules.md#rn-con-03--anybody-signed-in-creates-a-condominium-and-becomes-its-síndico) failed |
+| `400` | `{ "errors": { … } }` | A rule of [RN-CON-03 to RN-CON-05](business-rules.md#rn-con-03--whoever-belongs-to-no-condominium-creates-one-once-and-becomes-its-síndico) failed |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `409` | `{ "message": "Your request to join a condominium is still pending." }` | The caller signed up asking to join a condominium and has not been answered |
+| `409` | `{ "message": "You already belong to a condominium, so you cannot create one." }` | The caller has a membership already, with any role — or a second creation by the same account arrived at the same moment |
 
 Errors are keyed by field, and those of a block by its position:
 `name`, `address`, `blocks`, `blocks.0.code`, `blocks.1.unitCount`, `photo`.
 
 **All or nothing.** The condominium, its units and the membership are written in one transaction.
-Two condominiums may have the same name, so nothing is refused as a duplicate: a repeated request
-creates a second condominium, and stopping a double touch is the job of the app.
+Two condominiums may have the same name, so nothing is refused as a duplicate *by name*. A repeated
+request, though, no longer creates a second condominium: the second one is the `409` above, held by
+a unique index and not only by the app.
 
 ## `GET /condominiums/:condominiumId/photo?expires=…&signature=…`
 
@@ -746,6 +794,145 @@ and `DELETE /me`, refused while the person is in charge of a condominium.
 Wherever a response carries a display name (`authorizedBy.name`, `publishedBy.name`), a síndico
 reads `"Manager"`, as an administrator reads `"Administrator"`. `authorizedBy.role` may be
 `"manager"`.
+
+A **doorman** gets past none of them. `publishedBy.name` for somebody who no longer belongs to the
+condominium — removed by the síndico — is the person's own name.
+
+## The directory — public
+
+What somebody chooses from **before having an account**: no session, no token. Source:
+[directory.controller.ts](../server/src/condominiums/directory.controller.ts), registered outside
+the session group under its own prefix — everything under `/condominiums` checks a membership, and
+these must not sit beside it.
+
+| Route | `200` |
+|---|---|
+| `GET /directory/condominiums` | `{ id, name, address }[]`, by name. `address` is `null` for a condominium older than addresses |
+| `GET /directory/condominiums/:condominiumId/units` | `{ id, block, number }[]` — every apartment of it; `[]` for an unknown condominium |
+
+They show buildings and numbers, **never people**: no photo, no count, nobody's name, not whether
+an apartment is lived in. That the condominiums using the app can be listed by anybody is accepted.
+
+## Join requests
+
+A person who signed up is asking to join a condominium as a resident of one apartment. Whoever is
+in charge answers. Source:
+[joinRequest.controller.ts](../server/src/condominiums/joinRequest.controller.ts). Rules:
+[Joining a condominium](business-rules.md#joining-a-condominium).
+
+For the three routes below the caller must be the **administrator or the síndico** of the
+condominium in the path:
+
+| Status | Body | When — common to the three |
+|---|---|---|
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only whoever runs the condominium can answer requests." }` | A resident or a doorman of it |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller does not belong to it |
+
+### `GET /condominiums/:condominiumId/join-requests`
+
+`200`, oldest first: `{ id, name, email, unit: { block, number }, requestedAt }[]`.
+
+### `POST /condominiums/:condominiumId/join-requests/:requestId/approval`
+
+No body. `204`: the person is now a `resident` of that condominium living in that apartment, and
+the request is gone.
+
+### `DELETE /condominiums/:condominiumId/join-requests/:requestId`
+
+Rejects. `204`: the request **and the person's account** are removed; the e-mail can sign up again.
+
+Both answers give `404` `{ "message": "This request no longer exists." }` when the request was
+already answered, was withdrawn, or belongs to another condominium. There is no history, so the
+three are one answer.
+
+### `DELETE /me/join-request`
+
+The person withdraws their own request. Session required; **no body and no password**. `204`: the
+request and the account are removed. `404` with the message above when there is no pending request
+— it was answered a moment ago.
+
+## Roles: the `staff` resource
+
+The people a síndico brought in to work in the condominium: its administrator and its doormen.
+Source: [staff.controller.ts](../server/src/condominiums/staff.controller.ts), inside the session
+group. Rules: [Roles](business-rules.md#roles).
+
+For all five routes the caller must be the **síndico** of the condominium in the path — the
+administrator is refused:
+
+| Status | Body | When — common to the five |
+|---|---|---|
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only the condominium manager can manage roles." }` | The caller belongs to the condominium with another role |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller does not belong to it |
+
+```ts
+interface StaffMember {
+  userId: string;
+  name: string;                    // the person's own name, never "Administrator"
+  email: string;
+  role: "admin" | "doorman";
+  passwordIsProvisional: boolean;  // has not chosen their own password yet
+}
+```
+
+A password, in any form, is never in a response.
+
+### `GET /condominiums/:condominiumId/staff`
+
+`200` with `StaffMember[]`: the administrator first, then doormen by name. Empty when the
+condominium has only its síndico. Residents and the síndico are never in it.
+
+### `POST /condominiums/:condominiumId/staff`
+
+Creates an account **and** its role in this condominium, together or not at all.
+
+Body: `{ name, email, password, role }`, `role` being `"admin"` or `"doorman"`. Name, e-mail and
+password follow the rules and messages of `POST /accounts`.
+
+| Status | Body | When |
+|---|---|---|
+| `201` | `StaffMember`, `passwordIsProvisional: true` | Created. **No session is opened** and no credentials are returned |
+| `400` | `{ "errors": { … } }` | A field failed; `role` missing reads `Choose a role.` |
+| `400` | `{ "errors": { "email": "This e-mail is already in use." } }` | The address belongs to an account |
+| `400` | `{ "errors": { "role": "This condominium already has an administrator." } }` | `admin`, and somebody is |
+| `429` | `{ "message": "Too many attempts. Try again in a few minutes." }` + `Retry-After` | The origin reached the sign-up limit — the same counter as `POST /accounts` |
+
+### `PATCH /condominiums/:condominiumId/staff/:userId`
+
+Body: `{ role }`. Changes the role between `"admin"` and `"doorman"`.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | `StaffMember` | Changed, or already had that role |
+| `400` | `{ "errors": { "role": … } }` | `Choose a role.`, or the administrator's place is taken |
+| `404` | `{ "message": "Person not found." }` | `userId` holds neither role here — a resident, the síndico, another condominium |
+
+### `DELETE /condominiums/:condominiumId/staff/:userId`
+
+Ends the person's link to this condominium **and deletes the account the síndico created for
+them**, in one transaction. `204`, or the `404` above.
+
+- The visits they authorized and the bookings they held go with them.
+- The notices and found items they published **stay**, and pass to the síndico who removed them:
+  `publishedBy.name` reads `"Manager"` afterwards.
+- The person's sessions end; their next `GET /me` or renewal answers `401`. The e-mail is free to
+  be used again.
+- **The account is kept** when it also belongs to another condominium, or published something
+  another condominium keeps. Then only the link here ends.
+
+### `PUT /condominiums/:condominiumId/staff/:userId/password`
+
+Body: `{ password }`. Sets **another provisional password**, only while the person has not chosen
+their own.
+
+| Status | Body | When |
+|---|---|---|
+| `204` | — | Replaced; the previous one no longer signs in and the person's sessions ended |
+| `400` | `{ "errors": { "password": "Password must be at least 8 characters." } }` | Too short |
+| `404` | `{ "message": "Person not found." }` | As above |
+| `409` | `{ "message": "This person already chose their own password." }` | Not provisional any more |
 
 ## `GET /condominiums/:condominiumId/units`
 
@@ -782,8 +969,8 @@ order ([RN-VIS-06](business-rules.md#rn-vis-06--the-list-is-ordered-by-expected-
 What "may see" means depends on the caller's role **in each condominium**
 ([RN-VIS-11](business-rules.md#rn-vis-11--the-administrator-sees-every-visit-a-resident-sees-their-own)):
 
-- where they are the **administrator**: every visit of that condominium, to any unit, authorized by
-  anyone;
+- where they are the **administrator**, the **síndico** or — since feature 015 — a **doorman**:
+  every visit of that condominium, to any unit, authorized by anyone, past ones included;
 - where they are a **resident**: only the visits they authorized themselves — not even those of
   somebody they live with.
 
@@ -799,6 +986,16 @@ Each item also carries `canRemove: boolean` — `true` exactly when the caller a
 For the administrator it is `false` on everybody else's: they see those visits and cannot delete
 them. The app draws the remove control only where it is `true`.
 
+**For a doorman, `canRemove` is `false` and `passCode` is absent on every visit** — including one
+they authorized themselves before the síndico made them a doorman.
+
+And one field says whether the visitor has arrived:
+
+- `enteredAt: string | null` — the **instant** (full ISO 8601) of the first time the visit's pass was
+  checked and found valid, or `null`. Sent to **everybody who sees the visit**, unlike `passCode`.
+  It is the second instant in the contract, with a found item's `postedAt`: read it in local time,
+  and never with the functions that read `expectedDate`.
+
 Two more fields serve the visitor pass
 ([RN-VIS-13](business-rules.md#rn-vis-13--every-visit-has-a-pass-with-a-code-of-its-own-and-only-who-authorized-it-gets-the-code)):
 
@@ -810,8 +1007,8 @@ Two more fields serve the visitor pass
   visit at the time of the request. It lets the pass say "Resident …" or "Administrator" without
   guessing from the name.
 
-The QR on the pass carries `condfy:pass:<passCode>`, built by the app. **No route reads a code
-yet**: checking a pass is a later feature.
+The QR on the pass carries `condfy:pass:<passCode>`, built by the app. The route that reads a code
+is [`POST …/pass-checks`](#post-condominiumscondominiumidpass-checks).
 
 ```http
 GET /visitors
@@ -823,7 +1020,8 @@ GET /visitors
    "unit": { "id": "00000000-…-0101", "block": "A", "number": "101" },
    "authorizedBy": { "id": "00000000-…-0201", "name": "Ana Souza", "role": "resident" },
    "canRemove": true,
-   "passCode": "8d1f0c2e-4b7a-4e0e-9a53-6f2b1c0d7e44" }]
+   "passCode": "8d1f0c2e-4b7a-4e0e-9a53-6f2b1c0d7e44",
+   "enteredAt": null }]
 ```
 
 ## `POST /visitors`
@@ -845,6 +1043,7 @@ in must have a membership in that unit's condominium — a resident or an admin.
 | `400` | `{ "errors": { "unitId": "Select a unit." } }` | Unknown unit, **or** a unit in a condominium the caller does not belong to — deliberately the same answer, so the API does not reveal which units exist |
 | `400` | Fastify's own error shape, without `errors` | Body is not valid JSON |
 | `401` | `{ "message": "Your session has expired. Sign in again." }` | Missing, malformed, tampered or expired token |
+| `403` | `{ "message": "A doorman cannot register visitors." }` | The caller's role in that condominium is `doorman` |
 | `500` | `{ "message": … }` | Unexpected failure |
 
 ```http
@@ -865,13 +1064,58 @@ POST /visitors
 The app shows each message under its field without translating anything, which is why the message
 text is part of the contract and must stay identical on both sides.
 
+## `POST /condominiums/:condominiumId/pass-checks`
+
+Checks one visitor pass at the gate. Body: `{ code }` — what follows `condfy:pass:` in the QR code.
+Source: [passCheck.controller.ts](../server/src/condominiums/passCheck.controller.ts). Rules:
+[RN-GAT-01](business-rules.md#rn-gat-01--only-a-doorman-checks-a-pass-and-the-answer-is-one-of-four).
+
+**Only a doorman of that condominium may call it** — not the síndico, not the administrator.
+
+| Status | Body | When |
+|---|---|---|
+| `200` | a `PassCheck` | The question was answered — **whatever the outcome** |
+| `401` | `{ "message": "Your session has expired. Sign in again." }` | No valid session |
+| `403` | `{ "message": "Only a doorman can check a pass." }` | The caller belongs to the condominium with another role |
+| `404` | `{ "message": "Condominium not found." }` | No such condominium, or the caller does not belong to it |
+
+```ts
+type PassCheck =
+  | { outcome: "valid"; alreadyEntered: boolean; visit: CheckedVisit }
+  | { outcome: "notYet" | "expired"; visit: CheckedVisit }
+  | { outcome: "notRecognised" };
+
+interface CheckedVisit {
+  name: string;
+  type: VisitType;
+  expectedDate: string;                          // "YYYY-MM-DD", calendar day
+  unit: { block: string | null; number: string };
+  authorizedBy: { name: string };                // "Administrator", "Manager", or the person's name
+  enteredAt: string | null;                      // ISO 8601 instant
+}
+```
+
+- **`valid`** — the visit is expected **today**, by the server's clock. If nobody had checked it
+  before, this request recorded the entry: `alreadyEntered` is `false` and `enteredAt` is this
+  moment. Otherwise `alreadyEntered` is `true` and `enteredAt` is the first time, unchanged. A pass
+  is never used up.
+- **`notYet`**, **`expired`** — the visit is expected on a later day, or was on an earlier one.
+  Nothing is recorded.
+- **`notRecognised`** — one answer, with no other field, for a code that is not a UUID, a code that
+  does not exist, a visit that was removed and a visit to **another condominium**.
+
+**The four outcomes are all `200`**, on purpose: an error status is reserved for "you may not ask",
+which is what lets the app tell an answer from a failure. This route never answers `400` for its
+body. No id and no code is ever in a response.
+
 ## `DELETE /visitors/:id`
 
 Removes a visitor permanently. Idempotent: an id that no longer exists also returns `204`
 ([RN-VIS-07](business-rules.md#rn-vis-07--removing-a-visitor-twice-is-not-an-error)).
 
 Removes only a visitor **the caller authorized** — the administrator included, who sees everybody's
-visits and can delete only their own. It is the condition `GET /visitors` reports as `canRemove`.
+visits and can delete only their own. **A doorman removes none**, not even one they authorized
+before becoming a doorman; they get the same `204`. It is the condition `GET /visitors` reports as `canRemove`.
 Somebody else's id is **not** removed and still answers `204`, exactly like an id that does not
 exist: the answer tells nobody whether that visit is there. Until 2026-10-06 any signed-in account
 could delete any visitor.
@@ -888,6 +1132,7 @@ could delete any visitor.
 cannot be edited ([RN-VIS-08](business-rules.md#rn-vis-08--visitors-cannot-be-edited)). Any other
 path returns Fastify's default `404`.
 
-There are no routes for condominiums, units or memberships yet — only accounts, through
-`POST /accounts`. Linking a person to a condominium still happens exclusively through the
+A person is linked to a condominium by creating it (`POST /condominiums`) or by being brought in
+by its síndico with a role (`POST …/staff`). There is still no route that gives a role to an
+account that **already exists**, and none that brings in a resident: those happen only through the
 [seed script](development.md#sample-data).

@@ -22,18 +22,22 @@ condominium and a resident in another ([data model](data-model.md#condominiummem
 
 | Role (code) | In Portuguese | What they do in the system |
 |---|---|---|
-| `resident` | morador | Registers and removes the visitors they expect. Must live in at least one unit. |
-| `manager` | síndico | Creates the condominium and is in charge of it. Can do everything the administrator can, for now. At most one per condominium, and has no unit. |
-| `admin` | administrador | Manages the condominium: sees every visitor and authorizes visitors for any unit, switches common areas off and on, publishes notices and found items. At most one per condominium, and has no unit. |
+| `resident` | morador | Registers and removes the visitors they expect. Must live in at least one unit. Arrives by signing up — choosing their condominium and apartment — and being approved by whoever runs it. |
+| `manager` | síndico | Creates the condominium — one, and only somebody who belongs to no condominium can — and is in charge of it. Can do everything the administrator can, and two things alone: creating a place to book and **managing roles** — bringing in the administrator and the doormen. At most one per condominium, and has no unit. |
+| `admin` | administrador | Manages the condominium: sees every visitor and authorizes visitors for any unit, switches common areas off and on, publishes notices and found items. At most one per condominium, and has no unit. Appointed and removed by the síndico. |
+| `doorman` | porteiro | Works at the gate. Sees every visitor expected in the condominium, without registering or removing any; checks visitors' passes with the camera, which nobody else does; reads the notice board; and consults the reservations — which places exist and whether a day is full — without booking. Has no lost & found. Any number per condominium, and has no unit. Brought in and removed by the síndico. |
 
-Both roles see the same modules on the home screen. What differs is inside each one, and it is the
-API that decides it — the visitor list, for instance, is the whole condominium's for the
+Resident, administrator and síndico see the same four modules on the home screen; the síndico also
+sees **Roles**, and a doorman sees four: Visitors, Reservations (to consult), Newsletter and
+**Pass check**. What differs is inside each
+one, and it is the API that decides it — the visitor list, for instance, is the whole condominium's for the
 administrator and only the visits they authorized for a resident.
 
 The síndico **returned in feature 013** as a role of its own
 ([ADR 0017](decisions/0017-the-sindico-returns-as-a-third-role.md)). Before that,
 `manager` (síndico) and `doorman` (portaria) had been replaced by the single `admin` role; nobody held
-either when the change was made.
+either when the change was made. The **doorman returned in feature 014**, as a role the síndico
+gives; its own screens are still to come.
 
 ## Features
 
@@ -51,7 +55,35 @@ either when the change was made.
     memberships with roles, and residency (which user lives in which unit).
   - Populated for development by a seed command ([development.md](development.md#sample-data)).
   - Rules: [Condominiums, units and people](business-rules.md#condominiums-units-and-people)
-- **Home** — lists the modules of the app and opens the visitor module.
+- **Roles** — the síndico's module for staffing the condominium.
+  - Bring somebody in as administrator or doorman: the síndico creates their account, with a
+    provisional password the person must replace at their first sign-in.
+  - See who holds which role, change it, set another provisional password, and remove a person —
+    which deletes the account that was created for them.
+  - Rules: [Roles](business-rules.md#roles) · Screen:
+    [StaffScreen.tsx](../mobile/features/staff/StaffScreen.tsx) · API:
+    [api.md](api.md#roles-the-staff-resource)
+- **Joining a condominium** — how a resident arrives.
+  - Signing up asks for the condominium, the block and the apartment, chosen from lists; the
+    account waits on an "Awaiting approval" screen.
+  - **Requests**, the module of the administrator and the síndico: who is asking, for which
+    apartment, since when — approve or reject.
+  - Rules: [Joining a condominium](business-rules.md#joining-a-condominium) · Screens:
+    [SignUpScreen.tsx](../mobile/features/auth/SignUpScreen.tsx),
+    [JoinRequestsScreen.tsx](../mobile/features/joinRequests/JoinRequestsScreen.tsx) · API:
+    [api.md](api.md#join-requests)
+- **Pass check** — the doorman's module.
+  - Read the QR code of a visitor's pass with the camera and be told whether it is valid today, not
+    valid yet, expired, or not a pass of this condominium.
+  - The first valid check records that the visitor came in; the list of visitors shows it, with the
+    time, to everybody who sees that visit.
+  - Rules: [The gate](business-rules.md#the-gate) · Screen:
+    [PassCheckScreen.tsx](../mobile/features/passCheck/PassCheckScreen.tsx) · API:
+    [api.md](api.md#post-condominiumscondominiumidpass-checks)
+- **Home** — the condominium at a glance: the everyday modules in a grid, the **latest notice** on
+  a card that opens it, and — for whoever is in charge — the administration modules as rows below.
+  There is no bottom bar; signing out is in Settings.
+  Rules: [The home screen](business-rules.md#the-home-screen).
   [HomeScreen.tsx](../mobile/features/home/HomeScreen.tsx)
 
 ## Main journey: expecting a visitor
@@ -96,12 +128,25 @@ disappears. A failure at any point keeps the list untouched and explains what ha
   changes its status; nothing else about it changes, and the app does not record who collected it.
 - **Renaming, repricing or deleting a common area, and replacing its photo.** The síndico creates
   a place; after that the only thing that changes is whether it is available.
-- **Joining a condominium.** A person creates a condominium and is its síndico, but nothing lets a
-  resident enter one from the app yet: a new condominium has one member.
-- **Editing or deleting a condominium, and appointing an administrator.** Its name, address, blocks
-  and photo stay as they were created.
-- **Reading a visitor pass at the gate.** The app produces the pass and its code; nothing in it
-  scans a code or says whether one is valid yet, and there is no gate role to give a reader to.
+- **Becoming a síndico through the app.** Sign-up is for residents. The account of somebody who
+  will create a condominium is made outside the app, with a script.
+- **A history of requests, a reason for a rejection, and notifying anybody** that a request arrived
+  or was answered.
+- **Removing a resident, moving one to another apartment, and living in two.** A request is for
+  one apartment of one condominium.
+- **Giving a role to an account that already exists.** A role comes only with a new account: a
+  resident who becomes the doorman, or a management company that already uses the app, cannot be
+  brought in.
+- **Recovering a provisional password after it was replaced, and handing a condominium to another
+  síndico.**
+- **Running a second condominium with the same account.** A síndico has exactly one; somebody who
+  belongs to a condominium with any role cannot create another.
+- **Editing or deleting a condominium.** Its name, address, blocks and photo stay as they were
+  created.
+- **Recording who left, undoing an entry, and a history of checks.** A valid check records that a
+  visitor came in, once; nothing records them leaving, nothing unmarks an entry, and the readings
+  themselves are not kept.
+- **Checking a pass without a doorman.** The síndico and the administrator do not have the module.
 - **Notifying anyone.** A resident whose booking the administrator cancels finds out by not seeing
   it in "My bookings" any more.
 - **Offline use.** The app needs the server to show anything.
@@ -129,6 +174,13 @@ an administrator calls each thing in conversation.
 | Janela de reserva | How far ahead a booking may go: today plus 60 days, counted in whole days | `BOOKING_WINDOW_DAYS` |
 | Comprovante de liberação | The pass of one visit: a square for the visitor with who authorizes, where, when and a QR code | `VisitorPass`, `passCode` |
 | Síndico | The person in charge of a condominium, who created it. Shown as "Manager" | `manager` |
+| Porteiro | Whoever works at the gate. Shown under their own name, with the label "Doorman" | role `doorman` |
+| Cargos | The síndico's module: who works in the condominium, and bringing them in. "Roles" on the screen | `staff` (app feature and API resource) |
+| Conferência de comprovante | The doorman reading a visitor's pass with the camera, answered valid, not valid yet, expired or not recognised | `passCheck` (app feature), `pass-checks` (API) |
+| Entrada | The moment a visitor came in: the first valid check of their pass | `enteredAt`, `entered_at` |
+| Solicitação | Somebody asking to join a condominium as a resident of one apartment; it exists until it is answered | `JoinRequest`, `join_requests` |
+| Aguardando aprovação | The state of an account whose request has not been answered: it signs in and sees only that | `joinRequest` in the profile, `pendingRequest` in the app |
+| Senha provisória | The password the síndico sets when creating somebody's account; the person must replace it before reaching anything | `passwordIsProvisional` |
 | Bloco | A part of a condominium — a tower, a wing — with a code of one or two letters; what groups its units | `block` |
 | Local indisponível | A common area the administrator switched off: still listed, but it takes no booking from anyone | `isAvailable: false` |
 | Dia inteiro | Every remaining time of one day reserved by the administrator at once — ordinary reservations, all or none | `wholeDayHeld`, `takeWholeDay` |
