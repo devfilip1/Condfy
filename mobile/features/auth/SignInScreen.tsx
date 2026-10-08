@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import CondfySymbol from "@/shared/components/CondfySymbol";
 import FormField from "@/shared/components/FormField";
 import PrimaryButton from "@/shared/components/PrimaryButton";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -23,8 +24,18 @@ const useStyles = makeStyles((colors) =>
     content: {
       flexGrow: 1,
       justifyContent: "center",
-      paddingHorizontal: 28,
-      gap: 18,
+      paddingHorizontal: 24,
+      paddingVertical: 32,
+      gap: 24,
+    },
+    header: {
+      alignItems: "center",
+      gap: 10,
+    },
+    brand: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
     },
     title: {
       fontSize: fontSizes.display,
@@ -35,8 +46,16 @@ const useStyles = makeStyles((colors) =>
       fontSize: fontSizes.body,
       fontFamily: fonts.regular,
       lineHeight: 22,
+      textAlign: "center",
       color: colors.textSecondary,
-      marginBottom: 6,
+    },
+    card: {
+      gap: 18,
+      padding: 20,
+      backgroundColor: colors.cardBackground,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.card,
     },
     notice: {
       fontSize: fontSizes.label,
@@ -83,48 +102,53 @@ export default function SignInScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View>
-          <Text style={styles.title}>condfy</Text>
+        <View style={styles.header}>
+          <View style={styles.brand} accessible accessibilityLabel="Condfy">
+            <CondfySymbol size={44} />
+            <Text style={styles.title}>Condfy</Text>
+          </View>
           <Text style={styles.subtitle}>Sign in to your condominium.</Text>
         </View>
 
         {sessionNotice ? <Text style={styles.notice}>{sessionNotice}</Text> : null}
 
-        <FormField
-          label="E-mail"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          returnKeyType="next"
-          editable={!submitting}
-          error={formErrors.email}
-        />
+        <View style={styles.card}>
+          <FormField
+            label="E-mail"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            returnKeyType="next"
+            editable={!submitting}
+            error={formErrors.email}
+          />
 
-        <FormField
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Your password"
-          autoCapitalize="none"
-          autoComplete="current-password"
-          secureTextEntry
-          returnKeyType="done"
-          onSubmitEditing={() => signIn(email, password)}
-          editable={!submitting}
-          error={formErrors.password}
-        />
+          <FormField
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Your password"
+            autoCapitalize="none"
+            autoComplete="current-password"
+            secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={() => signIn(email, password)}
+            editable={!submitting}
+            error={formErrors.password}
+          />
 
-        {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
+          {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
 
-        <PrimaryButton
-          label="Sign in"
-          busyLabel="Signing in…"
-          busy={submitting}
-          onPress={() => signIn(email, password)}
-        />
+          <PrimaryButton
+            label="Sign in"
+            busyLabel="Signing in…"
+            busy={submitting}
+            onPress={() => signIn(email, password)}
+          />
+        </View>
 
         <Text style={styles.footer}>
           No account yet?{" "}
