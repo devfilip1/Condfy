@@ -46,10 +46,18 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Condfy to choose a photo of the found item.",
-          "cameraPermission": "Allow Condfy to take a photo of the found item."
+          "cameraPermission": "Allow Condfy to take photos and to read visitors' passes."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Condfy to take photos and to read visitors' passes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
