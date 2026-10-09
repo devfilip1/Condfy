@@ -1,4 +1,4 @@
-# condfy
+# Condfy
 
 Condominium management app. Residents register the visitors they expect from their phone, and the
 people who run the building see the same list. The visitor module works end to end; condominiums,
